@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="VoiceRambler Free"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="100% Free Gemini AI Dictation (English + Hindi + Hinglish + Odia)"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="1. Google AI Studio API Key (Free Tier)"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/etApiKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Paste your AIza... key from aistudio.google.com"
+            android:inputType="textPassword" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="2. Gemini Model"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/spinnerModel"
+            android:layout_width="match_parent"
+            android:layout_height="48dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="3. Default Dictation Mode"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/spinnerMode"
+            android:layout_width="match_parent"
+            android:layout_height="48dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="4. Personal Glossary (names, places, terms)"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/etGlossary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="e.g. Rourkela, Bhubaneswar, IGH, NBEMS"
+            android:inputType="textMultiLine"
+            android:minLines="2" />
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Save Settings" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="5. Required Permissions (One-time setup)"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnMicPerm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Grant Microphone &amp; Notification Permission" />
+
+        <Button
+            android:id="@+id/btnOverlayPerm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Grant Display Over Other Apps" />
+
+        <Button
+            android:id="@+id/btnAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Enable VoiceRambler Accessibility Service" />
+
+        <Button
+            android:id="@+id/btnBattery"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Set Battery to Unrestricted (Samsung One UI)" />
+
+        <Button
+            android:id="@+id/btnToggleService"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Start Floating Mic Bubble" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="13sp" />
+    </LinearLayout>
+</ScrollView>
