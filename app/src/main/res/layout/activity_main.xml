@@ -20,7 +20,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Auto English, Hindi, Hinglish, Odia + Medical Terminology"
+            android:text="Auto English, Hindi, Hinglish, Odia + Medical Terminology\n(Free-tier cloud API: avoid identifiable patient names or IDs)"
             android:textSize="14sp" />
 
         <TextView

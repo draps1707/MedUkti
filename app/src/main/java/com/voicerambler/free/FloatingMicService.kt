@@ -11,6 +11,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -40,8 +43,11 @@ class FloatingMicService : Service() {
 
     private var isListening = false
     private var isProcessing = false
-    private var prefixText = ""
+    private var beforeCursor = ""
+    private var afterCursor = ""
     private var lastPartialText = ""
+    private var lastUndoFullText: String? = null
+    private var lastUndoCursor: Int = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -49,6 +55,27 @@ class FloatingMicService : Service() {
         super.onCreate()
         startForegroundNotification()
         showFloatingBubble()
+
+        DictationAccessibilityService.onEditableFocusChanged = { focused ->
+            mainHandler.post {
+                if (!isListening && !isProcessing) {
+                    floatingView?.visibility = if (focused) View.VISIBLE else View.GONE
+                }
+            }
+        }
+    }
+
+    private fun buzz(ms: Long = 20L) {
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                getSystemService(VibratorManager::class.java)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(VIBRATOR_SERVICE) as? Vibrator
+            }
+            vibrator?.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+        } catch (_: Exception) {
+        }
     }
 
     private fun startForegroundNotification() {
@@ -61,7 +88,7 @@ class FloatingMicService : Service() {
         }
         val notification = Notification.Builder(this, channelId)
             .setContentTitle("VoiceRambler Free is active")
-            .setContentText("Tap the floating mic to dictate; drag to move.")
+            .setContentText("Mic appears when typing. Tap to dictate, hold to undo, drag to move.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
         startForeground(101, notification)
@@ -76,6 +103,10 @@ class FloatingMicService : Service() {
         val view = LayoutInflater.from(this).inflate(R.layout.layout_floating_mic, null)
         floatingView = view
         ivMic = view.findViewById(R.id.ivMicIcon)
+
+        if (DictationAccessibilityService.instance != null && DictationAccessibilityService.instance?.getActiveFieldText() == null) {
+            view.visibility = View.GONE
+        }
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -94,6 +125,19 @@ class FloatingMicService : Service() {
         var touchX = 0f
         var touchY = 0f
         var isDragging = false
+        var longPressTriggered = false
+        val longPressRunnable = Runnable {
+            if (!isDragging && !isListening && !isProcessing) {
+                longPressTriggered = true
+                val undo = lastUndoFullText
+                if (undo != null) {
+                    buzz(35L)
+                    DictationAccessibilityService.instance?.setFullTextWithCursor(undo, lastUndoCursor)
+                    lastUndoFullText = null
+                    Toast.makeText(this@FloatingMicService, "Restored previous text", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
 
         val touchTarget = ivMic ?: view
         touchTarget.setOnTouchListener { _, event ->
@@ -104,6 +148,8 @@ class FloatingMicService : Service() {
                     touchX = event.rawX
                     touchY = event.rawY
                     isDragging = false
+                    longPressTriggered = false
+                    mainHandler.postDelayed(longPressRunnable, 600L)
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -111,6 +157,7 @@ class FloatingMicService : Service() {
                     val dy = (event.rawY - touchY).toInt()
                     if (abs(dx) > 12 || abs(dy) > 12) {
                         isDragging = true
+                        mainHandler.removeCallbacks(longPressRunnable)
                     }
                     if (isDragging) {
                         params.x = initX + dx
@@ -119,10 +166,12 @@ class FloatingMicService : Service() {
                     }
                     true
                 }
-                MotionEvent.ACTION_UP -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    mainHandler.removeCallbacks(longPressRunnable)
                     if (isDragging) {
                         Prefs.setBubblePos(this@FloatingMicService, params.x, params.y)
-                    } else if (!isProcessing) {
+                    } else if (!longPressTriggered && !isProcessing) {
+                        buzz(20L)
                         if (!isListening) startDictation() else stopDictation()
                     }
                     true
@@ -134,15 +183,26 @@ class FloatingMicService : Service() {
         windowManager.addView(view, params)
     }
 
-    private fun combineText(prefix: String, chunk: String): String {
-        if (prefix.isBlank()) return chunk
-        if (chunk.isBlank()) return prefix
-        return if (prefix.endsWith(" ") || prefix.endsWith("\n")) "$prefix$chunk" else "$prefix $chunk"
+    private fun spliceAtCursor(inserted: String): Pair<String, Int> {
+        val needLeadingSpace = beforeCursor.isNotEmpty() && !beforeCursor.endsWith(" ") && !beforeCursor.endsWith("\n") && inserted.isNotEmpty()
+        val needTrailingSpace = afterCursor.isNotEmpty() && !afterCursor.startsWith(" ") && !afterCursor.startsWith("\n") && inserted.isNotEmpty()
+        val mid = buildString {
+            if (needLeadingSpace) append(" ")
+            append(inserted)
+            if (needTrailingSpace) append(" ")
+        }
+        val full = beforeCursor + mid + afterCursor
+        val cursorEnd = beforeCursor.length + (if (needLeadingSpace) 1 else 0) + inserted.length
+        return Pair(full, cursorEnd)
     }
 
     private fun startDictation() {
         val apiKey = Prefs.getApiKey(this)
-        prefixText = DictationAccessibilityService.instance?.getActiveFieldText() ?: ""
+        val ctx = DictationAccessibilityService.instance?.getCursorContext()
+        beforeCursor = ctx?.first ?: ""
+        afterCursor = ctx?.second ?: ""
+        lastUndoFullText = beforeCursor + afterCursor
+        lastUndoCursor = beforeCursor.length
         lastPartialText = ""
 
         if (apiKey.isBlank()) {
@@ -158,18 +218,18 @@ class FloatingMicService : Service() {
             onLiveTranscript = { liveText ->
                 mainHandler.post {
                     lastPartialText = liveText
-                    DictationAccessibilityService.instance?.insertText(
-                        combineText(prefixText, liveText),
-                        replaceAll = true
-                    )
+                    val (full, pos) = spliceAtCursor(liveText)
+                    DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
                 }
             },
             onFinished = { finalText ->
                 mainHandler.post {
                     isListening = false
                     setMicActiveUi(false)
-                    if (finalText.isNotBlank()) {
-                        polishWithGemini(finalText)
+                    liveClient = null
+                    val toPolish = finalText.ifBlank { lastPartialText }
+                    if (toPolish.isNotBlank()) {
+                        polishWithGemini(toPolish)
                     }
                 }
             },
@@ -177,6 +237,7 @@ class FloatingMicService : Service() {
                 mainHandler.post {
                     isListening = false
                     liveClient = null
+                    Toast.makeText(this@FloatingMicService, "Live unavailable; using English fallback", Toast.LENGTH_SHORT).show()
                     startFallbackRecognizer()
                 }
             }
@@ -189,12 +250,7 @@ class FloatingMicService : Service() {
         setMicActiveUi(false)
         val lc = liveClient
         if (lc != null) {
-            val captured = lc.stop()
-            liveClient = null
-            val textToPolish = captured.ifBlank { lastPartialText }
-            if (textToPolish.isNotBlank()) {
-                polishWithGemini(textToPolish)
-            }
+            lc.stopGracefully()
         } else {
             speechRecognizer?.stopListening()
         }
@@ -231,10 +287,8 @@ class FloatingMicService : Service() {
                 val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 if (!partial.isNullOrBlank()) {
                     lastPartialText = partial
-                    DictationAccessibilityService.instance?.insertText(
-                        combineText(prefixText, partial),
-                        replaceAll = true
-                    )
+                    val (full, pos) = spliceAtCursor(partial)
+                    DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
                 }
             }
 
@@ -253,10 +307,8 @@ class FloatingMicService : Service() {
 
                 if (finalRaw.isBlank()) return
 
-                DictationAccessibilityService.instance?.insertText(
-                    combineText(prefixText, finalRaw),
-                    replaceAll = true
-                )
+                val (full, pos) = spliceAtCursor(finalRaw)
+                DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
                 polishWithGemini(finalRaw)
             }
 
@@ -289,10 +341,8 @@ class FloatingMicService : Service() {
             isProcessing = false
 
             result.onSuccess { cleaned ->
-                DictationAccessibilityService.instance?.insertText(
-                    combineText(prefixText, cleaned),
-                    replaceAll = true
-                )
+                val (full, pos) = spliceAtCursor(cleaned)
+                DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
             }.onFailure { err ->
                 Toast.makeText(this@FloatingMicService, "Kept live draft (${err.message})", Toast.LENGTH_SHORT).show()
             }
@@ -300,7 +350,8 @@ class FloatingMicService : Service() {
     }
 
     override fun onDestroy() {
-        liveClient?.stop()
+        DictationAccessibilityService.onEditableFocusChanged = null
+        liveClient?.stopGracefully()
         speechRecognizer?.destroy()
         floatingView?.let { windowManager.removeView(it) }
         serviceScope.cancel()
