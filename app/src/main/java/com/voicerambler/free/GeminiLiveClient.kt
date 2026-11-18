@@ -17,7 +17,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class GeminiLiveClient(
     private val apiKey: String,
-    private val glossary: String,
     private val onLiveTranscript: (String) -> Unit,
     private val onFinished: (String) -> Unit,
     private val onError: (String) -> Unit
@@ -43,12 +42,8 @@ class GeminiLiveClient(
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
-                val inputConfig = JSONObject()
-                if (glossary.isNotBlank()) {
-                    val terms = glossary.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(100)
-                    if (terms.isNotEmpty()) {
-                        inputConfig.put("customVocabulary", JSONArray(terms))
-                    }
+                val inputConfig = JSONObject().apply {
+                    put("customVocabulary", JSONArray(GeminiClient.MEDICAL_BIAS_TERMS))
                 }
 
                 val setupPayload = JSONObject().apply {
@@ -118,7 +113,7 @@ class GeminiLiveClient(
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT
             )
-            val chunkBytes = 3200 // 100ms of 16kHz 16-bit mono PCM
+            val chunkBytes = 3200
             val bufSize = maxOf(minBuf, chunkBytes * 2)
 
             val ar = AudioRecord(

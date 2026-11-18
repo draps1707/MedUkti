@@ -19,19 +19,20 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.ImageButton
-import android.widget.TextView
+import android.widget.ImageView
 import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 class FloatingMicService : Service() {
 
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
+    private var ivMic: ImageView? = null
     private var liveClient: GeminiLiveClient? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -59,17 +60,22 @@ class FloatingMicService : Service() {
             )
         }
         val notification = Notification.Builder(this, channelId)
-            .setContentTitle("VoiceRambler Free is ready")
-            .setContentText("Tap the floating mic over any app for Gemini Live dictation.")
+            .setContentTitle("VoiceRambler Free is active")
+            .setContentText("Tap the floating mic to dictate; drag to move.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
         startForeground(101, notification)
+    }
+
+    private fun setMicActiveUi(active: Boolean) {
+        ivMic?.setBackgroundResource(if (active) R.drawable.bg_mic_ring_active else R.drawable.bg_mic_ring)
     }
 
     private fun showFloatingBubble() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val view = LayoutInflater.from(this).inflate(R.layout.layout_floating_mic, null)
         floatingView = view
+        ivMic = view.findViewById(R.id.ivMicIcon)
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -79,49 +85,49 @@ class FloatingMicService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 40
-            y = 400
-        }
-
-        val btnMic = view.findViewById<ImageButton>(R.id.btnMicBubble)
-        val tvMode = view.findViewById<TextView>(R.id.tvBubbleMode)
-        tvMode.text = Prefs.getMode(this).label
-
-        tvMode.setOnClickListener {
-            if (isListening || isProcessing) return@setOnClickListener
-            val modes = DictationMode.entries
-            val next = modes[(modes.indexOf(Prefs.getMode(this)) + 1) % modes.size]
-            Prefs.setMode(this, next)
-            tvMode.text = next.label
+            x = Prefs.getBubbleX(this@FloatingMicService)
+            y = Prefs.getBubbleY(this@FloatingMicService)
         }
 
         var initX = 0
         var initY = 0
         var touchX = 0f
         var touchY = 0f
-        view.setOnTouchListener { _, event ->
+        var isDragging = false
+
+        val touchTarget = ivMic ?: view
+        touchTarget.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    initX = params.x; initY = params.y
-                    touchX = event.rawX; touchY = event.rawY
+                    initX = params.x
+                    initY = params.y
+                    touchX = event.rawX
+                    touchY = event.rawY
+                    isDragging = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = initX + (event.rawX - touchX).toInt()
-                    params.y = initY + (event.rawY - touchY).toInt()
-                    windowManager.updateViewLayout(view, params)
+                    val dx = (event.rawX - touchX).toInt()
+                    val dy = (event.rawY - touchY).toInt()
+                    if (abs(dx) > 12 || abs(dy) > 12) {
+                        isDragging = true
+                    }
+                    if (isDragging) {
+                        params.x = initX + dx
+                        params.y = initY + dy
+                        windowManager.updateViewLayout(view, params)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (isDragging) {
+                        Prefs.setBubblePos(this@FloatingMicService, params.x, params.y)
+                    } else if (!isProcessing) {
+                        if (!isListening) startDictation() else stopDictation()
+                    }
                     true
                 }
                 else -> false
-            }
-        }
-
-        btnMic.setOnClickListener {
-            if (isProcessing) return@setOnClickListener
-            if (!isListening) {
-                startDictation(tvMode)
-            } else {
-                stopDictation(tvMode)
             }
         }
 
@@ -134,41 +140,36 @@ class FloatingMicService : Service() {
         return if (prefix.endsWith(" ") || prefix.endsWith("\n")) "$prefix$chunk" else "$prefix $chunk"
     }
 
-    private fun startDictation(tvMode: TextView) {
+    private fun startDictation() {
         val apiKey = Prefs.getApiKey(this)
-        val mode = Prefs.getMode(this)
         prefixText = DictationAccessibilityService.instance?.getActiveFieldText() ?: ""
         lastPartialText = ""
 
         if (apiKey.isBlank()) {
-            startFallbackRecognizer(tvMode, mode)
+            startFallbackRecognizer()
             return
         }
 
         isListening = true
-        tvMode.text = "Live..."
+        setMicActiveUi(true)
 
         liveClient = GeminiLiveClient(
             apiKey = apiKey,
-            glossary = Prefs.getGlossary(this),
             onLiveTranscript = { liveText ->
                 mainHandler.post {
                     lastPartialText = liveText
-                    if (mode != DictationMode.VOICE_EDIT) {
-                        DictationAccessibilityService.instance?.insertText(
-                            combineText(prefixText, liveText),
-                            replaceAll = true
-                        )
-                    }
+                    DictationAccessibilityService.instance?.insertText(
+                        combineText(prefixText, liveText),
+                        replaceAll = true
+                    )
                 }
             },
             onFinished = { finalText ->
                 mainHandler.post {
                     isListening = false
+                    setMicActiveUi(false)
                     if (finalText.isNotBlank()) {
-                        polishWithGemini(finalText, mode, tvMode)
-                    } else {
-                        tvMode.text = Prefs.getMode(this@FloatingMicService).label
+                        polishWithGemini(finalText)
                     }
                 }
             },
@@ -176,34 +177,32 @@ class FloatingMicService : Service() {
                 mainHandler.post {
                     isListening = false
                     liveClient = null
-                    // Seamless fallback to on-device partial recognizer + Gemini polish
-                    startFallbackRecognizer(tvMode, mode)
+                    startFallbackRecognizer()
                 }
             }
         )
         liveClient?.start()
     }
 
-    private fun stopDictation(tvMode: TextView) {
+    private fun stopDictation() {
         isListening = false
+        setMicActiveUi(false)
         val lc = liveClient
         if (lc != null) {
             val captured = lc.stop()
             liveClient = null
             val textToPolish = captured.ifBlank { lastPartialText }
             if (textToPolish.isNotBlank()) {
-                polishWithGemini(textToPolish, Prefs.getMode(this), tvMode)
-            } else {
-                tvMode.text = Prefs.getMode(this).label
+                polishWithGemini(textToPolish)
             }
         } else {
             speechRecognizer?.stopListening()
         }
     }
 
-    private fun startFallbackRecognizer(tvMode: TextView, mode: DictationMode) {
+    private fun startFallbackRecognizer() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            tvMode.text = Prefs.getMode(this).label
+            setMicActiveUi(false)
             return
         }
 
@@ -221,7 +220,7 @@ class FloatingMicService : Service() {
         sr.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
                 isListening = true
-                tvMode.text = "Listening..."
+                setMicActiveUi(true)
             }
 
             override fun onBeginningOfSpeech() {}
@@ -232,50 +231,43 @@ class FloatingMicService : Service() {
                 val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 if (!partial.isNullOrBlank()) {
                     lastPartialText = partial
-                    if (mode != DictationMode.VOICE_EDIT) {
-                        DictationAccessibilityService.instance?.insertText(
-                            combineText(prefixText, partial),
-                            replaceAll = true
-                        )
-                    }
+                    DictationAccessibilityService.instance?.insertText(
+                        combineText(prefixText, partial),
+                        replaceAll = true
+                    )
                 }
             }
 
             override fun onEndOfSpeech() {
                 isListening = false
+                setMicActiveUi(false)
             }
 
             override fun onResults(results: Bundle?) {
                 isListening = false
+                setMicActiveUi(false)
                 val finalRaw = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                     ?.takeIf { it.isNotBlank() } ?: lastPartialText
                 sr.destroy()
                 speechRecognizer = null
 
-                if (finalRaw.isBlank()) {
-                    tvMode.text = Prefs.getMode(this@FloatingMicService).label
-                    return
-                }
+                if (finalRaw.isBlank()) return
 
-                if (mode != DictationMode.VOICE_EDIT) {
-                    DictationAccessibilityService.instance?.insertText(
-                        combineText(prefixText, finalRaw),
-                        replaceAll = true
-                    )
-                }
-
-                polishWithGemini(finalRaw, mode, tvMode)
+                DictationAccessibilityService.instance?.insertText(
+                    combineText(prefixText, finalRaw),
+                    replaceAll = true
+                )
+                polishWithGemini(finalRaw)
             }
 
             override fun onError(error: Int) {
                 isListening = false
+                setMicActiveUi(false)
                 val fallback = lastPartialText
                 sr.destroy()
                 speechRecognizer = null
                 if (fallback.isNotBlank()) {
-                    polishWithGemini(fallback, mode, tvMode)
-                } else {
-                    tvMode.text = Prefs.getMode(this@FloatingMicService).label
+                    polishWithGemini(fallback)
                 }
             }
 
@@ -285,33 +277,24 @@ class FloatingMicService : Service() {
         sr.startListening(intent)
     }
 
-    private fun polishWithGemini(rawText: String, mode: DictationMode, tvMode: TextView) {
+    private fun polishWithGemini(rawText: String) {
         val apiKey = Prefs.getApiKey(this)
-        if (apiKey.isBlank()) {
-            tvMode.text = Prefs.getMode(this).label
-            return
-        }
+        if (apiKey.isBlank()) return
 
         isProcessing = true
-        tvMode.text = "Polishing..."
         val model = Prefs.getModel(this)
-        val glossary = Prefs.getGlossary(this)
-        val existingForEdit = if (mode == DictationMode.VOICE_EDIT) prefixText else null
 
         serviceScope.launch {
-            val result = GeminiClient.polishText(apiKey, model, rawText, mode, glossary, existingForEdit)
+            val result = GeminiClient.polishText(apiKey, model, rawText)
             isProcessing = false
-            tvMode.text = Prefs.getMode(this@FloatingMicService).label
 
             result.onSuccess { cleaned ->
-                val finalOutput = if (mode == DictationMode.VOICE_EDIT) {
-                    cleaned
-                } else {
-                    combineText(prefixText, cleaned)
-                }
-                DictationAccessibilityService.instance?.insertText(finalOutput, replaceAll = true)
+                DictationAccessibilityService.instance?.insertText(
+                    combineText(prefixText, cleaned),
+                    replaceAll = true
+                )
             }.onFailure { err ->
-                Toast.makeText(this@FloatingMicService, "Kept live draft (Gemini: ${err.message})", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@FloatingMicService, "Kept live draft (${err.message})", Toast.LENGTH_SHORT).show()
             }
         }
     }

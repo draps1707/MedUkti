@@ -2,19 +2,12 @@ package com.voicerambler.free
 
 import android.content.Context
 
-enum class DictationMode(val label: String) {
-    HINGLISH_CHAT("Hinglish"),
-    ODIA_ENGLISH("Odia+Eng"),
-    FORMAL_ENGLISH("Formal"),
-    VOICE_EDIT("Voice Edit")
-}
-
 object Prefs {
     private const val FILE = "voice_rambler_prefs"
     private const val KEY_API = "gemini_api_key"
     private const val KEY_MODEL = "gemini_model"
-    private const val KEY_MODE = "dictation_mode"
-    private const val KEY_GLOSSARY = "personal_glossary"
+    private const val KEY_BUBBLE_X = "bubble_x"
+    private const val KEY_BUBBLE_Y = "bubble_y"
 
     val AVAILABLE_MODELS = listOf(
         "gemini-2.5-flash",
@@ -36,19 +29,16 @@ object Prefs {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_MODEL, value).apply()
     }
 
-    fun getMode(ctx: Context): DictationMode {
-        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_MODE, DictationMode.HINGLISH_CHAT.name)
-        return DictationMode.entries.firstOrNull { it.name == raw } ?: DictationMode.HINGLISH_CHAT
-    }
+    fun getBubbleX(ctx: Context): Int =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getInt(KEY_BUBBLE_X, 40)
 
-    fun setMode(ctx: Context, mode: DictationMode) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_MODE, mode.name).apply()
-    }
+    fun getBubbleY(ctx: Context): Int =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getInt(KEY_BUBBLE_Y, 400)
 
-    fun getGlossary(ctx: Context): String =
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_GLOSSARY, "") ?: ""
-
-    fun setGlossary(ctx: Context, value: String) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_GLOSSARY, value.trim()).apply()
+    fun setBubblePos(ctx: Context, x: Int, y: Int) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putInt(KEY_BUBBLE_X, x)
+            .putInt(KEY_BUBBLE_Y, y)
+            .apply()
     }
 }

@@ -2,6 +2,7 @@ package com.voicerambler.free
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,14 +16,18 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
+    private var askedThisSession = false
+    private lateinit var tvStatus: TextView
+
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { updateStatus() }
-
-    private lateinit var tvStatus: TextView
+    ) {
+        updateStatusAndAutoStart()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,68 +35,69 @@ class MainActivity : AppCompatActivity() {
 
         val etApiKey = findViewById<EditText>(R.id.etApiKey)
         val spinnerModel = findViewById<Spinner>(R.id.spinnerModel)
-        val spinnerMode = findViewById<Spinner>(R.id.spinnerMode)
-        val etGlossary = findViewById<EditText>(R.id.etGlossary)
         tvStatus = findViewById(R.id.tvStatus)
 
         etApiKey.setText(Prefs.getApiKey(this))
-        etGlossary.setText(Prefs.getGlossary(this))
-
         spinnerModel.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Prefs.AVAILABLE_MODELS)
         spinnerModel.setSelection(Prefs.AVAILABLE_MODELS.indexOf(Prefs.getModel(this)).coerceAtLeast(0))
 
-        val modes = DictationMode.entries.map { it.label }
-        spinnerMode.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, modes)
-        spinnerMode.setSelection(DictationMode.entries.indexOf(Prefs.getMode(this)).coerceAtLeast(0))
-
-        findViewById<Button>(R.id.btnSave).setOnClickListener {
+        findViewById<Button>(R.id.btnSaveStart).setOnClickListener {
             Prefs.setApiKey(this, etApiKey.text.toString())
             Prefs.setModel(this, Prefs.AVAILABLE_MODELS[spinnerModel.selectedItemPosition])
-            Prefs.setMode(this, DictationMode.entries[spinnerMode.selectedItemPosition])
-            Prefs.setGlossary(this, etGlossary.text.toString())
-            Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show()
-            updateStatus()
+            askedThisSession = false
+            checkAndRequestNextMissingPermission()
+            updateStatusAndAutoStart()
         }
 
-        findViewById<Button>(R.id.btnMicPerm).setOnClickListener {
+        checkAndRequestNextMissingPermission()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateStatusAndAutoStart()
+    }
+
+    private fun hasMicAndNotif(): Boolean {
+        val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val notifOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else true
+        return micOk && notifOk
+    }
+
+    private fun checkAndRequestNextMissingPermission() {
+        if (askedThisSession) return
+        askedThisSession = true
+
+        if (!hasMicAndNotif()) {
             val perms = mutableListOf(Manifest.permission.RECORD_AUDIO)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 perms.add(Manifest.permission.POST_NOTIFICATIONS)
             }
             permLauncher.launch(perms.toTypedArray())
+            return
         }
 
-        findViewById<Button>(R.id.btnOverlayPerm).setOnClickListener {
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, "Allow Display over other apps for the floating mic", Toast.LENGTH_LONG).show()
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            return
         }
 
-        findViewById<Button>(R.id.btnAccessibility).setOnClickListener {
+        if (DictationAccessibilityService.instance == null) {
+            Toast.makeText(this, "Enable VoiceRambler Text Injector in Accessibility", Toast.LENGTH_LONG).show()
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            return
         }
 
-        findViewById<Button>(R.id.btnBattery).setOnClickListener {
+        val pm = getSystemService(PowerManager::class.java)
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
             startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
         }
-
-        findViewById<Button>(R.id.btnToggleService).setOnClickListener {
-            if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Grant Display Over Other Apps first", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val svc = Intent(this, FloatingMicService::class.java)
-            startForegroundService(svc)
-            Toast.makeText(this, "Floating Mic started! Open any app to dictate.", Toast.LENGTH_SHORT).show()
-        }
-
-        updateStatus()
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateStatus()
-    }
-
-    private fun updateStatus() {
+    private fun updateStatusAndAutoStart() {
+        val micOk = hasMicAndNotif()
         val overlayOk = Settings.canDrawOverlays(this)
         val accOk = DictationAccessibilityService.instance != null
         val pm = getSystemService(PowerManager::class.java)
@@ -99,10 +105,15 @@ class MainActivity : AppCompatActivity() {
         val keyOk = Prefs.getApiKey(this).isNotBlank()
 
         tvStatus.text = buildString {
-            appendLine("API Key: ${if (keyOk) "Set" else "Missing"}")
-            appendLine("Overlay Permission: ${if (overlayOk) "Granted" else "Missing"}")
-            appendLine("Accessibility Service: ${if (accOk) "Enabled" else "Disabled"}")
-            appendLine("Unrestricted Battery: ${if (batteryOk) "Yes" else "No (recommended for Samsung)"}")
+            appendLine("API Key: ${if (keyOk) "Ready" else "Paste your key above"}")
+            appendLine("Mic & Notifications: ${if (micOk) "Granted" else "Needed"}")
+            appendLine("Overlay (Floating Mic): ${if (overlayOk) "Granted" else "Needed"}")
+            appendLine("Accessibility Injector: ${if (accOk) "Enabled" else "Needed"}")
+            appendLine("Unrestricted Battery: ${if (batteryOk) "Yes" else "Recommended"}")
+        }
+
+        if (micOk && overlayOk && keyOk) {
+            startForegroundService(Intent(this, FloatingMicService::class.java))
         }
     }
 }

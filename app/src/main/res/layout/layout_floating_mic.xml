@@ -1,31 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/floatingRoot"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:background="@drawable/bg_floating_pill"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingStart="10dp"
-    android:paddingTop="6dp"
-    android:paddingEnd="10dp"
-    android:paddingBottom="6dp">
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:background="@android:color/transparent">
 
-    <ImageButton
-        android:id="@+id/btnMicBubble"
+    <ImageView
+        android:id="@+id/ivMicIcon"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:background="@android:color/transparent"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_mic_ring"
         android:contentDescription="Dictate"
+        android:padding="8dp"
         android:src="@android:drawable/ic_btn_speak_now" />
-
-    <TextView
-        android:id="@+id/tvBubbleMode"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:text="Hinglish"
-        android:textColor="#FFFFFF"
-        android:textSize="12sp"
-        android:textStyle="bold" />
-</LinearLayout>
+</FrameLayout>

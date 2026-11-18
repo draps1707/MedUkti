@@ -20,14 +20,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="100% Free Gemini AI Dictation (English + Hindi + Hinglish + Odia)"
+            android:text="Auto English, Hindi, Hinglish, Odia + Medical Terminology"
             android:textSize="14sp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="1. Google AI Studio API Key (Free Tier)"
+            android:layout_marginTop="24dp"
+            android:text="Google AI Studio API Key (Free Tier)"
             android:textStyle="bold" />
 
         <EditText
@@ -40,8 +40,8 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="2. Gemini Model"
+            android:layout_marginTop="16dp"
+            android:text="Gemini Model"
             android:textStyle="bold" />
 
         <Spinner
@@ -49,87 +49,18 @@
             android:layout_width="match_parent"
             android:layout_height="48dp" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="3. Default Dictation Mode"
-            android:textStyle="bold" />
-
-        <Spinner
-            android:id="@+id/spinnerMode"
-            android:layout_width="match_parent"
-            android:layout_height="48dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="4. Personal Glossary (names, places, terms)"
-            android:textStyle="bold" />
-
-        <EditText
-            android:id="@+id/etGlossary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="e.g. Rourkela, Bhubaneswar, IGH, NBEMS"
-            android:inputType="textMultiLine"
-            android:minLines="2" />
-
         <Button
-            android:id="@+id/btnSave"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Save Settings" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
-            android:text="5. Required Permissions (One-time setup)"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnMicPerm"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Grant Microphone &amp; Notification Permission" />
-
-        <Button
-            android:id="@+id/btnOverlayPerm"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Grant Display Over Other Apps" />
-
-        <Button
-            android:id="@+id/btnAccessibility"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Enable VoiceRambler Accessibility Service" />
-
-        <Button
-            android:id="@+id/btnBattery"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Set Battery to Unrestricted (Samsung One UI)" />
-
-        <Button
-            android:id="@+id/btnToggleService"
+            android:id="@+id/btnSaveStart"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Start Floating Mic Bubble" />
+            android:text="Save &amp; Start Floating Mic" />
 
         <TextView
             android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="16dp"
             android:textSize="13sp" />
     </LinearLayout>
 </ScrollView>
