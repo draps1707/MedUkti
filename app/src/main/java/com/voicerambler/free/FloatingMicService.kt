@@ -7,16 +7,12 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -36,8 +32,7 @@ class FloatingMicService : Service() {
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
     private var ivMic: ImageView? = null
-    private var liveClient: GeminiLiveClient? = null
-    private var speechRecognizer: SpeechRecognizer? = null
+    private lateinit var recorder: AudioRecorderHelper
     private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -45,7 +40,6 @@ class FloatingMicService : Service() {
     private var isProcessing = false
     private var beforeCursor = ""
     private var afterCursor = ""
-    private var lastPartialText = ""
     private var lastUndoFullText: String? = null
     private var lastUndoCursor: Int = 0
 
@@ -53,6 +47,7 @@ class FloatingMicService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        recorder = AudioRecorderHelper(this)
         startForegroundNotification()
         showFloatingBubble()
 
@@ -172,7 +167,7 @@ class FloatingMicService : Service() {
                         Prefs.setBubblePos(this@FloatingMicService, params.x, params.y)
                     } else if (!longPressTriggered && !isProcessing) {
                         buzz(20L)
-                        if (!isListening) startDictation() else stopDictation()
+                        if (!isListening) startDictation() else stopAndTranscribe()
                     }
                     true
                 }
@@ -197,162 +192,64 @@ class FloatingMicService : Service() {
     }
 
     private fun startDictation() {
-        val apiKey = Prefs.getApiKey(this)
         val ctx = DictationAccessibilityService.instance?.getCursorContext()
         beforeCursor = ctx?.first ?: ""
         afterCursor = ctx?.second ?: ""
         lastUndoFullText = beforeCursor + afterCursor
         lastUndoCursor = beforeCursor.length
-        lastPartialText = ""
 
-        if (apiKey.isBlank()) {
-            startFallbackRecognizer()
-            return
+        try {
+            recorder.startRecording()
+            isListening = true
+            setMicActiveUi(true)
+        } catch (e: Exception) {
+            isListening = false
+            setMicActiveUi(false)
+            Toast.makeText(this, "Mic error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
-
-        isListening = true
-        setMicActiveUi(true)
-
-        liveClient = GeminiLiveClient(
-            apiKey = apiKey,
-            onLiveTranscript = { liveText ->
-                mainHandler.post {
-                    lastPartialText = liveText
-                    val (full, pos) = spliceAtCursor(liveText)
-                    DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
-                }
-            },
-            onFinished = { finalText ->
-                mainHandler.post {
-                    isListening = false
-                    setMicActiveUi(false)
-                    liveClient = null
-                    val toPolish = finalText.ifBlank { lastPartialText }
-                    if (toPolish.isNotBlank()) {
-                        polishWithGemini(toPolish)
-                    }
-                }
-            },
-            onError = { _ ->
-                mainHandler.post {
-                    isListening = false
-                    liveClient = null
-                    Toast.makeText(this@FloatingMicService, "Live unavailable; using English fallback", Toast.LENGTH_SHORT).show()
-                    startFallbackRecognizer()
-                }
-            }
-        )
-        liveClient?.start()
     }
 
-    private fun stopDictation() {
+    private fun stopAndTranscribe() {
+        val file = recorder.stopRecording()
         isListening = false
         setMicActiveUi(false)
-        val lc = liveClient
-        if (lc != null) {
-            lc.stopGracefully()
-        } else {
-            speechRecognizer?.stopListening()
-        }
-    }
-
-    private fun startFallbackRecognizer() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            setMicActiveUi(false)
+        if (file == null || !file.exists()) {
+            Toast.makeText(this, "Recording failed", Toast.LENGTH_SHORT).show()
             return
         }
 
-        speechRecognizer?.destroy()
-        val sr = SpeechRecognizer.createSpeechRecognizer(this)
-        speechRecognizer = sr
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
-        }
-
-        sr.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {
-                isListening = true
-                setMicActiveUi(true)
-            }
-
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-
-            override fun onPartialResults(partialResults: Bundle?) {
-                val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (!partial.isNullOrBlank()) {
-                    lastPartialText = partial
-                    val (full, pos) = spliceAtCursor(partial)
-                    DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
-                }
-            }
-
-            override fun onEndOfSpeech() {
-                isListening = false
-                setMicActiveUi(false)
-            }
-
-            override fun onResults(results: Bundle?) {
-                isListening = false
-                setMicActiveUi(false)
-                val finalRaw = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                    ?.takeIf { it.isNotBlank() } ?: lastPartialText
-                sr.destroy()
-                speechRecognizer = null
-
-                if (finalRaw.isBlank()) return
-
-                val (full, pos) = spliceAtCursor(finalRaw)
-                DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
-                polishWithGemini(finalRaw)
-            }
-
-            override fun onError(error: Int) {
-                isListening = false
-                setMicActiveUi(false)
-                val fallback = lastPartialText
-                sr.destroy()
-                speechRecognizer = null
-                if (fallback.isNotBlank()) {
-                    polishWithGemini(fallback)
-                }
-            }
-
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-
-        sr.startListening(intent)
-    }
-
-    private fun polishWithGemini(rawText: String) {
         val apiKey = Prefs.getApiKey(this)
-        if (apiKey.isBlank()) return
+        if (apiKey.isBlank()) {
+            file.delete()
+            Toast.makeText(this, "Add your Gemini API key in VoiceRambler first", Toast.LENGTH_LONG).show()
+            return
+        }
 
         isProcessing = true
         val model = Prefs.getModel(this)
 
         serviceScope.launch {
-            val result = GeminiClient.polishText(apiKey, model, rawText)
+            val result = GeminiClient.transcribeAudio(apiKey, model, file)
+            file.delete()
             isProcessing = false
 
             result.onSuccess { cleaned ->
-                val (full, pos) = spliceAtCursor(cleaned)
-                DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
+                if (cleaned.isNotBlank()) {
+                    val (full, pos) = spliceAtCursor(cleaned)
+                    val ok = DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos) ?: false
+                    if (!ok) {
+                        Toast.makeText(this@FloatingMicService, "Enable Accessibility Injector to paste", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }.onFailure { err ->
-                Toast.makeText(this@FloatingMicService, "Kept live draft (${err.message})", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@FloatingMicService, "Error: ${err.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     override fun onDestroy() {
         DictationAccessibilityService.onEditableFocusChanged = null
-        liveClient?.stopGracefully()
-        speechRecognizer?.destroy()
+        recorder.stopRecording()
         floatingView?.let { windowManager.removeView(it) }
         serviceScope.cancel()
         super.onDestroy()
