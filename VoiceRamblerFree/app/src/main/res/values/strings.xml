@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VoiceRambler Free</string>
+    <string name="accessibility_service_label">VoiceRambler Text Injector</string>
+    <string name="accessibility_service_description">Allows VoiceRambler Free to paste cleaned voice transcriptions into the active text box and read existing text for Voice Edit mode.</string>
+</resources>
