@@ -30,17 +30,18 @@ class FloatingMicService : Service() {
 
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
-    private lateinit var recorder: AudioRecorderHelper
+    private var speechRecognizer: SpeechRecognizer? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private var isRecording = false
+    private var isListening = false
     private var isProcessing = false
+    private var prefixText = ""
+    private var lastPartialText = ""
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        recorder = AudioRecorderHelper(this)
         startForegroundNotification()
         showFloatingBubble()
     }
@@ -55,7 +56,7 @@ class FloatingMicService : Service() {
         }
         val notification = Notification.Builder(this, channelId)
             .setContentTitle("VoiceRambler Free is ready")
-            .setContentText("Tap the floating mic over any app to dictate.")
+            .setContentText("Tap the floating mic over any app to dictate live.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
         startForeground(101, notification)
@@ -82,15 +83,14 @@ class FloatingMicService : Service() {
         val tvMode = view.findViewById<TextView>(R.id.tvBubbleMode)
         tvMode.text = Prefs.getMode(this).label
 
-        // Tap mode label to cycle presets
         tvMode.setOnClickListener {
+            if (isListening || isProcessing) return@setOnClickListener
             val modes = DictationMode.entries
             val next = modes[(modes.indexOf(Prefs.getMode(this)) + 1) % modes.size]
             Prefs.setMode(this, next)
             tvMode.text = next.label
         }
 
-        // Drag support on root
         var initX = 0
         var initY = 0
         var touchX = 0f
@@ -114,101 +114,143 @@ class FloatingMicService : Service() {
 
         btnMic.setOnClickListener {
             if (isProcessing) return@setOnClickListener
-            if (!isRecording) {
-                startDictation(tvMode)
+            if (!isListening) {
+                startLiveDictation(tvMode)
             } else {
-                stopAndTranscribe(tvMode)
+                speechRecognizer?.stopListening()
             }
         }
 
         windowManager.addView(view, params)
     }
 
-    private fun startDictation(tvMode: TextView) {
-        try {
-            recorder.startRecording()
-            isRecording = true
-            tvMode.text = "Listening..."
-        } catch (e: Exception) {
-            Toast.makeText(this, "Mic error: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
+    private fun combineText(prefix: String, chunk: String): String {
+        if (prefix.isBlank()) return chunk
+        if (chunk.isBlank()) return prefix
+        return if (prefix.endsWith(" ") || prefix.endsWith("\n")) "$prefix$chunk" else "$prefix $chunk"
     }
 
-    private fun stopAndTranscribe(tvMode: TextView) {
-        val file = recorder.stopRecording()
-        isRecording = false
-        if (file == null || !file.exists()) {
-            tvMode.text = Prefs.getMode(this).label
+    private fun startLiveDictation(tvMode: TextView) {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "Speech recognition not available on this device", Toast.LENGTH_SHORT).show()
             return
         }
 
+        val mode = Prefs.getMode(this)
+        prefixText = DictationAccessibilityService.instance?.getActiveFieldText() ?: ""
+        lastPartialText = ""
+
+        speechRecognizer?.destroy()
+        val sr = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognizer = sr
+
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
+        }
+
+        sr.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                isListening = true
+                tvMode.text = "Listening..."
+            }
+
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                if (!partial.isNullOrBlank()) {
+                    lastPartialText = partial
+                    if (mode != DictationMode.VOICE_EDIT) {
+                        DictationAccessibilityService.instance?.insertText(
+                            combineText(prefixText, partial),
+                            replaceAll = true
+                        )
+                    }
+                }
+            }
+
+            override fun onEndOfSpeech() {
+                isListening = false
+            }
+
+            override fun onResults(results: Bundle?) {
+                isListening = false
+                val finalRaw = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    ?.takeIf { it.isNotBlank() } ?: lastPartialText
+                sr.destroy()
+                speechRecognizer = null
+
+                if (finalRaw.isBlank()) {
+                    tvMode.text = Prefs.getMode(this@FloatingMicService).label
+                    return
+                }
+
+                if (mode != DictationMode.VOICE_EDIT) {
+                    DictationAccessibilityService.instance?.insertText(
+                        combineText(prefixText, finalRaw),
+                        replaceAll = true
+                    )
+                }
+
+                polishWithGemini(finalRaw, mode, tvMode)
+            }
+
+            override fun onError(error: Int) {
+                isListening = false
+                val fallback = lastPartialText
+                sr.destroy()
+                speechRecognizer = null
+                if (fallback.isNotBlank()) {
+                    polishWithGemini(fallback, mode, tvMode)
+                } else {
+                    tvMode.text = Prefs.getMode(this@FloatingMicService).label
+                }
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+
+        sr.startListening(intent)
+    }
+
+    private fun polishWithGemini(rawText: String, mode: DictationMode, tvMode: TextView) {
         val apiKey = Prefs.getApiKey(this)
         if (apiKey.isBlank()) {
-            Toast.makeText(this, "Add your free Gemini API key in VoiceRambler first", Toast.LENGTH_LONG).show()
-            file.delete()
             tvMode.text = Prefs.getMode(this).label
             return
         }
 
         isProcessing = true
         tvMode.text = "Polishing..."
-
-        val mode = Prefs.getMode(this)
         val model = Prefs.getModel(this)
         val glossary = Prefs.getGlossary(this)
-        val existingText = if (mode == DictationMode.VOICE_EDIT) {
-            DictationAccessibilityService.instance?.getActiveFieldText()
-        } else null
+        val existingForEdit = if (mode == DictationMode.VOICE_EDIT) prefixText else null
 
         serviceScope.launch {
-            val result = GeminiClient.transcribeAudio(apiKey, model, file, mode, glossary, existingText)
-            file.delete()
+            val result = GeminiClient.polishText(apiKey, model, rawText, mode, glossary, existingForEdit)
             isProcessing = false
             tvMode.text = Prefs.getMode(this@FloatingMicService).label
 
             result.onSuccess { cleaned ->
-                val ok = DictationAccessibilityService.instance?.insertText(
-                    cleaned,
-                    replaceAll = (mode == DictationMode.VOICE_EDIT)
-                ) ?: false
-                if (!ok) {
-                    Toast.makeText(this@FloatingMicService, "Enable Accessibility Service to auto-paste", Toast.LENGTH_SHORT).show()
+                val finalOutput = if (mode == DictationMode.VOICE_EDIT) {
+                    cleaned
+                } else {
+                    combineText(prefixText, cleaned)
                 }
+                DictationAccessibilityService.instance?.insertText(finalOutput, replaceAll = true)
             }.onFailure { err ->
-                Toast.makeText(this@FloatingMicService, "Gemini failed (${err.message}); using offline fallback", Toast.LENGTH_SHORT).show()
-                runOfflineFallback()
+                Toast.makeText(this@FloatingMicService, "Kept live draft (Gemini: ${err.message})", Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    private fun runOfflineFallback() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) return
-        val sr = SpeechRecognizer.createSpeechRecognizer(this)
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-        }
-        sr.setRecognitionListener(object : RecognitionListener {
-            override fun onResults(results: Bundle?) {
-                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (!text.isNullOrBlank()) {
-                    DictationAccessibilityService.instance?.insertText(text)
-                }
-                sr.destroy()
-            }
-            override fun onError(error: Int) { sr.destroy() }
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {}
-            override fun onPartialResults(partialResults: Bundle?) {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-        sr.startListening(intent)
     }
 
     override fun onDestroy() {
+        speechRecognizer?.destroy()
         floatingView?.let { windowManager.removeView(it) }
         serviceScope.cancel()
         super.onDestroy()

@@ -1,11 +1,9 @@
 package com.voicerambler.free
 
-import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -21,12 +19,12 @@ object GeminiClient {
 
             DictationMode.ODIA_ENGLISH -> """
                 - Language: Mixed Odia, Hindi, and English.
-                - Script rule: Write Odia phrases in Odia script (ଓଡ଼ିଆ) and English words/technical terms in English script. If a single short Odia word is embedded inside an English sentence, keep it readable.
+                - Script rule: Write Odia phrases in Odia script (ଓଡ଼ିଆ) and English words/technical terms in English script. Fix any phonetic English misrecognitions of common Odia or Hindi words.
                 - Tone: Natural and accurate.
             """.trimIndent()
 
             DictationMode.FORMAL_ENGLISH -> """
-                - Language: Clean, polished English (translate/smooth out Hindi or Odia fillers if needed, or preserve proper nouns).
+                - Language: Clean, polished English (smooth out Hindi or Odia fillers if needed, or preserve proper nouns).
                 - Tone: Professional, structured, ready to send as an email or clinical/work note. Format lists as bullet points if spoken as a list.
             """.trimIndent()
 
@@ -42,7 +40,7 @@ object GeminiClient {
         } else ""
 
         return """
-            You are an ultra-accurate voice dictation engine like Google Rambler and Wispr Flow.
+            You are an ultra-accurate voice dictation cleanup engine like Google Rambler and Wispr Flow.
             Core rules:
             1. Remove all filler words (um, uh, ah, matlab, basically, you know), false starts, and self-corrections (keep only the speaker's final intended phrasing).
             2. Add accurate punctuation, capitalization, and paragraph breaks.
@@ -51,83 +49,81 @@ object GeminiClient {
         """.trimIndent()
     }
 
-    suspend fun transcribeAudio(
+    suspend fun polishText(
         apiKey: String,
-        model: String,
-        audioFile: File,
+        preferredModel: String,
+        rawTranscript: String,
         mode: DictationMode,
         glossary: String,
         existingText: String? = null
     ): Result<String> = withContext(Dispatchers.IO) {
-        try {
-            val audioBytes = audioFile.readBytes()
-            val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
+        val modelsToTry = (listOf(preferredModel) + Prefs.AVAILABLE_MODELS).distinct()
+        var lastError: Exception = Exception("Unknown error")
 
-            val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
-            val url = URL(endpoint)
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                connectTimeout = 15000
-                readTimeout = 30000
-                doOutput = true
-            }
+        for (model in modelsToTry) {
+            try {
+                val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+                val url = URL(endpoint)
+                val conn = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    connectTimeout = 10000
+                    readTimeout = 20000
+                    doOutput = true
+                }
 
-            val parts = JSONArray().apply {
-                put(JSONObject().apply {
-                    put("inline_data", JSONObject().apply {
-                        put("mime_type", "audio/mp4")
-                        put("data", base64Audio)
-                    })
-                })
                 val userInstruction = if (mode == DictationMode.VOICE_EDIT && !existingText.isNullOrBlank()) {
-                    "EXISTING TEXT:\n$existingText\n\nApply my spoken edit command from the audio above."
+                    "EXISTING TEXT:\n$existingText\n\nSPOKEN COMMAND:\n$rawTranscript"
                 } else {
-                    "Transcribe and clean up the attached voice recording."
+                    "Clean up and format this live speech transcript:\n$rawTranscript"
                 }
-                put(JSONObject().put("text", userInstruction))
-            }
 
-            val payload = JSONObject().apply {
-                put("system_instruction", JSONObject().apply {
-                    put("parts", JSONArray().put(JSONObject().put("text", buildSystemPrompt(mode, glossary))))
-                })
-                put("contents", JSONArray().put(JSONObject().apply {
-                    put("parts", parts)
-                }))
-                if (model.startsWith("gemini-3.8")) {
-                    put("generationConfig", JSONObject().apply {
-                        put("thinkingConfig", JSONObject().apply {
-                            put("thinkingLevel", "LOW")
-                        })
+                val payload = JSONObject().apply {
+                    put("system_instruction", JSONObject().apply {
+                        put("parts", JSONArray().put(JSONObject().put("text", buildSystemPrompt(mode, glossary))))
                     })
+                    put("contents", JSONArray().put(JSONObject().apply {
+                        put("parts", JSONArray().put(JSONObject().put("text", userInstruction)))
+                    }))
+                    if (model.startsWith("gemini-3.8")) {
+                        put("generationConfig", JSONObject().apply {
+                            put("thinkingConfig", JSONObject().apply {
+                                put("thinkingLevel", "LOW")
+                            })
+                        })
+                    }
                 }
+
+                conn.outputStream.use { os ->
+                    os.write(payload.toString().toByteArray(Charsets.UTF_8))
+                }
+
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val body = stream.bufferedReader().use { it.readText() }
+
+                if (code == 503 || code == 429 || code == 404) {
+                    lastError = Exception("HTTP $code on $model")
+                    continue
+                }
+                if (code !in 200..299) {
+                    return@withContext Result.failure(Exception("HTTP $code: $body"))
+                }
+
+                val json = JSONObject(body)
+                val text = json.getJSONArray("candidates")
+                    .getJSONObject(0)
+                    .getJSONObject("content")
+                    .getJSONArray("parts")
+                    .getJSONObject(0)
+                    .getString("text")
+                    .trim()
+
+                return@withContext Result.success(text)
+            } catch (e: Exception) {
+                lastError = e
             }
-
-            conn.outputStream.use { os ->
-                os.write(payload.toString().toByteArray(Charsets.UTF_8))
-            }
-
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val body = stream.bufferedReader().use { it.readText() }
-
-            if (code !in 200..299) {
-                return@withContext Result.failure(Exception("HTTP $code: $body"))
-            }
-
-            val json = JSONObject(body)
-            val text = json.getJSONArray("candidates")
-                .getJSONObject(0)
-                .getJSONObject("content")
-                .getJSONArray("parts")
-                .getJSONObject(0)
-                .getString("text")
-                .trim()
-
-            Result.success(text)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
+        Result.failure(lastError)
     }
 }

@@ -17,9 +17,9 @@ object Prefs {
     private const val KEY_GLOSSARY = "personal_glossary"
 
     val AVAILABLE_MODELS = listOf(
-        "gemini-3.8-flash",
+        "gemini-2.5-flash",
         "gemini-3.5-flash-lite",
-        "gemini-2.5-flash"
+        "gemini-3.8-flash"
     )
 
     fun getApiKey(ctx: Context): String =
