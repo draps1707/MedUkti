@@ -8,7 +8,9 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -30,7 +32,9 @@ class FloatingMicService : Service() {
 
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
+    private var liveClient: GeminiLiveClient? = null
     private var speechRecognizer: SpeechRecognizer? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private var isListening = false
@@ -56,7 +60,7 @@ class FloatingMicService : Service() {
         }
         val notification = Notification.Builder(this, channelId)
             .setContentTitle("VoiceRambler Free is ready")
-            .setContentText("Tap the floating mic over any app to dictate live.")
+            .setContentText("Tap the floating mic over any app for Gemini Live dictation.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
         startForeground(101, notification)
@@ -115,9 +119,9 @@ class FloatingMicService : Service() {
         btnMic.setOnClickListener {
             if (isProcessing) return@setOnClickListener
             if (!isListening) {
-                startLiveDictation(tvMode)
+                startDictation(tvMode)
             } else {
-                speechRecognizer?.stopListening()
+                stopDictation(tvMode)
             }
         }
 
@@ -130,15 +134,78 @@ class FloatingMicService : Service() {
         return if (prefix.endsWith(" ") || prefix.endsWith("\n")) "$prefix$chunk" else "$prefix $chunk"
     }
 
-    private fun startLiveDictation(tvMode: TextView) {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(this, "Speech recognition not available on this device", Toast.LENGTH_SHORT).show()
-            return
-        }
-
+    private fun startDictation(tvMode: TextView) {
+        val apiKey = Prefs.getApiKey(this)
         val mode = Prefs.getMode(this)
         prefixText = DictationAccessibilityService.instance?.getActiveFieldText() ?: ""
         lastPartialText = ""
+
+        if (apiKey.isBlank()) {
+            startFallbackRecognizer(tvMode, mode)
+            return
+        }
+
+        isListening = true
+        tvMode.text = "Live..."
+
+        liveClient = GeminiLiveClient(
+            apiKey = apiKey,
+            glossary = Prefs.getGlossary(this),
+            onLiveTranscript = { liveText ->
+                mainHandler.post {
+                    lastPartialText = liveText
+                    if (mode != DictationMode.VOICE_EDIT) {
+                        DictationAccessibilityService.instance?.insertText(
+                            combineText(prefixText, liveText),
+                            replaceAll = true
+                        )
+                    }
+                }
+            },
+            onFinished = { finalText ->
+                mainHandler.post {
+                    isListening = false
+                    if (finalText.isNotBlank()) {
+                        polishWithGemini(finalText, mode, tvMode)
+                    } else {
+                        tvMode.text = Prefs.getMode(this@FloatingMicService).label
+                    }
+                }
+            },
+            onError = { _ ->
+                mainHandler.post {
+                    isListening = false
+                    liveClient = null
+                    // Seamless fallback to on-device partial recognizer + Gemini polish
+                    startFallbackRecognizer(tvMode, mode)
+                }
+            }
+        )
+        liveClient?.start()
+    }
+
+    private fun stopDictation(tvMode: TextView) {
+        isListening = false
+        val lc = liveClient
+        if (lc != null) {
+            val captured = lc.stop()
+            liveClient = null
+            val textToPolish = captured.ifBlank { lastPartialText }
+            if (textToPolish.isNotBlank()) {
+                polishWithGemini(textToPolish, Prefs.getMode(this), tvMode)
+            } else {
+                tvMode.text = Prefs.getMode(this).label
+            }
+        } else {
+            speechRecognizer?.stopListening()
+        }
+    }
+
+    private fun startFallbackRecognizer(tvMode: TextView, mode: DictationMode) {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            tvMode.text = Prefs.getMode(this).label
+            return
+        }
 
         speechRecognizer?.destroy()
         val sr = SpeechRecognizer.createSpeechRecognizer(this)
@@ -250,6 +317,7 @@ class FloatingMicService : Service() {
     }
 
     override fun onDestroy() {
+        liveClient?.stop()
         speechRecognizer?.destroy()
         floatingView?.let { windowManager.removeView(it) }
         serviceScope.cancel()
