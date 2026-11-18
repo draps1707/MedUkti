@@ -89,8 +89,15 @@ class FloatingMicService : Service() {
         startForeground(101, notification)
     }
 
-    private fun setMicActiveUi(active: Boolean) {
-        ivMic?.setBackgroundResource(if (active) R.drawable.bg_mic_ring_active else R.drawable.bg_mic_ring)
+    private enum class MicUiState { IDLE, LISTENING, POLISHING }
+
+    private fun setMicUiState(state: MicUiState) {
+        val res = when (state) {
+            MicUiState.IDLE -> R.drawable.bg_mic_ring
+            MicUiState.LISTENING -> R.drawable.bg_mic_ring_active
+            MicUiState.POLISHING -> R.drawable.bg_mic_ring_polishing
+        }
+        ivMic?.setBackgroundResource(res)
     }
 
     private fun showFloatingBubble() {
@@ -201,10 +208,10 @@ class FloatingMicService : Service() {
         try {
             recorder.startRecording()
             isListening = true
-            setMicActiveUi(true)
+            setMicUiState(MicUiState.LISTENING)
         } catch (e: Exception) {
             isListening = false
-            setMicActiveUi(false)
+            setMicUiState(MicUiState.IDLE)
             Toast.makeText(this, "Mic error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
@@ -212,7 +219,7 @@ class FloatingMicService : Service() {
     private fun stopAndTranscribe() {
         val file = recorder.stopRecording()
         isListening = false
-        setMicActiveUi(false)
+        setMicUiState(MicUiState.IDLE)
         if (file == null || !file.exists()) {
             Toast.makeText(this, "Recording failed", Toast.LENGTH_SHORT).show()
             return
@@ -226,12 +233,14 @@ class FloatingMicService : Service() {
         }
 
         isProcessing = true
+        setMicUiState(MicUiState.POLISHING)
         val model = Prefs.getModel(this)
 
         serviceScope.launch {
             val result = GeminiClient.transcribeAudio(apiKey, model, file)
             file.delete()
             isProcessing = false
+            setMicUiState(MicUiState.IDLE)
 
             result.onSuccess { cleaned ->
                 if (cleaned.isNotBlank()) {
