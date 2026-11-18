@@ -55,8 +55,7 @@ class DictationAccessibilityService : AccessibilityService() {
             text
         } else {
             val current = node.text.toString()
-            if (current.endsWith(" ") || current.endsWith("
-")) "$current$text" else "$current $text"
+            if (current.endsWith(" ") || current.endsWith("\n")) "$current$text" else "$current $text"
         }
 
         val args = Bundle().apply {

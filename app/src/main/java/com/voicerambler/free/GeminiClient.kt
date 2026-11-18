@@ -38,8 +38,7 @@ object GeminiClient {
         }
 
         val glossaryBlock = if (glossary.isNotBlank()) {
-            "
-Personal vocabulary / exact spellings to prefer when heard: $glossary"
+            "\nPersonal vocabulary / exact spellings to prefer when heard: $glossary"
         } else ""
 
         return """
@@ -82,10 +81,7 @@ Personal vocabulary / exact spellings to prefer when heard: $glossary"
                     })
                 })
                 val userInstruction = if (mode == DictationMode.VOICE_EDIT && !existingText.isNullOrBlank()) {
-                    "EXISTING TEXT:
-$existingText
-
-Apply my spoken edit command from the audio above."
+                    "EXISTING TEXT:\n$existingText\n\nApply my spoken edit command from the audio above."
                 } else {
                     "Transcribe and clean up the attached voice recording."
                 }
