@@ -8,10 +8,12 @@ import java.io.File
 class AudioRecorderHelper(private val context: Context) {
     private var recorder: MediaRecorder? = null
     private var outputFile: File? = null
+    private var startTimeMs: Long = 0L
 
     fun startRecording(): File {
         val file = File(context.cacheDir, "dictation_${System.currentTimeMillis()}.m4a")
         outputFile = file
+        startTimeMs = System.currentTimeMillis()
 
         val mr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             MediaRecorder(context)
@@ -21,12 +23,12 @@ class AudioRecorderHelper(private val context: Context) {
         }
 
         mr.apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             setAudioChannels(1)
-            setAudioSamplingRate(16000)
-            setAudioEncodingBitRate(32000)
+            setAudioSamplingRate(44100)
+            setAudioEncodingBitRate(64000)
             setOutputFile(file.absolutePath)
             prepare()
             start()
@@ -36,13 +38,19 @@ class AudioRecorderHelper(private val context: Context) {
     }
 
     fun stopRecording(): File? {
+        val duration = System.currentTimeMillis() - startTimeMs
         return try {
             recorder?.apply {
                 stop()
                 release()
             }
             recorder = null
-            outputFile
+            if (duration < 400L) {
+                outputFile?.delete()
+                null
+            } else {
+                outputFile
+            }
         } catch (_: Exception) {
             try { recorder?.release() } catch (_: Exception) {}
             recorder = null

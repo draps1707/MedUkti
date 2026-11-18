@@ -13,26 +13,20 @@ import java.net.URL
 object GeminiClient {
 
     private val SYSTEM_PROMPT = """
-        You are an ultra-accurate multilingual and medical voice dictation engine.
+        You are a strict speech-to-text transcription and cleanup engine.
         Supported languages ONLY: English, Hindi, Hinglish (Hindi in Roman script), and Odia.
-        Do not output any other language.
 
-        Core rules:
-        1. Automatic language handling:
-           - Detect English, Hindi, Hinglish, and Odia automatically—even when mixed mid-sentence.
-           - Keep English in English.
-           - Keep conversational Hinglish in natural Roman script (do NOT force Devanagari unless the speaker clearly dictated pure formal Hindi).
-           - Write Odia phrases accurately in Odia script (ଓଡ଼ିଆ), while keeping embedded English/medical terms in English.
-        2. Clinical Safety & Medical Terminology (MANDATORY):
-           - Actively recognize clinical, anatomical, diagnostic, surgical, lab, imaging, and pharmacology terminology across all specialties (Casualty, Medicine, Cardiology, Pulmonology, Gastro, Nephro, Neuro, Psych, Ortho, Endocrinology, Infectious Diseases, Pediatrics, OB-GYN).
-           - NEVER alter, drop, round, or invent numbers, decimal points, lab values, vitals, or units (mg, mcg, gm, mL, IU, %, mmHg).
-           - NEVER alter negations (no, not, nil, absent, negative for, denies, without, nahi, na) or laterality (left, right, bilateral, unilateral).
-           - Fix clear phonetic misrecognitions into standard medical spellings and abbreviations (e.g., "SpO2 94% on RA", "CBC, LFT, RFT, ABG", "ceftriaxone", "piperacillin-tazobactam", "500 mg BD", "GCS 15/15"), but never substitute a different drug if uncertain.
-        3. Intelligent Punctuation & Formatting:
-           - Remove filler words (um, uh, ah, matlab, basically, you know) and false starts, while preserving all clinical facts.
-           - Infer accurate punctuation (periods, commas, question marks, colons, hyphens) from natural speech rhythm.
-           - Format enumerated items or treatment plans into clean bullet points or numbered lists, and separate distinct thoughts into paragraphs.
-           - Output ONLY the final cleaned text with no quotes, explanations, or preambles. If no speech is heard, return an empty string.
+        STRICT ANTI-HALLUCINATION RULES (HIGHEST PRIORITY):
+        1. Transcribe ONLY the exact words actually spoken in the attached audio.
+        2. NEVER invent, autocomplete, continue, or generate any sentence, vital sign, examination finding, or clinical note that was NOT explicitly spoken in the audio.
+        3. If the audio is silent, unclear, or contains only background noise with no speech, return an empty response ("").
+
+        LANGUAGE, MEDICAL & FORMATTING RULES:
+        4. Automatically detect English, Hindi, Hinglish (Roman script), and Odia (ଓଡ଼ିଆ script), including mid-sentence switching.
+        5. Accurately spell all medical, anatomical, lab, imaging, and drug names spoken in the audio.
+        6. NEVER alter spoken numbers, decimals, units, drug doses, laterality, or negations.
+        7. Remove only filler sounds (um, uh, ah) and add natural punctuation, capitalization, and list/paragraph formatting where spoken.
+        8. Output ONLY the transcribed text—no quotes, no labels, no explanations.
     """.trimIndent()
 
     suspend fun transcribeAudio(
@@ -41,8 +35,8 @@ object GeminiClient {
         audioFile: File
     ): Result<String> = withContext(Dispatchers.IO) {
         val audioBytes = audioFile.readBytes()
-        if (audioBytes.size < 500) {
-            return@withContext Result.failure(Exception("Audio too short"))
+        if (audioBytes.size < 2500) {
+            return@withContext Result.failure(Exception("Recording too short"))
         }
         val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
         val modelsToTry = (listOf(preferredModel) + Prefs.AVAILABLE_MODELS).distinct()
@@ -70,7 +64,7 @@ object GeminiClient {
                                 put("data", base64Audio)
                             })
                         })
-                        put(JSONObject().put("text", "Transcribe and clean up this voice recording following all language, clinical safety, and formatting rules."))
+                        put(JSONObject().put("text", "Transcribe ONLY what is spoken in this audio. Do not add or invent anything."))
                     }
 
                     val payload = JSONObject().apply {
