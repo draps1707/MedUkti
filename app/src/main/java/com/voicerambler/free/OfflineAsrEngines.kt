@@ -11,13 +11,15 @@ object OfflineAsrEngines {
     fun resolveEngine(ctx: Context, engine: AsrEngineType): Result<AsrEngineType> {
         if (engine != AsrEngineType.AUTO_OFFLINE) return Result.success(engine)
         return when {
+            ModelDownloader.isMedAsrInstalled(ctx) -> Result.success(AsrEngineType.MEDASR_EN)
+            ModelDownloader.isParakeetInstalled(ctx) -> Result.success(AsrEngineType.PARAKEET_TDT_110M)
             ModelDownloader.isIndianEnInstalled(ctx) -> Result.success(AsrEngineType.INDIAN_EN_STREAMING)
             ModelDownloader.isInstalled(ctx, ModelDownloader.WHISPER_SWIFT_ENC) &&
                 ModelDownloader.isInstalled(ctx, ModelDownloader.WHISPER_SWIFT_DEC) -> Result.success(AsrEngineType.WHISPER_HINGLISH_SWIFT)
             ModelDownloader.isInstalled(ctx, ModelDownloader.INDIC_HI) -> Result.success(AsrEngineType.INDIC_CONFORMER_HI)
             ModelDownloader.isInstalled(ctx, ModelDownloader.INDIC_OR) -> Result.success(AsrEngineType.INDIC_CONFORMER_OR)
             Prefs.getApiKey(ctx).isNotBlank() -> Result.success(AsrEngineType.GEMINI_CLOUD)
-            else -> Result.failure(Exception("Download English (India) Live Pack or All Offline Models first"))
+            else -> Result.failure(Exception("Download Google MedASR, Parakeet TDT 110M, or English (India) Pack first"))
         }
     }
 
@@ -33,6 +35,8 @@ object OfflineAsrEngines {
     ): Result<String> = withContext(Dispatchers.IO) {
         val resolved = resolveEngine(ctx, engine).getOrElse { return@withContext Result.failure(it) }
         when (resolved) {
+            AsrEngineType.MEDASR_EN,
+            AsrEngineType.PARAKEET_TDT_110M,
             AsrEngineType.INDIAN_EN_STREAMING,
             AsrEngineType.INDIC_CONFORMER_OR,
             AsrEngineType.INDIC_CONFORMER_HI,
@@ -60,6 +64,8 @@ object OfflineAsrEngines {
     ): Result<String> = withContext(Dispatchers.IO) {
         val resolved = resolveEngine(ctx, engine).getOrElse { return@withContext Result.failure(it) }
         when (resolved) {
+            AsrEngineType.MEDASR_EN,
+            AsrEngineType.PARAKEET_TDT_110M,
             AsrEngineType.INDIAN_EN_STREAMING,
             AsrEngineType.INDIC_CONFORMER_OR,
             AsrEngineType.INDIC_CONFORMER_HI,

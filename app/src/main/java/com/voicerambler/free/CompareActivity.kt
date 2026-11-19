@@ -46,8 +46,24 @@ class CompareActivity : AppCompatActivity() {
                 uiScope.launch {
                     val out = StringBuilder()
 
+                    val medAsr = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.MEDASR_EN, wav)
+                    out.appendLine("=== Google MedASR Medical English ===")
+                    medAsr.onSuccess { raw ->
+                        out.appendLine("Raw: $raw")
+                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
+                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
+                    out.appendLine()
+
+                    val parakeet = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.PARAKEET_TDT_110M, wav)
+                    out.appendLine("=== Parakeet TDT 110M English ===")
+                    parakeet.onSuccess { raw ->
+                        out.appendLine("Raw: $raw")
+                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
+                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
+                    out.appendLine()
+
                     val indEn = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIAN_EN_STREAMING, wav)
-                    out.appendLine("=== English (India) Streaming Zipformer ===")
+                    out.appendLine("=== English (India) Streaming + Hotwords ===")
                     indEn.onSuccess { raw ->
                         out.appendLine("Raw: $raw")
                         out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")

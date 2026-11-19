@@ -4,10 +4,12 @@ import android.content.Context
 import com.k2fsa.sherpa.onnx.EndpointConfig
 import com.k2fsa.sherpa.onnx.EndpointRule
 import com.k2fsa.sherpa.onnx.FeatureConfig
+import com.k2fsa.sherpa.onnx.OfflineMedAsrCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
 import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
@@ -97,31 +99,80 @@ object SherpaOnnxEngine {
         val dec = ModelDownloader.getFile(ctx, ModelDownloader.INDIAN_EN_DEC)
         val joiner = ModelDownloader.getFile(ctx, ModelDownloader.INDIAN_EN_JOINER)
         val tok = ModelDownloader.getFile(ctx, ModelDownloader.INDIAN_EN_TOKENS)
+        val bpeOk = ModelDownloader.isInstalled(ctx, ModelDownloader.INDIAN_EN_BPE)
+        val bpeFile = ModelDownloader.getFile(ctx, ModelDownloader.INDIAN_EN_BPE)
+        val hotwordsFile = if (bpeOk) MedicalNormalizer.ensureHotwordsFile(ctx) else null
 
-        val config = OnlineRecognizerConfig(
-            featConfig = FeatureConfig(sampleRate = 16000, featureDim = 80),
-            modelConfig = OnlineModelConfig(
-                transducer = OnlineTransducerModelConfig(
-                    encoder = enc.absolutePath,
-                    decoder = dec.absolutePath,
-                    joiner = joiner.absolutePath
-                ),
-                tokens = tok.absolutePath,
-                numThreads = 4,
-                debug = false,
-                modelType = "zipformer2"
-            ),
-            endpointConfig = EndpointConfig(
-                rule1 = EndpointRule(false, 2.4f, 0.0f),
-                rule2 = EndpointRule(true, 1.0f, 0.0f),
-                rule3 = EndpointRule(false, 0.0f, 20.0f)
-            ),
-            enableEndpoint = true,
-            decodingMethod = "greedy_search"
+        val endpointCfg = EndpointConfig(
+            rule1 = EndpointRule(false, 2.4f, 0.0f),
+            rule2 = EndpointRule(true, 1.0f, 0.0f),
+            rule3 = EndpointRule(false, 0.0f, 20.0f)
         )
-        val rec = OnlineRecognizer(assetManager = null, config = config)
+
+        val rec = if (bpeOk && hotwordsFile != null && hotwordsFile.exists()) {
+            try {
+                OnlineRecognizer(
+                    assetManager = null,
+                    config = OnlineRecognizerConfig(
+                        featConfig = FeatureConfig(sampleRate = 16000, featureDim = 80),
+                        modelConfig = OnlineModelConfig(
+                            transducer = OnlineTransducerModelConfig(
+                                encoder = enc.absolutePath,
+                                decoder = dec.absolutePath,
+                                joiner = joiner.absolutePath
+                            ),
+                            tokens = tok.absolutePath,
+                            numThreads = 4,
+                            debug = false,
+                            modelType = "zipformer2",
+                            modelingUnit = "bpe",
+                            bpeVocab = bpeFile.absolutePath
+                        ),
+                        endpointConfig = endpointCfg,
+                        enableEndpoint = true,
+                        decodingMethod = "modified_beam_search",
+                        maxActivePaths = 4,
+                        hotwordsFile = hotwordsFile.absolutePath,
+                        hotwordsScore = 2.0f
+                    )
+                )
+            } catch (_: Exception) {
+                buildPlainOnlineRecognizer(enc, dec, joiner, tok, endpointCfg)
+            }
+        } else {
+            buildPlainOnlineRecognizer(enc, dec, joiner, tok, endpointCfg)
+        }
         onlineRecognizer = rec
         return rec
+    }
+
+    private fun buildPlainOnlineRecognizer(
+        enc: File,
+        dec: File,
+        joiner: File,
+        tok: File,
+        endpointCfg: EndpointConfig
+    ): OnlineRecognizer {
+        return OnlineRecognizer(
+            assetManager = null,
+            config = OnlineRecognizerConfig(
+                featConfig = FeatureConfig(sampleRate = 16000, featureDim = 80),
+                modelConfig = OnlineModelConfig(
+                    transducer = OnlineTransducerModelConfig(
+                        encoder = enc.absolutePath,
+                        decoder = dec.absolutePath,
+                        joiner = joiner.absolutePath
+                    ),
+                    tokens = tok.absolutePath,
+                    numThreads = 4,
+                    debug = false,
+                    modelType = "zipformer2"
+                ),
+                endpointConfig = endpointCfg,
+                enableEndpoint = true,
+                decodingMethod = "greedy_search"
+            )
+        )
     }
 
     @Synchronized
@@ -133,6 +184,39 @@ object SherpaOnnxEngine {
         recognizer = null
 
         val modelConfig = when (engine) {
+            AsrEngineType.MEDASR_EN -> {
+                val model = ModelDownloader.getFile(ctx, ModelDownloader.MEDASR_MODEL)
+                val tokens = ModelDownloader.getFile(ctx, ModelDownloader.MEDASR_TOKENS)
+                if (!model.exists() || !tokens.exists()) {
+                    throw IllegalStateException("Download Google MedASR Medical Pack first")
+                }
+                OfflineModelConfig(
+                    medasr = OfflineMedAsrCtcModelConfig(model = model.absolutePath),
+                    tokens = tokens.absolutePath,
+                    numThreads = 4,
+                    debug = false
+                )
+            }
+            AsrEngineType.PARAKEET_TDT_110M -> {
+                val enc = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_ENC)
+                val dec = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_DEC)
+                val joiner = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_JOINER)
+                val tokens = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_TOKENS)
+                if (!enc.exists() || !dec.exists() || !joiner.exists() || !tokens.exists()) {
+                    throw IllegalStateException("Download Parakeet TDT 110M Pack first")
+                }
+                OfflineModelConfig(
+                    transducer = OfflineTransducerModelConfig(
+                        encoder = enc.absolutePath,
+                        decoder = dec.absolutePath,
+                        joiner = joiner.absolutePath
+                    ),
+                    tokens = tokens.absolutePath,
+                    modelType = "nemo_transducer",
+                    numThreads = 4,
+                    debug = false
+                )
+            }
             AsrEngineType.INDIC_CONFORMER_OR -> {
                 val model = ModelDownloader.getFile(ctx, ModelDownloader.INDIC_OR)
                 val tokens = ModelDownloader.getFile(ctx, ModelDownloader.INDIC_TOKENS)
@@ -193,9 +277,12 @@ object SherpaOnnxEngine {
 
     fun preload(ctx: Context, engine: AsrEngineType) {
         try {
+            MedicalNormalizer.init(ctx)
             getOrCreateVad(ctx)
             when (engine) {
                 AsrEngineType.INDIAN_EN_STREAMING -> getOrCreateOnlineRecognizer(ctx)
+                AsrEngineType.MEDASR_EN,
+                AsrEngineType.PARAKEET_TDT_110M,
                 AsrEngineType.WHISPER_HINGLISH_SWIFT,
                 AsrEngineType.INDIC_CONFORMER_HI,
                 AsrEngineType.INDIC_CONFORMER_OR -> getOrCreateRecognizer(ctx, engine)
@@ -211,7 +298,6 @@ object SherpaOnnxEngine {
             val rec = getOrCreateOnlineRecognizer(ctx)
             val stream = rec.createStream()
             stream.acceptWaveform(samples, 16000)
-            // Pad 0.4s trailing silence so the final word flushes cleanly
             stream.acceptWaveform(FloatArray(6400), 16000)
             while (rec.isReady(stream)) {
                 rec.decode(stream)

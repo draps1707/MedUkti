@@ -53,11 +53,36 @@ class MainActivity : AppCompatActivity() {
         spinnerModel.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Prefs.AVAILABLE_MODELS)
         spinnerModel.setSelection(Prefs.AVAILABLE_MODELS.indexOf(Prefs.getModel(this)).coerceAtLeast(0))
 
+        findViewById<Button>(R.id.btnDlMedAsr).setOnClickListener {
+            downloadBatch(
+                listOf(
+                    ModelDownloader.SILERO_VAD,
+                    ModelDownloader.MEDASR_TOKENS,
+                    ModelDownloader.MEDASR_MODEL
+                ),
+                "Google MedASR Medical Pack"
+            )
+        }
+
+        findViewById<Button>(R.id.btnDlParakeet).setOnClickListener {
+            downloadBatch(
+                listOf(
+                    ModelDownloader.SILERO_VAD,
+                    ModelDownloader.PARAKEET_TOKENS,
+                    ModelDownloader.PARAKEET_ENC,
+                    ModelDownloader.PARAKEET_DEC,
+                    ModelDownloader.PARAKEET_JOINER
+                ),
+                "Parakeet TDT 110M"
+            )
+        }
+
         findViewById<Button>(R.id.btnDlIndianEn).setOnClickListener {
             downloadBatch(
                 listOf(
                     ModelDownloader.SILERO_VAD,
                     ModelDownloader.INDIAN_EN_TOKENS,
+                    ModelDownloader.INDIAN_EN_BPE,
                     ModelDownloader.INDIAN_EN_ENC,
                     ModelDownloader.INDIAN_EN_DEC,
                     ModelDownloader.INDIAN_EN_JOINER
@@ -70,7 +95,14 @@ class MainActivity : AppCompatActivity() {
             downloadBatch(
                 listOf(
                     ModelDownloader.SILERO_VAD,
+                    ModelDownloader.MEDASR_TOKENS,
+                    ModelDownloader.MEDASR_MODEL,
+                    ModelDownloader.PARAKEET_TOKENS,
+                    ModelDownloader.PARAKEET_ENC,
+                    ModelDownloader.PARAKEET_DEC,
+                    ModelDownloader.PARAKEET_JOINER,
                     ModelDownloader.INDIAN_EN_TOKENS,
+                    ModelDownloader.INDIAN_EN_BPE,
                     ModelDownloader.INDIAN_EN_ENC,
                     ModelDownloader.INDIAN_EN_DEC,
                     ModelDownloader.INDIAN_EN_JOINER,
@@ -178,6 +210,8 @@ class MainActivity : AppCompatActivity() {
         val overlayOk = Settings.canDrawOverlays(this)
         val accOk = DictationAccessibilityService.instance != null
         val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
+        val medAsrOk = ModelDownloader.isMedAsrInstalled(this)
+        val parakeetOk = ModelDownloader.isParakeetInstalled(this)
         val indianEnOk = ModelDownloader.isIndianEnInstalled(this)
         val indicOrOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_OR)
         val indicHiOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_HI)
@@ -185,6 +219,8 @@ class MainActivity : AppCompatActivity() {
 
         tvStatus.text = buildString {
             appendLine("Active Engine: ${Prefs.getEngine(this@MainActivity).label}")
+            appendLine("Google MedASR Medical: ${if (medAsrOk) "Installed" else "Not downloaded"}")
+            appendLine("Parakeet TDT 110M: ${if (parakeetOk) "Installed" else "Not downloaded"}")
             appendLine("English (India) Live: ${if (indianEnOk) "Installed" else "Not downloaded"}")
             appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
             appendLine("Whisper Hinglish Swift: ${if (swiftOk) "Installed" else "Not downloaded"}")

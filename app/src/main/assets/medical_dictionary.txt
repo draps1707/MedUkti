@@ -38,7 +38,8 @@ Nystagmus
 Ptosis
 Proptosis
 Papilloedema
-Tinnitus Hypertension
+Tinnitus
+Hypertension
 Hypotension
 Hypertensive urgency
 Hypertensive emergency

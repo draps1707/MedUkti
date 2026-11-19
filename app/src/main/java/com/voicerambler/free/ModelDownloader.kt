@@ -23,6 +23,42 @@ object ModelDownloader {
         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
     )
 
+    val MEDASR_MODEL = ModelArtifact(
+        "medasr_model",
+        "medasr-model.int8.onnx",
+        "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/model.int8.onnx"
+    )
+
+    val MEDASR_TOKENS = ModelArtifact(
+        "medasr_tokens",
+        "medasr-tokens.txt",
+        "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/tokens.txt"
+    )
+
+    val PARAKEET_ENC = ModelArtifact(
+        "parakeet_enc",
+        "parakeet-110m-encoder.int8.onnx",
+        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/encoder.int8.onnx"
+    )
+
+    val PARAKEET_DEC = ModelArtifact(
+        "parakeet_dec",
+        "parakeet-110m-decoder.int8.onnx",
+        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/decoder.int8.onnx"
+    )
+
+    val PARAKEET_JOINER = ModelArtifact(
+        "parakeet_joiner",
+        "parakeet-110m-joiner.int8.onnx",
+        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/joiner.int8.onnx"
+    )
+
+    val PARAKEET_TOKENS = ModelArtifact(
+        "parakeet_tokens",
+        "parakeet-110m-tokens.txt",
+        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/tokens.txt"
+    )
+
     val INDIAN_EN_ENC = ModelArtifact(
         "indian_en_enc",
         "indian-en-encoder.int8.onnx",
@@ -45,6 +81,12 @@ object ModelDownloader {
         "indian_en_tokens",
         "indian-en-tokens.txt",
         "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/tokens.txt"
+    )
+
+    val INDIAN_EN_BPE = ModelArtifact(
+        "indian_en_bpe",
+        "indian-en-bpe.model",
+        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/bpe.model"
     )
 
     val INDIC_TOKENS = ModelArtifact(
@@ -91,6 +133,15 @@ object ModelDownloader {
         val f = getFile(ctx, artifact)
         return f.exists() && f.length() > 512L
     }
+
+    fun isMedAsrInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, MEDASR_MODEL) && isInstalled(ctx, MEDASR_TOKENS)
+
+    fun isParakeetInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, PARAKEET_ENC) &&
+            isInstalled(ctx, PARAKEET_DEC) &&
+            isInstalled(ctx, PARAKEET_JOINER) &&
+            isInstalled(ctx, PARAKEET_TOKENS)
 
     fun isIndianEnInstalled(ctx: Context): Boolean =
         isInstalled(ctx, INDIAN_EN_ENC) &&

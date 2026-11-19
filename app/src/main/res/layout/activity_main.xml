@@ -20,22 +20,36 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Live Offline Inline Dictation (English India + Hinglish + Hindi + Odia)"
+            android:text="Offline Medical + Indian English + Hinglish + Hindi + Odia"
             android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnDlMedAsr"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Download Google MedASR Medical Pack (Recommended)" />
+
+        <Button
+            android:id="@+id/btnDlParakeet"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download Parakeet TDT 110M English (~136 MB - Fast)" />
 
         <Button
             android:id="@+id/btnDlIndianEn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Download English (India) Live Pack (~71 MB - Fastest)" />
+            android:layout_marginTop="6dp"
+            android:text="Download English (India) Live Pack (~71 MB)" />
 
         <Button
             android:id="@+id/btnDlAll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Download All Offline Models (Recommended)" />
+            android:layout_marginTop="6dp"
+            android:text="Download All Offline Models (Full Suite)" />
 
         <TextView
             android:layout_width="wrap_content"
