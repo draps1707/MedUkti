@@ -11,8 +11,8 @@ android {
         applicationId = "com.voicerambler.free"
         minSdk = 29
         targetSdk = 35
-        versionCode = 8
-        versionName = "3.0.2"
+        versionCode = 9
+        versionName = "3.1.0"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -48,6 +48,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    packaging {
+        jniLibs {
+            pickFirsts += listOf("lib/**/libonnxruntime.so")
+        }
+    }
 }
 
 dependencies {
@@ -56,4 +62,5 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 }

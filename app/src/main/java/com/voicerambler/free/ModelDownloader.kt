@@ -34,6 +34,18 @@ object ModelDownloader {
         "https://huggingface.co/Docglasses-AI/indic-conformer-600m-sherpa-onnx-int8/resolve/main/indicconformer-or.int8.onnx"
     )
 
+    val SRAVAANI_ENC = ModelArtifact(
+        "sravaani_enc",
+        "sravaani-encoder.onnx",
+        "https://huggingface.co/killbanhar/sravaani-onnx/resolve/main/encoder.onnx"
+    )
+
+    val SRAVAANI_DEC = ModelArtifact(
+        "sravaani_dec",
+        "sravaani-decoder-joint.onnx",
+        "https://huggingface.co/killbanhar/sravaani-onnx/resolve/main/decoder_joint.onnx"
+    )
+
     val MEDASR_MODEL = ModelArtifact(
         "medasr_model",
         "medasr-model.int8.onnx",
@@ -106,6 +118,9 @@ object ModelDownloader {
     fun isOdiaInstalled(ctx: Context): Boolean =
         isInstalled(ctx, INDIC_OR) && isInstalled(ctx, INDIC_TOKENS)
 
+    fun isSraVaaniInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, SRAVAANI_ENC) && isInstalled(ctx, SRAVAANI_DEC)
+
     fun isMedAsrInstalled(ctx: Context): Boolean =
         isInstalled(ctx, MEDASR_MODEL) && isInstalled(ctx, MEDASR_TOKENS)
 
@@ -126,6 +141,8 @@ object ModelDownloader {
             SILERO_VAD.fileName,
             INDIC_TOKENS.fileName,
             INDIC_OR.fileName,
+            SRAVAANI_ENC.fileName,
+            SRAVAANI_DEC.fileName,
             MEDASR_MODEL.fileName,
             MEDASR_TOKENS.fileName,
             PARAKEET_110M_ENC.fileName,

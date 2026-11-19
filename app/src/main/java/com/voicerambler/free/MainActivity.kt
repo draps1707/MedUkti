@@ -83,6 +83,12 @@ class MainActivity : AppCompatActivity() {
                 "Odia Offline Pack"
             )
         }
+        findViewById<Button>(R.id.btnDlSraVaani).setOnClickListener {
+            downloadBatch(
+                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.SRAVAANI_DEC, ModelDownloader.SRAVAANI_ENC),
+                "SraVaani 1.0 Odia Natural"
+            )
+        }
         findViewById<Button>(R.id.btnCompare).setOnClickListener {
             startActivity(Intent(this, CompareActivity::class.java))
         }
@@ -171,6 +177,7 @@ class MainActivity : AppCompatActivity() {
         val p110Ok = ModelDownloader.isParakeet110mInstalled(this)
         val p06bOk = ModelDownloader.isParakeet06bInstalled(this)
         val odiaOk = ModelDownloader.isOdiaInstalled(this)
+        val sravaaniOk = ModelDownloader.isSraVaaniInstalled(this)
 
         tvStatus.text = buildString {
             appendLine("Active Mode: ${Prefs.getEngine(this@MainActivity).label}")
@@ -178,6 +185,7 @@ class MainActivity : AppCompatActivity() {
             appendLine("Parakeet TDT 110M: ${if (p110Ok) "Installed" else "Not downloaded"}")
             appendLine("Parakeet TDT 0.6B v2: ${if (p06bOk) "Installed" else "Not downloaded"}")
             appendLine("Odia (IndicConformer): ${if (odiaOk) "Installed" else "Not downloaded"}")
+            appendLine("Odia Natural (SraVaani 1.0): ${if (sravaaniOk) "Installed" else "Not downloaded"}")
             appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
             appendLine("Mic: ${if (micOk) "OK" else "Needed"} | Overlay: ${if (overlayOk) "OK" else "Needed"} | Accessibility: ${if (accOk) "OK" else "Needed"}")
         }

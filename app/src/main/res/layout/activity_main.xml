@@ -64,6 +64,13 @@
             android:text="Download Odia Offline Pack (~661 MB)" />
 
         <Button
+            android:id="@+id/btnDlSraVaani"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download SraVaani 1.0 Odia Natural (~1.81 GB)" />
+
+        <Button
             android:id="@+id/btnCompare"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

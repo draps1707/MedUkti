@@ -399,7 +399,7 @@ object MedicalNormalizer {
         var text = raw.trim()
         if (text.isEmpty()) return ""
 
-        if (engine == AsrEngineType.INDIC_CONFORMER_OR) {
+        if (Prefs.isOdiaEngine(engine)) {
             for ((odia, eng) in ODIA_TO_ENGLISH_BRIDGE) {
                 if (' ' in odia && odia in text) {
                     text = text.replace(odia, eng)
@@ -621,5 +621,58 @@ object MedicalNormalizer {
         }
 
         return pWords.joinToString(" ")
+    }
+
+    private val BROKEN_ODIA_MATRA = Regex("(?<=[\\s^])[\\u0B3E-\\u0B4C\\u0B56\\u0B57]|([\\u0B3E-\\u0B4C\\u0B56\\u0B57])\\1+")
+
+    fun cleanBrokenOdiaMatras(text: String): String {
+        return text
+            .replace(Regex("(?<=\\s)[\\u0B3E-\\u0B4C\\u0B56\\u0B57\\u0B01-\\u0B03]+"), "")
+            .replace(Regex("([\\u0B3E-\\u0B4C\\u0B56\\u0B57])\\1+"), "$1")
+            .replace(Regex("[ \\t]{2,}"), " ")
+            .trim()
+    }
+
+    fun mergeOdiaIndicAndSraVaani(indicRaw: String, sravaaniRaw: String): String {
+        val iClean = cleanBrokenOdiaMatras(indicRaw)
+        val sClean = cleanBrokenOdiaMatras(sravaaniRaw)
+        if (iClean.isEmpty()) return sClean
+        if (sClean.isEmpty()) return iClean
+
+        val iWords = iClean.split(Regex("\\s+")).toMutableList()
+        val sWords = sClean.split(Regex("\\s+"))
+
+        // If SraVaani has English/Latin words (e.g. "slip", "back"), prefer them over Odia transliterations
+        val sEnglish = sWords.filter { it.any { c -> c in 'a'..'z' || c in 'A'..'Z' } }
+        for (eng in sEnglish) {
+            val engSk = englishSkeleton(eng.trimEnd('.', ',', '?', '!'))
+            if (engSk.length < 2) continue
+            for (idx in iWords.indices) {
+                val w = iWords[idx]
+                if (w.any { it in '\u0B00'..'\u0B7F' }) {
+                    val oSk = odiaSkeleton(w)
+                    if (oSk == engSk || (engSk.length >= 3 && levenshtein(oSk, engSk, 1) <= 1)) {
+                        iWords[idx] = eng
+                        break
+                    }
+                }
+            }
+        }
+
+        // Replace broken/single-char Odia fragments with aligned SraVaani word if length ratio matches
+        val ratio = sWords.size.toDouble() / iWords.size.coerceAtLeast(1)
+        for (idx in iWords.indices) {
+            val w = iWords[idx]
+            val hasBroken = BROKEN_ODIA_MATRA.containsMatchIn(w) || (w.length == 1 && w[0] in '\u0B00'..'\u0B7F' && w !in setOf("ଓ", "ଏ", "ଆ", "ଇ", "ଉ"))
+            if (hasBroken) {
+                val sIdx = (idx * ratio).toInt().coerceIn(0, sWords.lastIndex)
+                val cand = sWords[sIdx]
+                if (cand.length >= 2) {
+                    iWords[idx] = cand
+                }
+            }
+        }
+
+        return iWords.joinToString(" ").replace(Regex("[ \\t]{2,}"), " ").trim()
     }
 }

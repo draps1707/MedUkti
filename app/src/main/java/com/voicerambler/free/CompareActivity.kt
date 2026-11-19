@@ -52,7 +52,9 @@ class CompareActivity : AppCompatActivity() {
                         "Google MedASR Only" to AsrEngineType.MEDASR_CTC,
                         "Parakeet 0.6B v2 Only" to AsrEngineType.PARAKEET_06B_V2,
                         "Parakeet 110M Only" to AsrEngineType.PARAKEET_110M,
-                        "Odia (IndicConformer 600M)" to AsrEngineType.INDIC_CONFORMER_OR
+                        "Odia Dual (IndicConformer + SraVaani)" to AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI,
+                        "Odia (IndicConformer 600M)" to AsrEngineType.INDIC_CONFORMER_OR,
+                        "Odia Natural (SraVaani 1.0)" to AsrEngineType.SRAVAANI_OR
                     )
 
                     for ((title, eng) in tests) {

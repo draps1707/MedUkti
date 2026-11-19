@@ -165,19 +165,16 @@ class FloatingMicService : Service() {
 
     private fun refreshLangBadge() {
         val eng = Prefs.getEngine(this)
-        tvLangBadge?.text = when (eng) {
-            AsrEngineType.INDIC_CONFORMER_OR -> "OD"
-            else -> "MED"
-        }
+        tvLangBadge?.text = if (Prefs.isOdiaEngine(eng)) "OD" else "MED"
     }
 
     private fun toggleLanguage() {
         if (isListening.get() || isProcessing) return
         val cur = Prefs.getEngine(this)
-        val next = if (cur == AsrEngineType.INDIC_CONFORMER_OR) {
+        val next = if (Prefs.isOdiaEngine(cur)) {
             Prefs.getMedEngine(this)
         } else {
-            AsrEngineType.INDIC_CONFORMER_OR
+            Prefs.getOdiaEngine(this)
         }
         Prefs.setEngine(this, next)
         refreshLangBadge()
@@ -185,7 +182,7 @@ class FloatingMicService : Service() {
         serviceScope.launch { OfflineAsrEngines.preload(this@FloatingMicService) }
         Toast.makeText(
             this,
-            if (next == AsrEngineType.INDIC_CONFORMER_OR) "Switched to Odia" else "Switched to Medical (${next.name.substringBefore('_')})",
+            if (Prefs.isOdiaEngine(next)) "Switched to Odia" else "Switched to Medical (${next.name.substringBefore('_')})",
             Toast.LENGTH_SHORT
         ).show()
         serviceScope.launch { OfflineAsrEngines.preload(this@FloatingMicService) }
