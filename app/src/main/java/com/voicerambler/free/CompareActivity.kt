@@ -56,12 +56,6 @@ class CompareActivity : AppCompatActivity() {
                     indicOr.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
                     out.appendLine()
 
-                    val key = Prefs.getApiKey(this@CompareActivity)
-                    if (key.isNotBlank()) {
-                        val gem = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.GEMINI_CLOUD, wav)
-                        out.appendLine("=== Optional Gemini Cloud ===")
-                        gem.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Error: ${it.message}") }
-                    }
 
                     wav.delete()
                     tv.text = out.toString()

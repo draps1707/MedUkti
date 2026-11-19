@@ -20,7 +20,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Offline Hinglish &amp; Odia Inline Voice Typing"
+            android:text="100% Offline Hinglish &amp; Odia Inline Voice Typing"
             android:textSize="13sp" />
 
         <TextView
@@ -72,30 +72,11 @@
             android:inputType="textMultiLine"
             android:minLines="3" />
 
-        <CheckBox
-            android:id="@+id/cbGeminiOptional"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="Optional: Polish offline transcript with Gemini Cloud" />
-
-        <EditText
-            android:id="@+id/etApiKey"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Optional Gemini API key (not required)"
-            android:inputType="textPassword" />
-
-        <Spinner
-            android:id="@+id/spinnerModel"
-            android:layout_width="match_parent"
-            android:layout_height="48dp" />
-
         <Button
             android:id="@+id/btnSaveStart"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="16dp"
             android:text="Save &amp; Start Floating Mic" />
 
         <TextView

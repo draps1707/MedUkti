@@ -10,7 +10,6 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
@@ -41,19 +40,12 @@ class MainActivity : AppCompatActivity() {
 
         val spinnerEngine = findViewById<Spinner>(R.id.spinnerEngine)
         val etPersonalDict = findViewById<EditText>(R.id.etPersonalDict)
-        val cbGemini = findViewById<CheckBox>(R.id.cbGeminiOptional)
-        val etApiKey = findViewById<EditText>(R.id.etApiKey)
-        val spinnerModel = findViewById<Spinner>(R.id.spinnerModel)
         tvStatus = findViewById(R.id.tvStatus)
 
         spinnerEngine.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
         spinnerEngine.setSelection(AsrEngineType.entries.indexOf(Prefs.getEngine(this)).coerceAtLeast(0))
 
         etPersonalDict.setText(Prefs.getPersonalDict(this))
-        cbGemini.isChecked = Prefs.isGeminiPolishEnabled(this)
-        etApiKey.setText(Prefs.getApiKey(this))
-        spinnerModel.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Prefs.AVAILABLE_MODELS)
-        spinnerModel.setSelection(Prefs.AVAILABLE_MODELS.indexOf(Prefs.getModel(this)).coerceAtLeast(0))
 
         findViewById<Button>(R.id.btnDlWhisperApex).setOnClickListener {
             downloadBatch(
@@ -74,9 +66,6 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnSaveStart).setOnClickListener {
             Prefs.setEngine(this, AsrEngineType.entries[spinnerEngine.selectedItemPosition])
             Prefs.setPersonalDict(this, etPersonalDict.text.toString())
-            Prefs.setGeminiPolishEnabled(this, cbGemini.isChecked)
-            Prefs.setApiKey(this, etApiKey.text.toString())
-            Prefs.setModel(this, Prefs.AVAILABLE_MODELS[spinnerModel.selectedItemPosition])
             askedThisSession = false
             checkAndRequestNextMissingPermission()
             updateStatusAndAutoStart()

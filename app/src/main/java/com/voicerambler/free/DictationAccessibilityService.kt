@@ -72,13 +72,15 @@ class DictationAccessibilityService : AccessibilityService() {
         return if (isHint) "" else (node.text?.toString() ?: "")
     }
 
-    /** Returns (beforeCursor, afterCursor) without ever capturing placeholder hint text. */
+    /** Returns (beforeCursor, afterCursor). Defaults to end of existing text if selection is -1. */
     fun getCursorContext(): Pair<String, String>? {
         val node = getFreshEditableNode() ?: return null
         val full = getRealText(node)
         if (full.isEmpty()) return Pair("", "")
-        val start = node.textSelectionStart.coerceIn(0, full.length)
-        val end = node.textSelectionEnd.coerceIn(start, full.length)
+        val rawStart = node.textSelectionStart
+        val rawEnd = node.textSelectionEnd
+        val start = if (rawStart < 0) full.length else rawStart.coerceIn(0, full.length)
+        val end = if (rawEnd < 0) start else rawEnd.coerceIn(start, full.length)
         return Pair(full.substring(0, start), full.substring(end))
     }
 

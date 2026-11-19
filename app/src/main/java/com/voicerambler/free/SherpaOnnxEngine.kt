@@ -236,9 +236,7 @@ object SherpaOnnxEngine {
     fun preload(ctx: Context, engine: AsrEngineType) {
         try {
             getOrCreateVad(ctx)
-            if (engine != AsrEngineType.GEMINI_CLOUD) {
-                getOrCreateRecognizer(ctx, engine)
-            }
+            getOrCreateRecognizer(ctx, engine)
         } catch (_: Exception) {
         }
     }

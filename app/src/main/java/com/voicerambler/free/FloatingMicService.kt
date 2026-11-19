@@ -140,7 +140,6 @@ class FloatingMicService : Service() {
         val eng = Prefs.getEngine(this)
         tvLangBadge?.text = when (eng) {
             AsrEngineType.INDIC_CONFORMER_OR -> "OD"
-            AsrEngineType.GEMINI_CLOUD -> "GM"
             else -> "HI"
         }
     }
@@ -342,17 +341,12 @@ class FloatingMicService : Service() {
         isListening.set(true)
         setMicUiState(MicUiState.LISTENING)
         val segmentChannel = Channel<FloatArray>(Channel.UNLIMITED)
-        val useOptionalGemini = Prefs.isGeminiPolishEnabled(this) && Prefs.getApiKey(this).isNotBlank()
 
         vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
             for (seg in segmentChannel) {
                 val res = OfflineAsrEngines.transcribeSamples(this@FloatingMicService, resolved, seg)
                 res.onSuccess { raw ->
-                    var finalOut = raw.trim()
-                    if (useOptionalGemini && resolved != AsrEngineType.GEMINI_CLOUD && finalOut.isNotBlank()) {
-                        GeminiClient.polishOfflineTranscript(Prefs.getApiKey(this@FloatingMicService), Prefs.getModel(this@FloatingMicService), finalOut)
-                            .onSuccess { polished -> if (polished.isNotBlank()) finalOut = polished }
-                    }
+                    val finalOut = raw.trim()
                     if (finalOut.isNotBlank()) {
                         appendPhraseAtLiveCursor(finalOut)
                     }
@@ -456,18 +450,13 @@ class FloatingMicService : Service() {
         setMicUiState(MicUiState.POLISHING)
 
         val engine = Prefs.getEngine(this)
-        val useOptionalGemini = Prefs.isGeminiPolishEnabled(this) && Prefs.getApiKey(this).isNotBlank()
 
         serviceScope.launch {
             val rawResult = OfflineAsrEngines.transcribe(this@FloatingMicService, engine, wavFile)
             wavFile.delete()
 
             rawResult.onSuccess { raw ->
-                var finalOut = raw.trim()
-                if (useOptionalGemini && engine != AsrEngineType.GEMINI_CLOUD && finalOut.isNotBlank()) {
-                    GeminiClient.polishOfflineTranscript(Prefs.getApiKey(this@FloatingMicService), Prefs.getModel(this@FloatingMicService), finalOut)
-                        .onSuccess { polished -> if (polished.isNotBlank()) finalOut = polished }
-                }
+                val finalOut = raw.trim()
                 isProcessing = false
                 setMicUiState(MicUiState.IDLE)
                 if (finalOut.isNotBlank()) {
