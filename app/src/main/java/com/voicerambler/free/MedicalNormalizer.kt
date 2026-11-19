@@ -91,7 +91,9 @@ object MedicalNormalizer {
         "milliliters" to "mL"
     )
 
-    /** Curated Odia-script -> English bridge for everyday chat, hospital, disease, and medicine terms. */
+    private val ODIA_SUFFIXES = listOf("ଗୁଡ଼ିକ", "ଗୁଡିକ", "ରେ", "କୁ", "ର", "ଟା", "ଟି", "ଠାରୁ", "ଙ୍କ")
+
+    /** Curated Odia-script -> English stems (works with suffixes like ଡ୍ୟୁଟିରେ -> dutyରେ). */
     private val ODIA_TO_ENGLISH_BRIDGE = linkedMapOf(
         "ଓକେ" to "ok",
         "ସରି" to "sorry",
@@ -112,6 +114,11 @@ object MedicalNormalizer {
         "ହ୍ୱାଟ୍ସଆପ୍" to "WhatsApp",
         "ଫଟୋ" to "photo",
         "ଭିଡିଓ" to "video",
+        "ଡ୍ୟୁଟି" to "duty",
+        "କ୍ଲାସ" to "class",
+        "କ୍ଲାସ୍" to "class",
+        "ୱାର୍ଡ" to "ward",
+        "କ୍ୟାଜୁଆଲ୍ଟି" to "Casualty",
         "ଡକ୍ଟର" to "doctor",
         "ଡାକ୍ତର" to "doctor",
         "ହସ୍ପିଟାଲ" to "hospital",
@@ -226,11 +233,14 @@ object MedicalNormalizer {
                     singleWordMap[k] = v
                 }
             }
-            val skelCounts = HashMap<String, Int>()
-            val skelTerm = HashMap<String, String>()
+            val coreSkeletons = HashMap<String, String>()
+            val extraSkelCounts = HashMap<String, Int>()
+            val extraSkelTerm = HashMap<String, String>()
+            var lineNo = 0
             try {
                 ctx.assets.open("medical_dictionary.txt").bufferedReader().useLines { lines ->
                     lines.forEach { raw ->
+                        lineNo++
                         val term = raw.trim()
                         val lower = term.lowercase()
                         if (lower.length >= 2 && lower.all { it.code < 128 }) {
@@ -244,19 +254,25 @@ object MedicalNormalizer {
                                 if (lower.length >= 7) {
                                     val sk = englishSkeleton(lower)
                                     if (sk.length >= 5) {
-                                        skelCounts[sk] = (skelCounts[sk] ?: 0) + 1
-                                        skelTerm[sk] = term
+                                        if (lineNo <= 1000) {
+                                            coreSkeletons.putIfAbsent(sk, term)
+                                        } else {
+                                            extraSkelCounts[sk] = (extraSkelCounts[sk] ?: 0) + 1
+                                            extraSkelTerm[sk] = term
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-                for ((sk, cnt) in skelCounts) {
+                for ((sk, cnt) in extraSkelCounts) {
                     if (cnt == 1) {
-                        skeletonMap[sk] = skelTerm[sk]!!
+                        skeletonMap[sk] = extraSkelTerm[sk]!!
                     }
                 }
+                // Core 989 Indian clinical/drug terms always take priority over 98k-word collisions
+                skeletonMap.putAll(coreSkeletons)
             } catch (_: Exception) {
             }
             loaded = true
@@ -303,33 +319,49 @@ object MedicalNormalizer {
         return if (!tie && bestDist <= 1) bestTerm else null
     }
 
+    private fun mapOdiaWordWithSuffix(word: String): String {
+        ODIA_TO_ENGLISH_BRIDGE[word]?.let { return it }
+
+        var stem = word
+        var suffix = ""
+        for (suf in ODIA_SUFFIXES) {
+            if (word.endsWith(suf) && word.length > suf.length + 2) {
+                stem = word.substring(0, word.length - suf.length)
+                suffix = suf
+                break
+            }
+        }
+
+        ODIA_TO_ENGLISH_BRIDGE[stem]?.let { return it + suffix }
+
+        if (stem.length >= 7 && stem.any { it in '\u0B00'..'\u0B7F' }) {
+            val sk = odiaSkeleton(stem)
+            val hit = if (sk.length >= 5) skeletonMap[sk] else null
+            if (hit != null) return hit + suffix
+        }
+        return word
+    }
+
     fun normalize(ctx: Context, raw: String, engine: AsrEngineType): String {
         init(ctx)
         var text = raw.trim()
         if (text.isEmpty()) return ""
 
         if (engine == AsrEngineType.INDIC_CONFORMER_OR) {
+            // Multi-word Odia phrases first
             for ((odia, eng) in ODIA_TO_ENGLISH_BRIDGE) {
-                if (odia in text) {
+                if (' ' in odia && odia in text) {
                     text = text.replace(odia, eng)
                 }
             }
-            // Phonetic Odia-script -> English medical term matcher for longer drug/disease words
             val words = text.split(Regex("\\s+"))
             val out = ArrayList<String>(words.size)
             for (w in words) {
-                if (w.length >= 7 && w.any { it in '\u0B00'..'\u0B7F' }) {
-                    val sk = odiaSkeleton(w)
-                    val hit = if (sk.length >= 5) skeletonMap[sk] else null
-                    out.add(hit ?: w)
-                } else {
-                    out.add(w)
-                }
+                out.add(mapOdiaWordWithSuffix(w))
             }
             return out.joinToString(" ").replace(Regex("\\s{2,}"), " ").trim()
         }
 
-        // Hinglish safe medical normalization (never alters numbers, units, negations, or short Hinglish words)
         for ((regex, replacement) in multiWordRules) {
             if (regex.containsMatchIn(text)) {
                 text = regex.replace(text, replacement)

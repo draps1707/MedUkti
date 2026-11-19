@@ -20,6 +20,10 @@ class DictationAccessibilityService : AccessibilityService() {
 
         @Volatile
         var onEditableFocusChanged: ((Boolean) -> Unit)? = null
+
+        private val KNOWN_PLACEHOLDERS = setOf(
+            "message", "type a message", "ask google", "search", "search...", "write a message"
+        )
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -67,9 +71,11 @@ class DictationAccessibilityService : AccessibilityService() {
     }
 
     private fun getRealText(node: AccessibilityNodeInfo): String {
+        val raw = node.text?.toString() ?: ""
         val isHint = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && node.isShowingHintText) ||
-            (node.hintText != null && node.text?.toString() == node.hintText?.toString())
-        return if (isHint) "" else (node.text?.toString() ?: "")
+            (node.hintText != null && raw == node.hintText?.toString()) ||
+            (raw.trim().lowercase() in KNOWN_PLACEHOLDERS && node.textSelectionStart <= 0)
+        return if (isHint) "" else raw
     }
 
     /** Returns (beforeCursor, afterCursor). Defaults to end of existing text if selection is -1. */
@@ -106,7 +112,7 @@ class DictationAccessibilityService : AccessibilityService() {
         }
 
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("VoiceRambler", fullText))
+        clipboard.setPrimaryClip(ClipData.newPlainText("KathaType", fullText))
         return node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
     }
 }

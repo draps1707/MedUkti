@@ -30,11 +30,16 @@ object SherpaOnnxEngine {
         cachedEngineType = null
     }
 
-    private fun normalizeGainAndPad(samples: FloatArray): FloatArray {
-        if (samples.isEmpty()) return samples
+    private fun computeRms(samples: FloatArray): Float {
+        if (samples.isEmpty()) return 0f
         var sumSq = 0.0
         for (s in samples) sumSq += s * s
-        val rms = sqrt(sumSq / samples.size).toFloat()
+        return sqrt(sumSq / samples.size).toFloat()
+    }
+
+    private fun normalizeGainAndPad(samples: FloatArray): FloatArray {
+        if (samples.isEmpty()) return samples
+        val rms = computeRms(samples)
         val gain = if (rms in 0.002f..0.08f) (0.08f / rms).coerceAtMost(6.0f) else 1.0f
 
         val padSamples = 4800 // 0.3s trailing silence
@@ -90,10 +95,8 @@ object SherpaOnnxEngine {
             text = text.replace(Regex("\\b${Regex.escape(phrase)}\\b", RegexOption.IGNORE_CASE), emoji)
         }
 
-        // Apply Odia-English bridge + safe medical dictionary
         text = MedicalNormalizer.normalize(ctx, text, engine)
 
-        // Personal dictionary replacements (wrong = right, one per line)
         val dictRaw = Prefs.getPersonalDict(ctx)
         if (dictRaw.isNotBlank()) {
             for (line in dictRaw.lines()) {
@@ -140,10 +143,10 @@ object SherpaOnnxEngine {
             val vadConfig = VadModelConfig(
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = vadFile.absolutePath,
-                    threshold = 0.45f,
-                    minSilenceDuration = 0.55f,
-                    minSpeechDuration = 0.22f,
-                    maxSpeechDuration = 10.0f,
+                    threshold = 0.55f,
+                    minSilenceDuration = 0.45f,
+                    minSpeechDuration = 0.25f,
+                    maxSpeechDuration = 6.0f,
                     windowSize = 512
                 ),
                 sampleRate = 16000,
@@ -241,7 +244,10 @@ object SherpaOnnxEngine {
 
     fun transcribeSamples(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            if (samples.isEmpty()) return Result.success("")
+            // Drop tiny or near-silent trailing clips (< 0.45s or RMS < 0.004) to prevent Whisper hallucinations on stop
+            if (samples.size < 7200 || computeRms(samples) < 0.004f) {
+                return Result.success("")
+            }
             val boosted = normalizeGainAndPad(samples)
             val rec = getOrCreateRecognizer(ctx, engine)
             val stream = rec.createStream()
@@ -268,6 +274,7 @@ object SherpaOnnxEngine {
             val rec = getOrCreateRecognizer(ctx, engine)
             val sb = StringBuilder()
             for (seg in speechSegments) {
+                if (seg.size < 4800 || computeRms(seg) < 0.003f) continue
                 val boosted = normalizeGainAndPad(seg)
                 val stream = rec.createStream()
                 stream.acceptWaveform(boosted, 16000)
