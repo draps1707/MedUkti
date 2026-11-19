@@ -6,6 +6,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -20,6 +22,13 @@ class DictationAccessibilityService : AccessibilityService() {
         var onEditableFocusChanged: ((Boolean) -> Unit)? = null
     }
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val hideRunnable = Runnable {
+        if (getFreshEditableNode() == null) {
+            onEditableFocusChanged?.invoke(false)
+        }
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
@@ -28,15 +37,25 @@ class DictationAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val focused = getFreshEditableNode()
         if (focused != null) {
+            handler.removeCallbacks(hideRunnable)
             onEditableFocusChanged?.invoke(true)
-        } else if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            onEditableFocusChanged?.invoke(false)
+        } else {
+            val t = event?.eventType
+            if (t == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+                t == AccessibilityEvent.TYPE_WINDOWS_CHANGED ||
+                t == AccessibilityEvent.TYPE_VIEW_FOCUSED ||
+                t == AccessibilityEvent.TYPE_VIEW_CLICKED
+            ) {
+                handler.removeCallbacks(hideRunnable)
+                handler.postDelayed(hideRunnable, 150L)
+            }
         }
     }
 
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        handler.removeCallbacks(hideRunnable)
         instance = null
         onEditableFocusChanged?.invoke(false)
         super.onDestroy()

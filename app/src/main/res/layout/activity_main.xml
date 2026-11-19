@@ -20,42 +20,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Offline Medical + Indian English + Hinglish + Hindi + Odia"
+            android:text="Offline Hinglish &amp; Odia Inline Voice Typing"
             android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/btnDlMedAsr"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Download Google MedASR Medical Pack (Recommended)" />
-
-        <Button
-            android:id="@+id/btnDlParakeet"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Download Parakeet TDT 110M English (~136 MB - Fast)" />
-
-        <Button
-            android:id="@+id/btnDlIndianEn"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Download English (India) Live Pack (~71 MB)" />
-
-        <Button
-            android:id="@+id/btnDlAll"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Download All Offline Packs (Automatic Setup)" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="Dictation Mode (Automatic by default)"
+            android:layout_marginTop="16dp"
+            android:text="Active Language"
             android:textStyle="bold" />
 
         <Spinner
@@ -67,36 +39,29 @@
             android:id="@+id/btnDlWhisperApex"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Download Whisper Hinglish Apex (~1.03 GB - Best Hinglish)" />
+            android:layout_marginTop="14dp"
+            android:text="Download Hinglish Apex (~1.03 GB - Best Quality)" />
 
         <Button
-            android:id="@+id/btnDlWhisperSwift" 
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Download Only Whisper Hinglish Swift (~152 MB)" />
-
-        <Button
-            android:id="@+id/btnDlIndicHi"
+            android:id="@+id/btnDlWhisperSwift"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Download Only IndicConformer Hindi (~661 MB)" />
+            android:text="Download Hinglish Swift (~152 MB - Fast)" />
 
         <Button
             android:id="@+id/btnDlIndicOr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Download Only IndicConformer Odia (~661 MB)" />
+            android:text="Download Odia Offline Pack (~661 MB)" />
 
         <Button
             android:id="@+id/btnCompare"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Open Recognition Lab (Compare Engines)" />
+            android:text="Compare Hinglish &amp; Odia (Lab)" />
 
         <CheckBox
             android:id="@+id/cbGeminiOptional"

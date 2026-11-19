@@ -53,86 +53,23 @@ class MainActivity : AppCompatActivity() {
         spinnerModel.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Prefs.AVAILABLE_MODELS)
         spinnerModel.setSelection(Prefs.AVAILABLE_MODELS.indexOf(Prefs.getModel(this)).coerceAtLeast(0))
 
-        findViewById<Button>(R.id.btnDlMedAsr).setOnClickListener {
+        findViewById<Button>(R.id.btnDlWhisperApex).setOnClickListener {
             downloadBatch(
-                listOf(
-                    ModelDownloader.SILERO_VAD,
-                    ModelDownloader.MEDASR_TOKENS,
-                    ModelDownloader.MEDASR_MODEL
-                ),
-                "Google MedASR Medical Pack"
+                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_APEX_TOKENS, ModelDownloader.WHISPER_APEX_ENC, ModelDownloader.WHISPER_APEX_DEC),
+                "Hinglish Apex"
             )
         }
-
-        findViewById<Button>(R.id.btnDlParakeet).setOnClickListener {
+        findViewById<Button>(R.id.btnDlWhisperSwift).setOnClickListener {
             downloadBatch(
-                listOf(
-                    ModelDownloader.SILERO_VAD,
-                    ModelDownloader.PARAKEET_TOKENS,
-                    ModelDownloader.PARAKEET_ENC,
-                    ModelDownloader.PARAKEET_DEC,
-                    ModelDownloader.PARAKEET_JOINER
-                ),
-                "Parakeet TDT 110M"
-            )
-        }
-
-        findViewById<Button>(R.id.btnDlIndianEn).setOnClickListener {
-            downloadBatch(
-                listOf(
-                    ModelDownloader.SILERO_VAD,
-                    ModelDownloader.INDIAN_EN_TOKENS,
-                    ModelDownloader.INDIAN_EN_BPE,
-                    ModelDownloader.INDIAN_EN_ENC,
-                    ModelDownloader.INDIAN_EN_DEC,
-                    ModelDownloader.INDIAN_EN_JOINER
-                ),
-                "English (India) Live Pack"
-            )
-        }
-
-        findViewById<Button>(R.id.btnDlAll).setOnClickListener {
-            downloadBatch(
-                listOf(
-                    ModelDownloader.SILERO_VAD,
-                    ModelDownloader.MEDASR_TOKENS,
-                    ModelDownloader.MEDASR_MODEL,
-                    ModelDownloader.PARAKEET_TOKENS,
-                    ModelDownloader.PARAKEET_ENC,
-                    ModelDownloader.PARAKEET_DEC,
-                    ModelDownloader.PARAKEET_JOINER,
-                    ModelDownloader.INDIAN_EN_TOKENS,
-                    ModelDownloader.INDIAN_EN_BPE,
-                    ModelDownloader.INDIAN_EN_ENC,
-                    ModelDownloader.INDIAN_EN_DEC,
-                    ModelDownloader.INDIAN_EN_JOINER,
-                    ModelDownloader.WHISPER_APEX_TOKENS,
-                    ModelDownloader.WHISPER_APEX_ENC,
-                    ModelDownloader.WHISPER_APEX_DEC,
-                    ModelDownloader.WHISPER_SWIFT_TOKENS,
-                    ModelDownloader.WHISPER_SWIFT_ENC,
-                    ModelDownloader.WHISPER_SWIFT_DEC,
-                    ModelDownloader.INDIC_TOKENS,
-                    ModelDownloader.INDIC_HI,
-                    ModelDownloader.INDIC_OR
-                ),
-                "All Offline Models"
+                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_SWIFT_TOKENS, ModelDownloader.WHISPER_SWIFT_ENC, ModelDownloader.WHISPER_SWIFT_DEC),
+                "Hinglish Swift"
             )
         }
         findViewById<Button>(R.id.btnDlIndicOr).setOnClickListener {
-            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_OR), "IndicConformer Odia")
-        }
-        findViewById<Button>(R.id.btnDlIndicHi).setOnClickListener {
-            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_HI), "IndicConformer Hindi")
-        }
-        findViewById<Button>(R.id.btnDlWhisperApex).setOnClickListener {
-            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_APEX_TOKENS, ModelDownloader.WHISPER_APEX_ENC, ModelDownloader.WHISPER_APEX_DEC), "Whisper Hinglish Apex")
-        }
-        findViewById<Button>(R.id.btnDlWhisperSwift).setOnClickListener {
-            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_APEX_TOKENS,
-                    ModelDownloader.WHISPER_APEX_ENC,
-                    ModelDownloader.WHISPER_APEX_DEC,
-                    ModelDownloader.WHISPER_SWIFT_TOKENS, ModelDownloader.WHISPER_SWIFT_ENC, ModelDownloader.WHISPER_SWIFT_DEC), "Whisper Hinglish Swift")
+            downloadBatch(
+                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_OR),
+                "Odia Offline Pack"
+            )
         }
         findViewById<Button>(R.id.btnCompare).setOnClickListener {
             startActivity(Intent(this, CompareActivity::class.java))
@@ -219,24 +156,16 @@ class MainActivity : AppCompatActivity() {
         val overlayOk = Settings.canDrawOverlays(this)
         val accOk = DictationAccessibilityService.instance != null
         val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
-        val medAsrOk = ModelDownloader.isMedAsrInstalled(this)
-        val parakeetOk = ModelDownloader.isParakeetInstalled(this)
-        val indianEnOk = ModelDownloader.isIndianEnInstalled(this)
-        val indicOrOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_OR)
-        val indicHiOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_HI)
         val apexOk = ModelDownloader.isWhisperApexInstalled(this)
-        val swiftOk = ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_ENC) && ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_DEC)
+        val swiftOk = ModelDownloader.isWhisperSwiftInstalled(this)
+        val odiaOk = ModelDownloader.isOdiaInstalled(this)
 
         tvStatus.text = buildString {
-            appendLine("Active Engine: ${Prefs.getEngine(this@MainActivity).label}")
-            appendLine("Google MedASR Medical: ${if (medAsrOk) "Installed" else "Not downloaded"}")
-            appendLine("Parakeet TDT 110M: ${if (parakeetOk) "Installed" else "Not downloaded"}")
-            appendLine("English (India) Live: ${if (indianEnOk) "Installed" else "Not downloaded"}")
+            appendLine("Active Language: ${Prefs.getEngine(this@MainActivity).label}")
+            appendLine("Hinglish Apex: ${if (apexOk) "Installed" else "Not downloaded"}")
+            appendLine("Hinglish Swift: ${if (swiftOk) "Installed" else "Not downloaded"}")
+            appendLine("Odia (IndicConformer): ${if (odiaOk) "Installed" else "Not downloaded"}")
             appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
-            appendLine("Whisper Hinglish Apex: ${if (apexOk) "Installed" else "Not downloaded"}")
-            appendLine("Whisper Hinglish Swift: ${if (swiftOk) "Installed" else "Not downloaded"}")
-            appendLine("IndicConformer Hindi: ${if (indicHiOk) "Installed" else "Not downloaded"}")
-            appendLine("IndicConformer Odia: ${if (indicOrOk) "Installed" else "Not downloaded"}")
             appendLine("Mic: ${if (micOk) "OK" else "Needed"} | Overlay: ${if (overlayOk) "OK" else "Needed"} | Accessibility: ${if (accOk) "OK" else "Needed"}")
         }
 

@@ -1,17 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/floatingRoot"
-    android:layout_width="48dp"
-    android:layout_height="48dp"
-    android:background="@android:color/transparent">
+    android:layout_width="wrap_content"
+    android:layout_height="44dp"
+    android:background="@drawable/bg_mic_ring"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp">
 
     <ImageView
         android:id="@+id/ivMicIcon"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_gravity="center"
-        android:background="@drawable/bg_mic_ring"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
         android:contentDescription="Dictate"
-        android:padding="8dp"
-        android:src="@android:drawable/ic_btn_speak_now" />
-</FrameLayout>
+        android:src="@android:drawable/ic_btn_speak_now"
+        android:tint="#FFFFFFFF" />
+
+    <TextView
+        android:id="@+id/tvLangBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:background="#33FFFFFF"
+        android:paddingStart="6dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="2dp"
+        android:text="HI"
+        android:textColor="#FFFFFFFF"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+</LinearLayout>

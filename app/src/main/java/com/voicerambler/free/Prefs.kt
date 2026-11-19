@@ -3,14 +3,9 @@ package com.voicerambler.free
 import android.content.Context
 
 enum class AsrEngineType(val label: String) {
-    AUTO_OFFLINE("Smart Clinical Auto (Uses Best Installed Pack)"),
-    PARAKEET_TDT_110M("Parakeet TDT 110M English (Offline ~136 MB)"),
-    WHISPER_HINGLISH_APEX("Whisper Hinglish Apex (Offline ~1.03 GB - Best Hinglish)"),
-    WHISPER_HINGLISH_SWIFT("Whisper Hinglish Swift (Offline ~152 MB)"),
-    INDIAN_EN_STREAMING("English (India) Live Streaming (Offline ~71 MB)"),
-    MEDASR_EN("Google MedASR Medical English (Offline)"),
-    INDIC_CONFORMER_OR("AI4Bharat IndicConformer Odia (Offline)"),
-    INDIC_CONFORMER_HI("AI4Bharat IndicConformer Hindi (Offline)"),
+    WHISPER_HINGLISH_APEX("Hinglish — Whisper Apex (Offline ~1.03 GB)"),
+    WHISPER_HINGLISH_SWIFT("Hinglish — Whisper Swift (Offline ~152 MB)"),
+    INDIC_CONFORMER_OR("Odia — AI4Bharat IndicConformer 600M (Offline ~661 MB)"),
     GEMINI_CLOUD("Gemini Cloud Audio (Optional)")
 }
 
@@ -30,8 +25,8 @@ object Prefs {
     )
 
     fun getEngine(ctx: Context): AsrEngineType {
-        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_ENGINE, AsrEngineType.AUTO_OFFLINE.name)
-        return AsrEngineType.entries.firstOrNull { it.name == raw } ?: AsrEngineType.AUTO_OFFLINE
+        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_ENGINE, AsrEngineType.WHISPER_HINGLISH_APEX.name)
+        return AsrEngineType.entries.firstOrNull { it.name == raw } ?: AsrEngineType.WHISPER_HINGLISH_APEX
     }
 
     fun setEngine(ctx: Context, engine: AsrEngineType) {

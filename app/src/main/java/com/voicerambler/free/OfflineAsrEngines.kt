@@ -9,18 +9,28 @@ import java.io.FileOutputStream
 object OfflineAsrEngines {
 
     fun resolveEngine(ctx: Context, engine: AsrEngineType): Result<AsrEngineType> {
-        if (engine != AsrEngineType.AUTO_OFFLINE) return Result.success(engine)
-        return when {
-            ModelDownloader.isParakeetInstalled(ctx) -> Result.success(AsrEngineType.PARAKEET_TDT_110M)
-            ModelDownloader.isWhisperApexInstalled(ctx) -> Result.success(AsrEngineType.WHISPER_HINGLISH_APEX)
-            ModelDownloader.isIndianEnInstalled(ctx) -> Result.success(AsrEngineType.INDIAN_EN_STREAMING)
-            ModelDownloader.isInstalled(ctx, ModelDownloader.WHISPER_SWIFT_ENC) &&
-                ModelDownloader.isInstalled(ctx, ModelDownloader.WHISPER_SWIFT_DEC) -> Result.success(AsrEngineType.WHISPER_HINGLISH_SWIFT)
-            ModelDownloader.isMedAsrInstalled(ctx) -> Result.success(AsrEngineType.MEDASR_EN)
-            ModelDownloader.isInstalled(ctx, ModelDownloader.INDIC_HI) -> Result.success(AsrEngineType.INDIC_CONFORMER_HI)
-            ModelDownloader.isInstalled(ctx, ModelDownloader.INDIC_OR) -> Result.success(AsrEngineType.INDIC_CONFORMER_OR)
-            Prefs.getApiKey(ctx).isNotBlank() -> Result.success(AsrEngineType.GEMINI_CLOUD)
-            else -> Result.failure(Exception("Tap 'Download All Offline Packs' in VoiceRambler first"))
+        return when (engine) {
+            AsrEngineType.WHISPER_HINGLISH_APEX -> {
+                if (ModelDownloader.isWhisperApexInstalled(ctx)) {
+                    Result.success(engine)
+                } else if (ModelDownloader.isWhisperSwiftInstalled(ctx)) {
+                    Result.success(AsrEngineType.WHISPER_HINGLISH_SWIFT)
+                } else {
+                    Result.failure(Exception("Download Hinglish Apex or Swift Pack first"))
+                }
+            }
+            AsrEngineType.WHISPER_HINGLISH_SWIFT -> {
+                if (ModelDownloader.isWhisperSwiftInstalled(ctx)) Result.success(engine)
+                else Result.failure(Exception("Download Hinglish Swift Pack first"))
+            }
+            AsrEngineType.INDIC_CONFORMER_OR -> {
+                if (ModelDownloader.isOdiaInstalled(ctx)) Result.success(engine)
+                else Result.failure(Exception("Download Odia Offline Pack first"))
+            }
+            AsrEngineType.GEMINI_CLOUD -> {
+                if (Prefs.getApiKey(ctx).isNotBlank()) Result.success(engine)
+                else Result.failure(Exception("Gemini API key not set"))
+            }
         }
     }
 
@@ -36,26 +46,17 @@ object OfflineAsrEngines {
     ): Result<String> = withContext(Dispatchers.IO) {
         val resolved = resolveEngine(ctx, engine).getOrElse { return@withContext Result.failure(it) }
         when (resolved) {
-            AsrEngineType.MEDASR_EN,
-            AsrEngineType.PARAKEET_TDT_110M,
             AsrEngineType.WHISPER_HINGLISH_APEX,
-            AsrEngineType.INDIAN_EN_STREAMING,
-            AsrEngineType.INDIC_CONFORMER_OR,
-            AsrEngineType.INDIC_CONFORMER_HI,
-            AsrEngineType.WHISPER_HINGLISH_SWIFT -> SherpaOnnxEngine.transcribeSamples(ctx, resolved, samples)
+            AsrEngineType.WHISPER_HINGLISH_SWIFT,
+            AsrEngineType.INDIC_CONFORMER_OR -> SherpaOnnxEngine.transcribeSamples(ctx, resolved, samples)
             AsrEngineType.GEMINI_CLOUD -> {
                 val key = Prefs.getApiKey(ctx)
-                if (key.isBlank()) {
-                    Result.failure(Exception("Gemini API key not set"))
-                } else {
-                    val tmp = File(ctx.cacheDir, "vad_seg_${System.currentTimeMillis()}.wav")
-                    writeFloatWav(tmp, samples)
-                    val res = GeminiClient.transcribeWav(key, Prefs.getModel(ctx), tmp)
-                    tmp.delete()
-                    res
-                }
+                val tmp = File(ctx.cacheDir, "vad_seg_${System.currentTimeMillis()}.wav")
+                writeFloatWav(tmp, samples)
+                val res = GeminiClient.transcribeWav(key, Prefs.getModel(ctx), tmp)
+                tmp.delete()
+                res
             }
-            AsrEngineType.AUTO_OFFLINE -> Result.failure(Exception("No model installed"))
         }
     }
 
@@ -66,22 +67,10 @@ object OfflineAsrEngines {
     ): Result<String> = withContext(Dispatchers.IO) {
         val resolved = resolveEngine(ctx, engine).getOrElse { return@withContext Result.failure(it) }
         when (resolved) {
-            AsrEngineType.MEDASR_EN,
-            AsrEngineType.PARAKEET_TDT_110M,
             AsrEngineType.WHISPER_HINGLISH_APEX,
-            AsrEngineType.INDIAN_EN_STREAMING,
-            AsrEngineType.INDIC_CONFORMER_OR,
-            AsrEngineType.INDIC_CONFORMER_HI,
-            AsrEngineType.WHISPER_HINGLISH_SWIFT -> SherpaOnnxEngine.transcribe(ctx, resolved, wavFile)
-            AsrEngineType.GEMINI_CLOUD -> {
-                val key = Prefs.getApiKey(ctx)
-                if (key.isBlank()) {
-                    Result.failure(Exception("Gemini API key not set"))
-                } else {
-                    GeminiClient.transcribeWav(key, Prefs.getModel(ctx), wavFile)
-                }
-            }
-            AsrEngineType.AUTO_OFFLINE -> Result.failure(Exception("No model installed"))
+            AsrEngineType.WHISPER_HINGLISH_SWIFT,
+            AsrEngineType.INDIC_CONFORMER_OR -> SherpaOnnxEngine.transcribe(ctx, resolved, wavFile)
+            AsrEngineType.GEMINI_CLOUD -> GeminiClient.transcribeWav(Prefs.getApiKey(ctx), Prefs.getModel(ctx), wavFile)
         }
     }
 

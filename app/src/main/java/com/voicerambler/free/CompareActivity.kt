@@ -41,65 +41,24 @@ class CompareActivity : AppCompatActivity() {
                     tv.text = "Recording too short."
                     return@setOnClickListener
                 }
-                tv.text = "Running engines..."
+                tv.text = "Running Hinglish & Odia..."
 
                 uiScope.launch {
                     val out = StringBuilder()
 
-                    val medAsr = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.MEDASR_EN, wav)
-                    out.appendLine("=== Google MedASR Medical English ===")
-                    medAsr.onSuccess { raw ->
-                        out.appendLine("Raw: $raw")
-                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
-                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
-                    out.appendLine()
-
-                    val parakeet = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.PARAKEET_TDT_110M, wav)
-                    out.appendLine("=== Parakeet TDT 110M English ===")
-                    parakeet.onSuccess { raw ->
-                        out.appendLine("Raw: $raw")
-                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
-                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
-                    out.appendLine()
-
-                    val indEn = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIAN_EN_STREAMING, wav)
-                    out.appendLine("=== English (India) Streaming + Hotwords ===")
-                    indEn.onSuccess { raw ->
-                        out.appendLine("Raw: $raw")
-                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
-                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
-                    out.appendLine()
-
                     val apex = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_APEX, wav)
-                    out.appendLine("=== Whisper Hinglish Apex (~1.03 GB) ===")
-                    apex.onSuccess { raw ->
-                        out.appendLine("Raw: $raw")
-                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
-                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
+                    out.appendLine("=== Hinglish Apex ===")
+                    apex.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
                     out.appendLine()
 
                     val swift = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_SWIFT, wav)
-                    out.appendLine("=== Whisper Hinglish Swift (sherpa-onnx + VAD) ===")
-                    swift.onSuccess { raw ->
-                        out.appendLine("Raw: $raw")
-                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
-                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
-                    out.appendLine()
-
-                    val indicHi = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIC_CONFORMER_HI, wav)
-                    out.appendLine("=== IndicConformer Hindi (sherpa-onnx + VAD) ===")
-                    indicHi.onSuccess { raw ->
-                        out.appendLine("Raw: $raw")
-                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
-                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
+                    out.appendLine("=== Hinglish Swift ===")
+                    swift.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
                     out.appendLine()
 
                     val indicOr = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIC_CONFORMER_OR, wav)
-                    out.appendLine("=== IndicConformer Odia (sherpa-onnx + VAD) ===")
-                    indicOr.onSuccess { raw ->
-                        out.appendLine("Raw: $raw")
-                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
-                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
+                    out.appendLine("=== Odia (IndicConformer 600M) ===")
+                    indicOr.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
                     out.appendLine()
 
                     val key = Prefs.getApiKey(this@CompareActivity)

@@ -13,8 +13,7 @@ object ModelDownloader {
     data class ModelArtifact(
         val id: String,
         val fileName: String,
-        val url: String,
-        val executable: Boolean = false
+        val url: String
     )
 
     val SILERO_VAD = ModelArtifact(
@@ -23,82 +22,10 @@ object ModelDownloader {
         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
     )
 
-    val MEDASR_MODEL = ModelArtifact(
-        "medasr_model",
-        "medasr-model.int8.onnx",
-        "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/model.int8.onnx"
-    )
-
-    val MEDASR_TOKENS = ModelArtifact(
-        "medasr_tokens",
-        "medasr-tokens.txt",
-        "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/tokens.txt"
-    )
-
-    val PARAKEET_ENC = ModelArtifact(
-        "parakeet_enc",
-        "parakeet-110m-encoder.int8.onnx",
-        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/encoder.int8.onnx"
-    )
-
-    val PARAKEET_DEC = ModelArtifact(
-        "parakeet_dec",
-        "parakeet-110m-decoder.int8.onnx",
-        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/decoder.int8.onnx"
-    )
-
-    val PARAKEET_JOINER = ModelArtifact(
-        "parakeet_joiner",
-        "parakeet-110m-joiner.int8.onnx",
-        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/joiner.int8.onnx"
-    )
-
-    val PARAKEET_TOKENS = ModelArtifact(
-        "parakeet_tokens",
-        "parakeet-110m-tokens.txt",
-        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/tokens.txt"
-    )
-
-    val INDIAN_EN_ENC = ModelArtifact(
-        "indian_en_enc",
-        "indian-en-encoder.int8.onnx",
-        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/encoder-epoch-10-avg-5-chunk-64-left-256.int8.onnx"
-    )
-
-    val INDIAN_EN_DEC = ModelArtifact(
-        "indian_en_dec",
-        "indian-en-decoder.int8.onnx",
-        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/decoder-epoch-10-avg-5-chunk-64-left-256.int8.onnx"
-    )
-
-    val INDIAN_EN_JOINER = ModelArtifact(
-        "indian_en_joiner",
-        "indian-en-joiner.int8.onnx",
-        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/joiner-epoch-10-avg-5-chunk-64-left-256.int8.onnx"
-    )
-
-    val INDIAN_EN_TOKENS = ModelArtifact(
-        "indian_en_tokens",
-        "indian-en-tokens.txt",
-        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/tokens.txt"
-    )
-
-    val INDIAN_EN_BPE = ModelArtifact(
-        "indian_en_bpe",
-        "indian-en-bpe.model",
-        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/bpe.model"
-    )
-
     val INDIC_TOKENS = ModelArtifact(
         "indic_tokens",
         "indicconformer-tokens.txt",
         "https://huggingface.co/Docglasses-AI/indic-conformer-600m-sherpa-onnx-int8/resolve/main/indicconformer-tokens.txt"
-    )
-
-    val INDIC_HI = ModelArtifact(
-        "indic_hi",
-        "indicconformer-hi.int8.onnx",
-        "https://huggingface.co/Docglasses-AI/indic-conformer-600m-sherpa-onnx-int8/resolve/main/indicconformer-hi.int8.onnx"
     )
 
     val INDIC_OR = ModelArtifact(
@@ -152,25 +79,18 @@ object ModelDownloader {
         return f.exists() && f.length() > 512L
     }
 
-    fun isMedAsrInstalled(ctx: Context): Boolean =
-        isInstalled(ctx, MEDASR_MODEL) && isInstalled(ctx, MEDASR_TOKENS)
-
-    fun isParakeetInstalled(ctx: Context): Boolean =
-        isInstalled(ctx, PARAKEET_ENC) &&
-            isInstalled(ctx, PARAKEET_DEC) &&
-            isInstalled(ctx, PARAKEET_JOINER) &&
-            isInstalled(ctx, PARAKEET_TOKENS)
-
     fun isWhisperApexInstalled(ctx: Context): Boolean =
         isInstalled(ctx, WHISPER_APEX_ENC) &&
             isInstalled(ctx, WHISPER_APEX_DEC) &&
             isInstalled(ctx, WHISPER_APEX_TOKENS)
 
-    fun isIndianEnInstalled(ctx: Context): Boolean =
-        isInstalled(ctx, INDIAN_EN_ENC) &&
-            isInstalled(ctx, INDIAN_EN_DEC) &&
-            isInstalled(ctx, INDIAN_EN_JOINER) &&
-            isInstalled(ctx, INDIAN_EN_TOKENS)
+    fun isWhisperSwiftInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, WHISPER_SWIFT_ENC) &&
+            isInstalled(ctx, WHISPER_SWIFT_DEC) &&
+            isInstalled(ctx, WHISPER_SWIFT_TOKENS)
+
+    fun isOdiaInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, INDIC_OR) && isInstalled(ctx, INDIC_TOKENS)
 
     private fun openWithRedirects(startUrl: String): HttpURLConnection {
         var current = startUrl
@@ -227,9 +147,6 @@ object ModelDownloader {
             }
             if (dest.exists()) dest.delete()
             tmp.renameTo(dest)
-            if (artifact.executable) {
-                dest.setExecutable(true, false)
-            }
             onProgress(100)
             Result.success(dest)
         } catch (e: Exception) {
