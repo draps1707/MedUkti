@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
@@ -68,6 +69,16 @@ class FloatingMicService : Service() {
         mainHandler.postDelayed(idleSleepRunnable, 10 * 60 * 1000L) // 10 min RAM auto-sleep
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == "ACTION_PAUSE_BANKING") {
+            if (isListening.get()) stopContinuousDictation()
+            floatingView?.visibility = View.GONE
+            DictationAccessibilityService.instance?.pauseForBanking()
+            Toast.makeText(this, "Accessibility paused for banking. Re-enable in KathaType when done.", Toast.LENGTH_LONG).show()
+        }
+        return START_STICKY
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -119,10 +130,26 @@ class FloatingMicService : Service() {
                 NotificationChannel(channelId, "VoiceRambler Mic", NotificationManager.IMPORTANCE_LOW)
             )
         }
+        val pauseIntent = Intent(this, FloatingMicService::class.java).apply {
+            action = "ACTION_PAUSE_BANKING"
+        }
+        val pausePi = PendingIntent.getService(
+            this,
+            202,
+            pauseIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val notification = Notification.Builder(this, channelId)
             .setContentTitle("କଥାType (Medical & Odia)")
             .setContentText("Tap mic to dictate, tap MED/OD to switch mode.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .addAction(
+                Notification.Action.Builder(
+                    android.R.drawable.ic_media_pause,
+                    "Pause for Banking",
+                    pausePi
+                ).build()
+            )
             .build()
         startForeground(101, notification)
     }

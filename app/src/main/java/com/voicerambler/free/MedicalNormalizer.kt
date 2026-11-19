@@ -473,7 +473,7 @@ object MedicalNormalizer {
             i++
         }
 
-        var res = out.joinToString(" ").replace(Regex("[ \t]{2,}"), " ").trim()
+        var res = out.joinToString(" ").replace(Regex("[ \\t]{2,}"), " ").trim()
         res = formatClinicalShorthand(res)
         return res
     }
@@ -495,28 +495,27 @@ object MedicalNormalizer {
     private fun formatClinicalShorthand(input: String): String {
         var t = input
         // BP 130 by 80 / 130 over 80 -> BP 130/80
-        t = t.replace(Regex("(?i)\b(bp\s+)?(\d{2,3})\s+(?:by|over)\s+(\d{2,3})\b")) { m ->
+        t = t.replace(Regex("(?i)\\b(bp\\s+)?(\\d{2,3})\\s+(?:by|over)\\s+(\\d{2,3})\\b")) { m ->
             val bpPrefix = if (m.groupValues[1].isNotEmpty()) "BP " else ""
             "$bpPrefix${m.groupValues[2]}/${m.groupValues[3]}"
         }
         // Decimal numbers: "10 point 2" -> "10.2"
-        t = t.replace(Regex("(?i)(\d+)\s+point\s+(\d+)"), "$1.$2")
+        t = t.replace(Regex("(?i)(\\d+)\\s+point\\s+(\\d+)"), "$1.$2")
         // SpO2 98 percent -> SpO2 98%
-        t = t.replace(Regex("(?i)\bspo2\s+(\d{2,3})\s+percent\b"), "SpO2 $1%")
-        t = t.replace(Regex("(?i)(\d{1,3}(?:\.\d+)?)\s+percent\b"), "$1%")
+        t = t.replace(Regex("(?i)\\bspo2\\s+(\\d{2,3})\\s+percent\\b"), "SpO2 $1%")
+        t = t.replace(Regex("(?i)(\\d{1,3}(?:\\.\\d+)?)\\s+percent\\b"), "$1%")
         // Rx prefixes before drug/word
-        t = t.replace(Regex("(?i)\b(?:tab|tablet)\s+(?=[A-Za-z])"), "Tab. ")
-        t = t.replace(Regex("(?i)\b(?:inj|injection)\s+(?=[A-Za-z])"), "Inj. ")
-        t = t.replace(Regex("(?i)\b(?:cap|capsule)\s+(?=[A-Za-z])"), "Cap. ")
-        t = t.replace(Regex("(?i)\b(?:syp|syrup)\s+(?=[A-Za-z])"), "Syp. ")
+        t = t.replace(Regex("(?i)\\b(?:tab|tablet)\\s+(?=[A-Za-z])"), "Tab. ")
+        t = t.replace(Regex("(?i)\\b(?:inj|injection)\\s+(?=[A-Za-z])"), "Inj. ")
+        t = t.replace(Regex("(?i)\\b(?:cap|capsule)\\s+(?=[A-Za-z])"), "Cap. ")
+        t = t.replace(Regex("(?i)\\b(?:syp|syrup)\\s+(?=[A-Za-z])"), "Syp. ")
         // Uppercase dosing/route tokens when following dose/drug
-        t = t.replace(Regex("(?i)\b(od|bd|tds|qid|hs|sos|iv|im|sc)\b(?=[.,;:\s]|$)")) { m ->
+        t = t.replace(Regex("(?i)\\b(od|bd|tds|qid|hs|sos|iv|im|sc)\\b(?=[.,;:\\s]|$)")) { m ->
             m.value.uppercase()
         }
         // Discharge summary & case history section headers
         for ((phrase, heading) in SECTION_HEADINGS) {
-            t = t.replace(Regex("(?i)\s*\b${Regex.escape(phrase)}\b[:.,]*\s*"), "
-$heading ")
+            t = t.replace(Regex("(?i)\\s*\\b${Regex.escape(phrase)}\\b[:.,]*\\s*"), "\n$heading ")
         }
         return t.trim()
     }
@@ -531,7 +530,7 @@ $heading ")
         if (pTrim.isEmpty()) return mTrim
         if (mTrim.isEmpty()) return pTrim
 
-        val medTokens = mTrim.split(Regex("\s+")).map { it.trimEnd('.', ',', ';', ':', '?', '!') }
+        val medTokens = mTrim.split(Regex("\\s+")).map { it.trimEnd('.', ',', ';', ':', '?', '!') }
         val medTerms = ArrayList<String>()
         var mi = 0
         while (mi < medTokens.size) {
@@ -555,7 +554,7 @@ $heading ")
 
         if (medTerms.isEmpty()) return pTrim
 
-        val pWords = pTrim.split(Regex("\s+")).toMutableList()
+        val pWords = pTrim.split(Regex("\\s+")).toMutableList()
         val pLowerAll = pTrim.lowercase()
 
         for (term in medTerms) {

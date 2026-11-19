@@ -24,6 +24,14 @@ class DictationAccessibilityService : AccessibilityService() {
         private val KNOWN_PLACEHOLDERS = setOf(
             "message", "type a message", "ask google", "search", "search...", "write a message"
         )
+
+        private val BANKING_PKG_PREFIXES = listOf(
+            "com.sbi.", "com.csam.icici", "com.snapwork.hdfc", "com.axis.mobile",
+            "com.phonepe.app", "com.google.android.apps.nbu.paisa.user", "net.one97.paytm",
+            "com.dreamplug.androidapp", "com.infrasofttech", "com.fss.", "com.bob.",
+            "com.kotak", "in.org.npci", "com.unionbank", "com.canarabank",
+            "com.iob", "com.bankofbaroda"
+        )
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -38,7 +46,20 @@ class DictationAccessibilityService : AccessibilityService() {
         instance = this
     }
 
+    fun pauseForBanking() {
+        handler.removeCallbacks(hideRunnable)
+        onEditableFocusChanged?.invoke(false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            disableSelf()
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        val pkg = event?.packageName?.toString()?.lowercase() ?: ""
+        if (pkg.isNotEmpty() && BANKING_PKG_PREFIXES.any { pkg.startsWith(it) }) {
+            pauseForBanking()
+            return
+        }
         val focused = getFreshEditableNode()
         if (focused != null) {
             handler.removeCallbacks(hideRunnable)
