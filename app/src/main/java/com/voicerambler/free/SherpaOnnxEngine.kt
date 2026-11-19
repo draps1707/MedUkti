@@ -2,32 +2,37 @@ package com.voicerambler.free
 
 import android.content.Context
 import com.k2fsa.sherpa.onnx.FeatureConfig
+import com.k2fsa.sherpa.onnx.OfflineMedAsrCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
-import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.File
 import java.text.Normalizer
+import java.util.concurrent.Callable
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import kotlin.math.sqrt
 
 object SherpaOnnxEngine {
 
-    private var cachedEngineType: AsrEngineType? = null
-    private var recognizer: OfflineRecognizer? = null
+    private val recognizers = ConcurrentHashMap<String, OfflineRecognizer>()
+    private val dualPool = Executors.newFixedThreadPool(2)
     private var vad: Vad? = null
 
     @Synchronized
     fun releaseRecognizer() {
-        try {
-            recognizer?.release()
-        } catch (_: Exception) {
+        for (rec in recognizers.values) {
+            try {
+                rec.release()
+            } catch (_: Exception) {
+            }
         }
-        recognizer = null
-        cachedEngineType = null
+        recognizers.clear()
     }
 
     private fun computeRms(samples: FloatArray): Float {
@@ -42,10 +47,11 @@ object SherpaOnnxEngine {
         val rms = computeRms(samples)
         val gain = if (rms in 0.002f..0.08f) (0.08f / rms).coerceAtMost(6.0f) else 1.0f
 
-        val padSamples = 4800 // 0.3s trailing silence
-        val out = FloatArray(samples.size + padSamples)
+        val leadPad = 2560  // 0.16s leading silence so soft plosives ("Pa-") aren't clipped
+        val tailPad = 4800  // 0.30s trailing silence
+        val out = FloatArray(leadPad + samples.size + tailPad)
         for (i in samples.indices) {
-            out[i] = (samples[i] * gain).coerceIn(-0.95f, 0.95f)
+            out[leadPad + i] = (samples[i] * gain).coerceIn(-0.95f, 0.95f)
         }
         return out
     }
@@ -66,13 +72,32 @@ object SherpaOnnxEngine {
         "ok emoji" to "👌"
     )
 
+    private fun capitalizeSentences(input: String): String {
+        if (input.isEmpty()) return input
+        val sb = StringBuilder(input.length)
+        var capNext = true
+        for (ch in input) {
+            if (capNext && ch in 'a'..'z') {
+                sb.append(ch.uppercaseChar())
+                capNext = false
+            } else {
+                sb.append(ch)
+                if (ch == '.' || ch == '?' || ch == '!' || ch == '\n') {
+                    capNext = true
+                } else if (!ch.isWhitespace()) {
+                    capNext = false
+                }
+            }
+        }
+        return sb.toString()
+    }
+
     fun postProcessTranscript(ctx: Context, raw: String, engine: AsrEngineType): String {
         var text = Normalizer.normalize(raw.trim(), Normalizer.Form.NFC)
         if (text.isEmpty()) return ""
 
         text = text
             .replace(Regex("\\[(?:BLANK_AUDIO|unintelligible|unk|noise|silence|inaudible)\\]", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("(?i)\\b(?:thanks for watching|thank you for watching|subscribe to my channel)\\b[.!]*"), "")
             .replace(Regex("\\b(\\w+)(?:\\s+\\1){2,}\\b", RegexOption.IGNORE_CASE), "$1")
 
         text = text.replace(Regex("(?i)\\b(?:umm+|uhh+|err+m*|ahh+)\\b[,\\s]*"), " ")
@@ -96,6 +121,10 @@ object SherpaOnnxEngine {
         }
 
         text = MedicalNormalizer.normalize(ctx, text, engine)
+
+        if (engine == AsrEngineType.MEDASR_CTC) {
+            text = capitalizeSentences(text)
+        }
 
         val dictRaw = Prefs.getPersonalDict(ctx)
         if (dictRaw.isNotBlank()) {
@@ -143,9 +172,9 @@ object SherpaOnnxEngine {
             val vadConfig = VadModelConfig(
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = vadFile.absolutePath,
-                    threshold = 0.55f,
+                    threshold = 0.45f,
                     minSilenceDuration = 0.45f,
-                    minSpeechDuration = 0.25f,
+                    minSpeechDuration = 0.18f,
                     maxSpeechDuration = 6.0f,
                     windowSize = 512
                 ),
@@ -181,15 +210,11 @@ object SherpaOnnxEngine {
     }
 
     @Synchronized
-    private fun getOrCreateRecognizer(ctx: Context, engine: AsrEngineType): OfflineRecognizer {
-        if (recognizer != null && cachedEngineType == engine) {
-            return recognizer!!
-        }
-        recognizer?.release()
-        recognizer = null
+    private fun getOrCreateModel(ctx: Context, key: String): OfflineRecognizer {
+        recognizers[key]?.let { return it }
 
-        val modelConfig = when (engine) {
-            AsrEngineType.INDIC_CONFORMER_OR -> {
+        val modelConfig = when (key) {
+            "odia" -> {
                 val model = ModelDownloader.getFile(ctx, ModelDownloader.INDIC_OR)
                 val tokens = ModelDownloader.getFile(ctx, ModelDownloader.INDIC_TOKENS)
                 if (!model.exists() || !tokens.exists()) {
@@ -202,25 +227,60 @@ object SherpaOnnxEngine {
                     debug = false
                 )
             }
-            AsrEngineType.WHISPER_HINGLISH_APEX -> {
-                val enc = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_APEX_ENC)
-                val dec = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_APEX_DEC)
-                val tok = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_APEX_TOKENS)
-                if (!enc.exists() || !dec.exists() || !tok.exists()) {
-                    throw IllegalStateException("Download Hinglish Apex Pack first")
+            "medasr" -> {
+                val model = ModelDownloader.getFile(ctx, ModelDownloader.MEDASR_MODEL)
+                val tokens = ModelDownloader.getFile(ctx, ModelDownloader.MEDASR_TOKENS)
+                if (!model.exists() || !tokens.exists()) {
+                    throw IllegalStateException("Download Google MedASR Pack first")
                 }
                 OfflineModelConfig(
-                    whisper = OfflineWhisperModelConfig(
-                        encoder = enc.absolutePath,
-                        decoder = dec.absolutePath,
-                        language = "en",
-                        task = "transcribe"
-                    ),
-                    tokens = tok.absolutePath,
+                    medasr = OfflineMedAsrCtcModelConfig(model = model.absolutePath),
+                    tokens = tokens.absolutePath,
                     numThreads = 4,
                     debug = false
                 )
             }
+            "parakeet_110m" -> {
+                val enc = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_110M_ENC)
+                val dec = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_110M_DEC)
+                val joiner = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_110M_JOINER)
+                val tok = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_110M_TOKENS)
+                if (!enc.exists() || !dec.exists() || !joiner.exists() || !tok.exists()) {
+                    throw IllegalStateException("Download Parakeet 110M Pack first")
+                }
+                OfflineModelConfig(
+                    transducer = OfflineTransducerModelConfig(
+                        encoder = enc.absolutePath,
+                        decoder = dec.absolutePath,
+                        joiner = joiner.absolutePath
+                    ),
+                    tokens = tok.absolutePath,
+                    modelType = "nemo_transducer",
+                    numThreads = 4,
+                    debug = false
+                )
+            }
+            "parakeet_06b" -> {
+                val enc = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_06B_ENC)
+                val dec = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_06B_DEC)
+                val joiner = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_06B_JOINER)
+                val tok = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_06B_TOKENS)
+                if (!enc.exists() || !dec.exists() || !joiner.exists() || !tok.exists()) {
+                    throw IllegalStateException("Download Parakeet 0.6B v2 Pack first")
+                }
+                OfflineModelConfig(
+                    transducer = OfflineTransducerModelConfig(
+                        encoder = enc.absolutePath,
+                        decoder = dec.absolutePath,
+                        joiner = joiner.absolutePath
+                    ),
+                    tokens = tok.absolutePath,
+                    modelType = "nemo_transducer",
+                    numThreads = 4,
+                    debug = false
+                )
+            }
+            else -> throw IllegalArgumentException("Unknown model key: $key")
         }
 
         val config = OfflineRecognizerConfig(
@@ -228,34 +288,70 @@ object SherpaOnnxEngine {
             modelConfig = modelConfig
         )
         val rec = OfflineRecognizer(assetManager = null, config = config)
-        recognizer = rec
-        cachedEngineType = engine
+        recognizers[key] = rec
         return rec
+    }
+
+    private fun decodeSingle(rec: OfflineRecognizer, boosted: FloatArray): String {
+        val stream = rec.createStream()
+        return try {
+            stream.acceptWaveform(boosted, 16000)
+            rec.decode(stream)
+            rec.getResult(stream).text.trim()
+        } finally {
+            stream.release()
+        }
+    }
+
+    private fun decodeRaw(ctx: Context, engine: AsrEngineType, boosted: FloatArray): String {
+        return when (engine) {
+            AsrEngineType.INDIC_CONFORMER_OR -> decodeSingle(getOrCreateModel(ctx, "odia"), boosted)
+            AsrEngineType.MEDASR_CTC -> decodeSingle(getOrCreateModel(ctx, "medasr"), boosted)
+            AsrEngineType.PARAKEET_110M -> decodeSingle(getOrCreateModel(ctx, "parakeet_110m"), boosted)
+            AsrEngineType.PARAKEET_06B_V2 -> decodeSingle(getOrCreateModel(ctx, "parakeet_06b"), boosted)
+            AsrEngineType.DUAL_PARAKEET_110M_MEDASR, AsrEngineType.DUAL_PARAKEET_06B_MEDASR -> {
+                val parakeetKey = if (engine == AsrEngineType.DUAL_PARAKEET_06B_MEDASR) "parakeet_06b" else "parakeet_110m"
+                val pRec = getOrCreateModel(ctx, parakeetKey)
+                val mRec = getOrCreateModel(ctx, "medasr")
+                val pFuture = dualPool.submit(Callable { decodeSingle(pRec, boosted) })
+                val mFuture = dualPool.submit(Callable { decodeSingle(mRec, boosted) })
+                val pRaw = pFuture.get()
+                val mRaw = mFuture.get()
+                MedicalNormalizer.mergeParakeetAndMedAsr(ctx, pRaw, mRaw)
+            }
+        }
     }
 
     fun preload(ctx: Context, engine: AsrEngineType) {
         try {
             MedicalNormalizer.init(ctx)
             getOrCreateVad(ctx)
-            getOrCreateRecognizer(ctx, engine)
+            when (engine) {
+                AsrEngineType.INDIC_CONFORMER_OR -> getOrCreateModel(ctx, "odia")
+                AsrEngineType.MEDASR_CTC -> getOrCreateModel(ctx, "medasr")
+                AsrEngineType.PARAKEET_110M -> getOrCreateModel(ctx, "parakeet_110m")
+                AsrEngineType.PARAKEET_06B_V2 -> getOrCreateModel(ctx, "parakeet_06b")
+                AsrEngineType.DUAL_PARAKEET_110M_MEDASR -> {
+                    getOrCreateModel(ctx, "parakeet_110m")
+                    getOrCreateModel(ctx, "medasr")
+                }
+                AsrEngineType.DUAL_PARAKEET_06B_MEDASR -> {
+                    getOrCreateModel(ctx, "parakeet_06b")
+                    getOrCreateModel(ctx, "medasr")
+                }
+            }
         } catch (_: Exception) {
         }
     }
 
     fun transcribeSamples(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            // Drop tiny or near-silent trailing clips (< 0.45s or RMS < 0.004) to prevent Whisper hallucinations on stop
-            if (samples.size < 7200 || computeRms(samples) < 0.004f) {
+            if (samples.size < 4800 || computeRms(samples) < 0.003f) {
                 return Result.success("")
             }
             val boosted = normalizeGainAndPad(samples)
-            val rec = getOrCreateRecognizer(ctx, engine)
-            val stream = rec.createStream()
-            stream.acceptWaveform(boosted, 16000)
-            rec.decode(stream)
-            val text = postProcessTranscript(ctx, rec.getResult(stream).text, engine)
-            stream.release()
-            Result.success(text)
+            val raw = decodeRaw(ctx, engine, boosted)
+            Result.success(postProcessTranscript(ctx, raw, engine))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -271,16 +367,12 @@ object SherpaOnnxEngine {
                 return Result.success("")
             }
 
-            val rec = getOrCreateRecognizer(ctx, engine)
             val sb = StringBuilder()
             for (seg in speechSegments) {
                 if (seg.size < 4800 || computeRms(seg) < 0.003f) continue
                 val boosted = normalizeGainAndPad(seg)
-                val stream = rec.createStream()
-                stream.acceptWaveform(boosted, 16000)
-                rec.decode(stream)
-                val text = postProcessTranscript(ctx, rec.getResult(stream).text, engine)
-                stream.release()
+                val raw = decodeRaw(ctx, engine, boosted)
+                val text = postProcessTranscript(ctx, raw, engine)
                 if (text.isNotEmpty()) {
                     if (sb.isNotEmpty()) sb.append(" ")
                     sb.append(text)

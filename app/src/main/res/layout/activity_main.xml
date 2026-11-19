@@ -20,14 +20,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="100% Offline Hinglish &amp; Odia Inline Voice Typing"
+            android:text="100% Offline Medical &amp; Odia Inline Voice Typing"
             android:textSize="13sp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Active Language"
+            android:text="Active Mode"
             android:textStyle="bold" />
 
         <Spinner
@@ -36,11 +36,25 @@
             android:layout_height="48dp" />
 
         <Button
-            android:id="@+id/btnDlWhisperApex"
+            android:id="@+id/btnDlMedAsr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:text="Download Hinglish Apex (~1.03 GB - Best Quality)" />
+            android:text="Download Google MedASR CTC (Clinical Core)" />
+
+        <Button
+            android:id="@+id/btnDlParakeet110m"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download Parakeet TDT 110M (~137 MB - Fastest)" />
+
+        <Button
+            android:id="@+id/btnDlParakeet06b"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download Parakeet TDT 0.6B v2 (~661 MB - Pro English)" />
 
         <Button
             android:id="@+id/btnDlIndicOr"
@@ -54,7 +68,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Compare Hinglish &amp; Odia (Lab)" />
+            android:text="Compare Medical &amp; Odia Engines (Lab)" />
 
         <TextView
             android:layout_width="wrap_content"

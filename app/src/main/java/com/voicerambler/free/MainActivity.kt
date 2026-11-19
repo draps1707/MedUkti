@@ -47,10 +47,34 @@ class MainActivity : AppCompatActivity() {
 
         etPersonalDict.setText(Prefs.getPersonalDict(this))
 
-        findViewById<Button>(R.id.btnDlWhisperApex).setOnClickListener {
+        findViewById<Button>(R.id.btnDlMedAsr).setOnClickListener {
             downloadBatch(
-                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_APEX_TOKENS, ModelDownloader.WHISPER_APEX_ENC, ModelDownloader.WHISPER_APEX_DEC),
-                "Hinglish Apex"
+                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.MEDASR_TOKENS, ModelDownloader.MEDASR_MODEL),
+                "Google MedASR CTC"
+            )
+        }
+        findViewById<Button>(R.id.btnDlParakeet110m).setOnClickListener {
+            downloadBatch(
+                listOf(
+                    ModelDownloader.SILERO_VAD,
+                    ModelDownloader.PARAKEET_110M_TOKENS,
+                    ModelDownloader.PARAKEET_110M_ENC,
+                    ModelDownloader.PARAKEET_110M_DEC,
+                    ModelDownloader.PARAKEET_110M_JOINER
+                ),
+                "Parakeet TDT 110M"
+            )
+        }
+        findViewById<Button>(R.id.btnDlParakeet06b).setOnClickListener {
+            downloadBatch(
+                listOf(
+                    ModelDownloader.SILERO_VAD,
+                    ModelDownloader.PARAKEET_06B_TOKENS,
+                    ModelDownloader.PARAKEET_06B_ENC,
+                    ModelDownloader.PARAKEET_06B_DEC,
+                    ModelDownloader.PARAKEET_06B_JOINER
+                ),
+                "Parakeet TDT 0.6B v2"
             )
         }
         findViewById<Button>(R.id.btnDlIndicOr).setOnClickListener {
@@ -143,12 +167,16 @@ class MainActivity : AppCompatActivity() {
         val overlayOk = Settings.canDrawOverlays(this)
         val accOk = DictationAccessibilityService.instance != null
         val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
-        val apexOk = ModelDownloader.isWhisperApexInstalled(this)
+        val medOk = ModelDownloader.isMedAsrInstalled(this)
+        val p110Ok = ModelDownloader.isParakeet110mInstalled(this)
+        val p06bOk = ModelDownloader.isParakeet06bInstalled(this)
         val odiaOk = ModelDownloader.isOdiaInstalled(this)
 
         tvStatus.text = buildString {
-            appendLine("Active Language: ${Prefs.getEngine(this@MainActivity).label}")
-            appendLine("Hinglish Apex: ${if (apexOk) "Installed" else "Not downloaded"}")
+            appendLine("Active Mode: ${Prefs.getEngine(this@MainActivity).label}")
+            appendLine("Google MedASR CTC: ${if (medOk) "Installed" else "Not downloaded"}")
+            appendLine("Parakeet TDT 110M: ${if (p110Ok) "Installed" else "Not downloaded"}")
+            appendLine("Parakeet TDT 0.6B v2: ${if (p06bOk) "Installed" else "Not downloaded"}")
             appendLine("Odia (IndicConformer): ${if (odiaOk) "Installed" else "Not downloaded"}")
             appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
             appendLine("Mic: ${if (micOk) "OK" else "Needed"} | Overlay: ${if (overlayOk) "OK" else "Needed"} | Accessibility: ${if (accOk) "OK" else "Needed"}")

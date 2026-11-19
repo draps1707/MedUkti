@@ -34,22 +34,64 @@ object ModelDownloader {
         "https://huggingface.co/Docglasses-AI/indic-conformer-600m-sherpa-onnx-int8/resolve/main/indicconformer-or.int8.onnx"
     )
 
-    val WHISPER_APEX_ENC = ModelArtifact(
-        "whisper_apex_enc",
-        "hinglish-apex-encoder.int8.onnx",
-        "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-apex/encoder.int8.onnx"
+    val MEDASR_MODEL = ModelArtifact(
+        "medasr_model",
+        "medasr-model.int8.onnx",
+        "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/model.int8.onnx"
     )
 
-    val WHISPER_APEX_DEC = ModelArtifact(
-        "whisper_apex_dec",
-        "hinglish-apex-decoder.int8.onnx",
-        "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-apex/decoder.int8.onnx"
+    val MEDASR_TOKENS = ModelArtifact(
+        "medasr_tokens",
+        "medasr-tokens.txt",
+        "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/tokens.txt"
     )
 
-    val WHISPER_APEX_TOKENS = ModelArtifact(
-        "whisper_apex_tok",
-        "hinglish-apex-tokens.txt",
-        "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-apex/tokens.txt"
+    val PARAKEET_110M_ENC = ModelArtifact(
+        "parakeet_110m_enc",
+        "parakeet-110m-encoder.int8.onnx",
+        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/encoder.int8.onnx"
+    )
+
+    val PARAKEET_110M_DEC = ModelArtifact(
+        "parakeet_110m_dec",
+        "parakeet-110m-decoder.int8.onnx",
+        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/decoder.int8.onnx"
+    )
+
+    val PARAKEET_110M_JOINER = ModelArtifact(
+        "parakeet_110m_joiner",
+        "parakeet-110m-joiner.int8.onnx",
+        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/joiner.int8.onnx"
+    )
+
+    val PARAKEET_110M_TOKENS = ModelArtifact(
+        "parakeet_110m_tokens",
+        "parakeet-110m-tokens.txt",
+        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/tokens.txt"
+    )
+
+    val PARAKEET_06B_ENC = ModelArtifact(
+        "parakeet_06b_enc",
+        "parakeet-06b-encoder.int8.onnx",
+        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/encoder.int8.onnx"
+    )
+
+    val PARAKEET_06B_DEC = ModelArtifact(
+        "parakeet_06b_dec",
+        "parakeet-06b-decoder.int8.onnx",
+        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/decoder.int8.onnx"
+    )
+
+    val PARAKEET_06B_JOINER = ModelArtifact(
+        "parakeet_06b_joiner",
+        "parakeet-06b-joiner.int8.onnx",
+        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/joiner.int8.onnx"
+    )
+
+    val PARAKEET_06B_TOKENS = ModelArtifact(
+        "parakeet_06b_tokens",
+        "parakeet-06b-tokens.txt",
+        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/tokens.txt"
     )
 
     fun modelsDir(ctx: Context): File = File(ctx.filesDir, "models").apply { mkdirs() }
@@ -61,22 +103,39 @@ object ModelDownloader {
         return f.exists() && f.length() > 512L
     }
 
-    fun isWhisperApexInstalled(ctx: Context): Boolean =
-        isInstalled(ctx, WHISPER_APEX_ENC) &&
-            isInstalled(ctx, WHISPER_APEX_DEC) &&
-            isInstalled(ctx, WHISPER_APEX_TOKENS)
-
     fun isOdiaInstalled(ctx: Context): Boolean =
         isInstalled(ctx, INDIC_OR) && isInstalled(ctx, INDIC_TOKENS)
+
+    fun isMedAsrInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, MEDASR_MODEL) && isInstalled(ctx, MEDASR_TOKENS)
+
+    fun isParakeet110mInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, PARAKEET_110M_ENC) &&
+            isInstalled(ctx, PARAKEET_110M_DEC) &&
+            isInstalled(ctx, PARAKEET_110M_JOINER) &&
+            isInstalled(ctx, PARAKEET_110M_TOKENS)
+
+    fun isParakeet06bInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, PARAKEET_06B_ENC) &&
+            isInstalled(ctx, PARAKEET_06B_DEC) &&
+            isInstalled(ctx, PARAKEET_06B_JOINER) &&
+            isInstalled(ctx, PARAKEET_06B_TOKENS)
 
     fun cleanupUnusedModels(ctx: Context) {
         val keep = setOf(
             SILERO_VAD.fileName,
             INDIC_TOKENS.fileName,
             INDIC_OR.fileName,
-            WHISPER_APEX_ENC.fileName,
-            WHISPER_APEX_DEC.fileName,
-            WHISPER_APEX_TOKENS.fileName
+            MEDASR_MODEL.fileName,
+            MEDASR_TOKENS.fileName,
+            PARAKEET_110M_ENC.fileName,
+            PARAKEET_110M_DEC.fileName,
+            PARAKEET_110M_JOINER.fileName,
+            PARAKEET_110M_TOKENS.fileName,
+            PARAKEET_06B_ENC.fileName,
+            PARAKEET_06B_DEC.fileName,
+            PARAKEET_06B_JOINER.fileName,
+            PARAKEET_06B_TOKENS.fileName
         )
         modelsDir(ctx).listFiles()?.forEach { f ->
             if (f.name !in keep && !f.name.endsWith(".tmp")) {

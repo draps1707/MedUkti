@@ -120,8 +120,8 @@ class FloatingMicService : Service() {
             )
         }
         val notification = Notification.Builder(this, channelId)
-            .setContentTitle("କଥାType (Hinglish & Odia)")
-            .setContentText("Tap mic to dictate, tap HI/OD to switch language.")
+            .setContentTitle("କଥାType (Medical & Odia)")
+            .setContentText("Tap mic to dictate, tap MED/OD to switch mode.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
         startForeground(101, notification)
@@ -140,7 +140,7 @@ class FloatingMicService : Service() {
         val eng = Prefs.getEngine(this)
         tvLangBadge?.text = when (eng) {
             AsrEngineType.INDIC_CONFORMER_OR -> "OD"
-            else -> "HI"
+            else -> "MED"
         }
     }
 
@@ -148,16 +148,17 @@ class FloatingMicService : Service() {
         if (isListening.get() || isProcessing) return
         val cur = Prefs.getEngine(this)
         val next = if (cur == AsrEngineType.INDIC_CONFORMER_OR) {
-            AsrEngineType.WHISPER_HINGLISH_APEX
+            Prefs.getMedEngine(this)
         } else {
             AsrEngineType.INDIC_CONFORMER_OR
         }
         Prefs.setEngine(this, next)
         refreshLangBadge()
         buzz(25L)
+        serviceScope.launch { OfflineAsrEngines.preload(this@FloatingMicService) }
         Toast.makeText(
             this,
-            if (next == AsrEngineType.INDIC_CONFORMER_OR) "Switched to Odia" else "Switched to Hinglish Apex",
+            if (next == AsrEngineType.INDIC_CONFORMER_OR) "Switched to Odia" else "Switched to Medical (${next.name.substringBefore('_')})",
             Toast.LENGTH_SHORT
         ).show()
         serviceScope.launch { OfflineAsrEngines.preload(this@FloatingMicService) }

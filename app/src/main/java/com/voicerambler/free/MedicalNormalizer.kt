@@ -57,6 +57,11 @@ object MedicalNormalizer {
         "cef triaxone" to "Ceftriaxone",
         "safe triaxone" to "Ceftriaxone",
         "ceftryaxone" to "Ceftriaxone",
+        "parasetamol" to "Paracetamol",
+        "para setamol" to "Paracetamol",
+        "para sitamol" to "Paracetamol",
+        "paracitamol" to "Paracetamol",
+        "para cetamol" to "Paracetamol",
         "tapa glyphlogin" to "Dapagliflozin",
         "tapa gliflozin" to "Dapagliflozin",
         "dapa gliflozin" to "Dapagliflozin",
@@ -209,7 +214,9 @@ object MedicalNormalizer {
     )
 
     private fun englishSkeleton(word: String): String {
-        val norm = word.lowercase().replace("ph", "f")
+        val norm = word.lowercase()
+            .replace("ph", "f")
+            .replace(Regex("c(?=[eiy])"), "s")
         val sb = StringBuilder()
         var prev = '\u0000'
         for (ch in norm) {
@@ -410,6 +417,30 @@ object MedicalNormalizer {
             val punct1 = w1.substring(clean1.length)
             val low1 = clean1.lowercase()
 
+            if (i + 2 < tokens.size && clean1.all { it in 'a'..'z' || it in 'A'..'Z' } && low1 !in PROTECTED_WORDS) {
+                val w2 = tokens[i + 1]
+                val w3 = tokens[i + 2]
+                val clean2 = w2.trimEnd('.', ',', ';', ':', '?', '!')
+                val clean3 = w3.trimEnd('.', ',', ';', ':', '?', '!')
+                val punct3 = w3.substring(clean3.length)
+                val low2 = clean2.lowercase()
+                val low3 = clean3.lowercase()
+                if (clean2.all { it in 'a'..'z' || it in 'A'..'Z' } &&
+                    clean3.all { it in 'a'..'z' || it in 'A'..'Z' } &&
+                    low2 !in PROTECTED_WORDS && low3 !in PROTECTED_WORDS
+                ) {
+                    val joined3 = low1 + low2 + low3
+                    val hit3 = singleWordMap[joined3]
+                        ?: (if (joined3.length >= 8) fuzzyLookup(joined3) else null)
+                        ?: (if (joined3.length >= 9) skeletonMap[englishSkeleton(joined3)] else null)
+                    if (hit3 != null) {
+                        out.add(hit3 + punct3)
+                        i += 3
+                        continue
+                    }
+                }
+            }
+
             if (i + 1 < tokens.size && clean1.all { it in 'a'..'z' || it in 'A'..'Z' } && low1 !in PROTECTED_WORDS) {
                 val w2 = tokens[i + 1]
                 val clean2 = w2.trimEnd('.', ',', ';', ':', '?', '!')
@@ -442,6 +473,129 @@ object MedicalNormalizer {
             i++
         }
 
-        return out.joinToString(" ").replace(Regex("\\s{2,}"), " ").trim()
+        var res = out.joinToString(" ").replace(Regex("[ \t]{2,}"), " ").trim()
+        res = formatClinicalShorthand(res)
+        return res
+    }
+
+    private val SECTION_HEADINGS = linkedMapOf(
+        "chief complaints" to "Chief Complaints:",
+        "history of present illness" to "History of Present Illness:",
+        "past history" to "Past History:",
+        "on examination" to "On Examination:",
+        "systemic examination" to "Systemic Examination:",
+        "provisional diagnosis" to "Provisional Diagnosis:",
+        "final diagnosis" to "Final Diagnosis:",
+        "investigations" to "Investigations:",
+        "treatment given" to "Treatment Given:",
+        "discharge advice" to "Discharge Advice:",
+        "follow up advice" to "Follow-up Advice:"
+    )
+
+    private fun formatClinicalShorthand(input: String): String {
+        var t = input
+        // BP 130 by 80 / 130 over 80 -> BP 130/80
+        t = t.replace(Regex("(?i)\b(bp\s+)?(\d{2,3})\s+(?:by|over)\s+(\d{2,3})\b")) { m ->
+            val bpPrefix = if (m.groupValues[1].isNotEmpty()) "BP " else ""
+            "$bpPrefix${m.groupValues[2]}/${m.groupValues[3]}"
+        }
+        // Decimal numbers: "10 point 2" -> "10.2"
+        t = t.replace(Regex("(?i)(\d+)\s+point\s+(\d+)"), "$1.$2")
+        // SpO2 98 percent -> SpO2 98%
+        t = t.replace(Regex("(?i)\bspo2\s+(\d{2,3})\s+percent\b"), "SpO2 $1%")
+        t = t.replace(Regex("(?i)(\d{1,3}(?:\.\d+)?)\s+percent\b"), "$1%")
+        // Rx prefixes before drug/word
+        t = t.replace(Regex("(?i)\b(?:tab|tablet)\s+(?=[A-Za-z])"), "Tab. ")
+        t = t.replace(Regex("(?i)\b(?:inj|injection)\s+(?=[A-Za-z])"), "Inj. ")
+        t = t.replace(Regex("(?i)\b(?:cap|capsule)\s+(?=[A-Za-z])"), "Cap. ")
+        t = t.replace(Regex("(?i)\b(?:syp|syrup)\s+(?=[A-Za-z])"), "Syp. ")
+        // Uppercase dosing/route tokens when following dose/drug
+        t = t.replace(Regex("(?i)\b(od|bd|tds|qid|hs|sos|iv|im|sc)\b(?=[.,;:\s]|$)")) { m ->
+            m.value.uppercase()
+        }
+        // Discharge summary & case history section headers
+        for ((phrase, heading) in SECTION_HEADINGS) {
+            t = t.replace(Regex("(?i)\s*\b${Regex.escape(phrase)}\b[:.,]*\s*"), "
+$heading ")
+        }
+        return t.trim()
+    }
+
+    fun isKnownMedicalWord(lowerWord: String): Boolean =
+        lowerWord !in PROTECTED_WORDS && (singleWordMap.containsKey(lowerWord) || fuzzyLookup(lowerWord) != null)
+
+    fun mergeParakeetAndMedAsr(ctx: Context, parakeetRaw: String, medAsrRaw: String): String {
+        init(ctx)
+        val pTrim = parakeetRaw.trim()
+        val mTrim = medAsrRaw.trim()
+        if (pTrim.isEmpty()) return mTrim
+        if (mTrim.isEmpty()) return pTrim
+
+        val medTokens = mTrim.split(Regex("\s+")).map { it.trimEnd('.', ',', ';', ':', '?', '!') }
+        val medTerms = ArrayList<String>()
+        var mi = 0
+        while (mi < medTokens.size) {
+            val w1 = medTokens[mi].lowercase()
+            if (mi + 1 < medTokens.size) {
+                val w2 = medTokens[mi + 1].lowercase()
+                val joined = w1 + w2
+                val hit2 = singleWordMap[joined] ?: (if (joined.length >= 8) fuzzyLookup(joined) else null)
+                if (hit2 != null && w1 !in PROTECTED_WORDS && w2 !in PROTECTED_WORDS) {
+                    medTerms.add(hit2)
+                    mi += 2
+                    continue
+                }
+            }
+            val hit1 = if (w1.length >= 5 && w1 !in PROTECTED_WORDS) {
+                singleWordMap[w1] ?: (if (w1.length >= 8) fuzzyLookup(w1) else null)
+            } else null
+            if (hit1 != null) medTerms.add(hit1)
+            mi++
+        }
+
+        if (medTerms.isEmpty()) return pTrim
+
+        val pWords = pTrim.split(Regex("\s+")).toMutableList()
+        val pLowerAll = pTrim.lowercase()
+
+        for (term in medTerms) {
+            if (term.lowercase() in pLowerAll) continue
+            val targetSkel = englishSkeleton(term)
+            if (targetSkel.length < 4) continue
+
+            var bestIdx = -1
+            var bestSpan = 1
+            var bestDist = 2
+
+            for (i in pWords.indices) {
+                for (span in 1..3) {
+                    if (i + span > pWords.size) break
+                    val slice = pWords.subList(i, i + span).map { it.trimEnd('.', ',', ';', ':', '?', '!') }
+                    if (slice.any { it.lowercase() in PROTECTED_WORDS || it.any(Char::isDigit) }) continue
+                    if (span == 1 && isKnownMedicalWord(slice[0].lowercase())) continue
+                    val joined = slice.joinToString("")
+                    if (joined.length < 4) continue
+                    val sk = englishSkeleton(joined)
+                    val d = levenshtein(sk, targetSkel, 1)
+                    if (d < bestDist) {
+                        bestDist = d
+                        bestIdx = i
+                        bestSpan = span
+                    }
+                }
+            }
+
+            if (bestIdx >= 0) {
+                val lastRaw = pWords[bestIdx + bestSpan - 1]
+                val lastClean = lastRaw.trimEnd('.', ',', ';', ':', '?', '!')
+                val punct = lastRaw.substring(lastClean.length)
+                pWords[bestIdx] = term + punct
+                for (r in 1 until bestSpan) {
+                    pWords.removeAt(bestIdx + 1)
+                }
+            }
+        }
+
+        return pWords.joinToString(" ")
     }
 }

@@ -41,21 +41,26 @@ class CompareActivity : AppCompatActivity() {
                     tv.text = "Recording too short."
                     return@setOnClickListener
                 }
-                tv.text = "Running Hinglish & Odia..."
+                tv.text = "Running installed engines..."
 
                 uiScope.launch {
                     val out = StringBuilder()
 
-                    val apex = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_APEX, wav)
-                    out.appendLine("=== Hinglish Apex ===")
-                    apex.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
-                    out.appendLine()
+                    val tests = listOf(
+                        "Dual Pro (Parakeet 0.6B + MedASR)" to AsrEngineType.DUAL_PARAKEET_06B_MEDASR,
+                        "Dual Fast (Parakeet 110M + MedASR)" to AsrEngineType.DUAL_PARAKEET_110M_MEDASR,
+                        "Google MedASR Only" to AsrEngineType.MEDASR_CTC,
+                        "Parakeet 0.6B v2 Only" to AsrEngineType.PARAKEET_06B_V2,
+                        "Parakeet 110M Only" to AsrEngineType.PARAKEET_110M,
+                        "Odia (IndicConformer 600M)" to AsrEngineType.INDIC_CONFORMER_OR
+                    )
 
-                    val indicOr = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIC_CONFORMER_OR, wav)
-                    out.appendLine("=== Odia (IndicConformer 600M) ===")
-                    indicOr.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
-                    out.appendLine()
-
+                    for ((title, eng) in tests) {
+                        val res = OfflineAsrEngines.transcribe(this@CompareActivity, eng, wav)
+                        out.appendLine("=== $title ===")
+                        res.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
+                        out.appendLine()
+                    }
 
                     wav.delete()
                     tv.text = out.toString()

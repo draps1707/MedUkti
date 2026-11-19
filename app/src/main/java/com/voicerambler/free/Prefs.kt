@@ -3,24 +3,47 @@ package com.voicerambler.free
 import android.content.Context
 
 enum class AsrEngineType(val label: String) {
-    WHISPER_HINGLISH_APEX("Hinglish — Whisper Apex (Offline ~1.03 GB)"),
-    INDIC_CONFORMER_OR("Odia — AI4Bharat IndicConformer 600M (Offline ~661 MB)")
+    DUAL_PARAKEET_110M_MEDASR("Medical Dual Fast — Parakeet 110M + Google MedASR"),
+    DUAL_PARAKEET_06B_MEDASR("Medical Dual Pro — Parakeet 0.6B v2 + Google MedASR"),
+    MEDASR_CTC("Medical Only — Google MedASR CTC"),
+    PARAKEET_110M("English Fast — Parakeet TDT 110M"),
+    PARAKEET_06B_V2("English Pro — Parakeet TDT 0.6B v2"),
+    INDIC_CONFORMER_OR("Odia — AI4Bharat IndicConformer 600M (~661 MB)")
 }
 
 object Prefs {
     private const val FILE = "voice_rambler_prefs"
     private const val KEY_ENGINE = "asr_engine"
+    private const val KEY_MED_ENGINE = "med_asr_engine"
     private const val KEY_BUBBLE_X = "bubble_x"
     private const val KEY_BUBBLE_Y = "bubble_y"
     private const val KEY_PERSONAL_DICT = "personal_dictionary"
 
     fun getEngine(ctx: Context): AsrEngineType {
-        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_ENGINE, AsrEngineType.WHISPER_HINGLISH_APEX.name)
-        return AsrEngineType.entries.firstOrNull { it.name == raw } ?: AsrEngineType.WHISPER_HINGLISH_APEX
+        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .getString(KEY_ENGINE, AsrEngineType.DUAL_PARAKEET_110M_MEDASR.name)
+        return AsrEngineType.entries.firstOrNull { it.name == raw }
+            ?: AsrEngineType.DUAL_PARAKEET_110M_MEDASR
     }
 
     fun setEngine(ctx: Context, engine: AsrEngineType) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_ENGINE, engine.name).apply()
+        val editor = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_ENGINE, engine.name)
+        if (engine != AsrEngineType.INDIC_CONFORMER_OR) {
+            editor.putString(KEY_MED_ENGINE, engine.name)
+        }
+        editor.apply()
+    }
+
+    fun getMedEngine(ctx: Context): AsrEngineType {
+        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .getString(KEY_MED_ENGINE, AsrEngineType.DUAL_PARAKEET_110M_MEDASR.name)
+        val parsed = AsrEngineType.entries.firstOrNull { it.name == raw }
+        return if (parsed != null && parsed != AsrEngineType.INDIC_CONFORMER_OR) {
+            parsed
+        } else {
+            AsrEngineType.DUAL_PARAKEET_110M_MEDASR
+        }
     }
 
     fun getBubbleX(ctx: Context): Int =
