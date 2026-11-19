@@ -25,38 +25,6 @@ object OfflineAsrEngines {
                 if (ModelDownloader.isSraVaaniInstalled(ctx)) Result.success(engine)
                 else Result.failure(Exception("Download SraVaani 1.0 Odia Pack first"))
             }
-            AsrEngineType.MEDASR_CTC -> {
-                if (ModelDownloader.isMedAsrInstalled(ctx)) Result.success(engine)
-                else Result.failure(Exception("Download Google MedASR Pack first"))
-            }
-            AsrEngineType.PARAKEET_110M -> {
-                if (ModelDownloader.isParakeet110mInstalled(ctx)) Result.success(engine)
-                else Result.failure(Exception("Download Parakeet 110M Pack first"))
-            }
-            AsrEngineType.PARAKEET_06B_V2 -> {
-                if (ModelDownloader.isParakeet06bInstalled(ctx)) Result.success(engine)
-                else Result.failure(Exception("Download Parakeet 0.6B v2 Pack first"))
-            }
-            AsrEngineType.DUAL_PARAKEET_110M_MEDASR -> {
-                val pOk = ModelDownloader.isParakeet110mInstalled(ctx)
-                val mOk = ModelDownloader.isMedAsrInstalled(ctx)
-                when {
-                    pOk && mOk -> Result.success(engine)
-                    mOk -> Result.success(AsrEngineType.MEDASR_CTC)
-                    pOk -> Result.success(AsrEngineType.PARAKEET_110M)
-                    else -> Result.failure(Exception("Download Parakeet 110M & Google MedASR first"))
-                }
-            }
-            AsrEngineType.DUAL_PARAKEET_06B_MEDASR -> {
-                val pOk = ModelDownloader.isParakeet06bInstalled(ctx)
-                val mOk = ModelDownloader.isMedAsrInstalled(ctx)
-                when {
-                    pOk && mOk -> Result.success(engine)
-                    mOk -> Result.success(AsrEngineType.MEDASR_CTC)
-                    pOk -> Result.success(AsrEngineType.PARAKEET_06B_V2)
-                    else -> Result.failure(Exception("Download Parakeet 0.6B v2 & Google MedASR first"))
-                }
-            }
         }
     }
 

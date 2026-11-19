@@ -49,11 +49,8 @@ class CompareActivity : AppCompatActivity() {
                     val tests = listOf(
                         "Whisper Large-v3-Turbo (Indian/Med)" to AsrEngineType.WHISPER_TURBO,
                         "Parakeet-Indic v1 (Indian EN)" to AsrEngineType.PARAKEET_INDIC,
-                        "Dual Pro (Parakeet 0.6B + MedASR)" to AsrEngineType.DUAL_PARAKEET_06B_MEDASR,
-                        "Google MedASR Only" to AsrEngineType.MEDASR_CTC,
-                        "Parakeet 0.6B v2 Only" to AsrEngineType.PARAKEET_06B_V2,
-                        "Odia (IndicConformer 600M)" to AsrEngineType.INDIC_CONFORMER_OR,
-                        "Odia Natural (SraVaani 1.0)" to AsrEngineType.SRAVAANI_OR
+                        "Odia Natural (SraVaani 1.0)" to AsrEngineType.SRAVAANI_OR,
+                        "Odia Backup (IndicConformer 600M)" to AsrEngineType.INDIC_CONFORMER_OR
                     )
 
                     for ((title, eng) in tests) {

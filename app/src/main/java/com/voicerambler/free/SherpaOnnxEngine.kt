@@ -43,13 +43,8 @@ object SherpaOnnxEngine {
         val keepKeys = when (active) {
             AsrEngineType.INDIC_CONFORMER_OR -> setOf("odia")
             AsrEngineType.SRAVAANI_OR -> emptySet()
-            AsrEngineType.MEDASR_CTC -> setOf("medasr")
-            AsrEngineType.PARAKEET_110M -> setOf("parakeet_110m")
-            AsrEngineType.PARAKEET_06B_V2 -> setOf("parakeet_06b")
-            AsrEngineType.DUAL_PARAKEET_110M_MEDASR -> setOf("parakeet_110m", "medasr")
             AsrEngineType.WHISPER_TURBO -> setOf("whisper_turbo")
             AsrEngineType.PARAKEET_INDIC -> setOf("parakeet_indic")
-            AsrEngineType.DUAL_PARAKEET_06B_MEDASR -> setOf("parakeet_06b", "medasr")
         }
         val toRemove = recognizers.keys.filter { it !in keepKeys }
         for (k in toRemove) {
@@ -151,9 +146,6 @@ object SherpaOnnxEngine {
 
         text = MedicalNormalizer.normalize(ctx, text, engine)
 
-        if (engine == AsrEngineType.MEDASR_CTC) {
-            text = capitalizeSentences(text)
-        }
 
         val dictRaw = Prefs.getPersonalDict(ctx)
         if (dictRaw.isNotBlank()) {
@@ -386,21 +378,8 @@ object SherpaOnnxEngine {
         return when (engine) {
             AsrEngineType.INDIC_CONFORMER_OR -> decodeSingle(getOrCreateModel(ctx, "odia"), boosted)
             AsrEngineType.SRAVAANI_OR -> SraVaaniEngine.transcribeSamples(ctx, boosted)
-            AsrEngineType.MEDASR_CTC -> decodeSingle(getOrCreateModel(ctx, "medasr"), boosted)
-            AsrEngineType.PARAKEET_110M -> decodeSingle(getOrCreateModel(ctx, "parakeet_110m"), boosted)
             AsrEngineType.WHISPER_TURBO -> decodeSingle(getOrCreateModel(ctx, "whisper_turbo"), boosted)
             AsrEngineType.PARAKEET_INDIC -> decodeSingle(getOrCreateModel(ctx, "parakeet_indic"), boosted)
-            AsrEngineType.PARAKEET_06B_V2 -> decodeSingle(getOrCreateModel(ctx, "parakeet_06b"), boosted)
-            AsrEngineType.DUAL_PARAKEET_110M_MEDASR, AsrEngineType.DUAL_PARAKEET_06B_MEDASR -> {
-                val parakeetKey = if (engine == AsrEngineType.DUAL_PARAKEET_06B_MEDASR) "parakeet_06b" else "parakeet_110m"
-                val pRec = getOrCreateModel(ctx, parakeetKey)
-                val mRec = getOrCreateModel(ctx, "medasr")
-                val pFuture = dualPool.submit(Callable { decodeSingle(pRec, boosted) })
-                val mFuture = dualPool.submit(Callable { decodeSingle(mRec, boosted) })
-                val pRaw = pFuture.get()
-                val mRaw = mFuture.get()
-                MedicalNormalizer.mergeParakeetAndMedAsr(ctx, pRaw, mRaw)
-            }
         }
     }
 
@@ -411,19 +390,8 @@ object SherpaOnnxEngine {
             when (engine) {
                 AsrEngineType.INDIC_CONFORMER_OR -> getOrCreateModel(ctx, "odia")
                 AsrEngineType.SRAVAANI_OR -> SraVaaniEngine.preload(ctx)
-                AsrEngineType.MEDASR_CTC -> getOrCreateModel(ctx, "medasr")
-                AsrEngineType.PARAKEET_110M -> getOrCreateModel(ctx, "parakeet_110m")
                 AsrEngineType.WHISPER_TURBO -> getOrCreateModel(ctx, "whisper_turbo")
                 AsrEngineType.PARAKEET_INDIC -> getOrCreateModel(ctx, "parakeet_indic")
-                AsrEngineType.PARAKEET_06B_V2 -> getOrCreateModel(ctx, "parakeet_06b")
-                AsrEngineType.DUAL_PARAKEET_110M_MEDASR -> {
-                    getOrCreateModel(ctx, "parakeet_110m")
-                    getOrCreateModel(ctx, "medasr")
-                }
-                AsrEngineType.DUAL_PARAKEET_06B_MEDASR -> {
-                    getOrCreateModel(ctx, "parakeet_06b")
-                    getOrCreateModel(ctx, "medasr")
-                }
             }
         } catch (_: Exception) {
         }

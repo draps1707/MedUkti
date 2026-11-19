@@ -3,11 +3,12 @@ package com.voicerambler.free
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
-import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
 import android.widget.Switch
@@ -24,6 +25,13 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
+    private lateinit var tvSetupBadge: TextView
+    private lateinit var btnDlWhisperTurbo: TextView
+    private lateinit var btnDlStreamingDraft: TextView
+    private lateinit var btnDlParakeetIndic: TextView
+    private lateinit var btnDlSraVaani: TextView
+    private lateinit var btnDlIndicOr: TextView
+    private lateinit var etHfToken: EditText
     private val uiScope = CoroutineScope(Dispatchers.Main + Job())
 
     private val permLauncher = registerForActivityResult(
@@ -38,12 +46,19 @@ class MainActivity : AppCompatActivity() {
 
         val spinnerEngine = findViewById<Spinner>(R.id.spinnerEngine)
         val etPersonalDict = findViewById<EditText>(R.id.etPersonalDict)
-        val etHfToken = findViewById<EditText>(R.id.etHfToken)
+        etHfToken = findViewById(R.id.etHfToken)
         val switchAutoListen = findViewById<Switch>(R.id.switchAutoListen)
         val switchStreamingDraft = findViewById<Switch>(R.id.switchStreamingDraft)
         tvStatus = findViewById(R.id.tvStatus)
+        tvSetupBadge = findViewById(R.id.tvSetupBadge)
+        btnDlWhisperTurbo = findViewById(R.id.btnDlWhisperTurbo)
+        btnDlStreamingDraft = findViewById(R.id.btnDlStreamingDraft)
+        btnDlParakeetIndic = findViewById(R.id.btnDlParakeetIndic)
+        btnDlSraVaani = findViewById(R.id.btnDlSraVaani)
+        btnDlIndicOr = findViewById(R.id.btnDlIndicOr)
 
-        spinnerEngine.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
+        spinnerEngine.adapter = adapter
         spinnerEngine.setSelection(AsrEngineType.entries.indexOf(Prefs.getEngine(this)).coerceAtLeast(0))
 
         switchAutoListen.isChecked = Prefs.isAutoListen(this)
@@ -58,16 +73,18 @@ class MainActivity : AppCompatActivity() {
         etHfToken.setText(Prefs.getHfToken(this))
         etPersonalDict.setText(Prefs.getPersonalDict(this))
 
-        findViewById<Button>(R.id.btnEnableKb).setOnClickListener {
+        findViewById<View>(R.id.btnEnableKb).setOnClickListener {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
         }
-        findViewById<Button>(R.id.btnPickKb).setOnClickListener {
+        findViewById<View>(R.id.btnPickKb).setOnClickListener {
             val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
             imm.showInputMethodPicker()
         }
 
-        findViewById<Button>(R.id.btnDlWhisperTurbo).setOnClickListener {
+        btnDlWhisperTurbo.setOnClickListener {
+            if (ModelDownloader.isWhisperTurboInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
             downloadBatch(
+                btnDlWhisperTurbo,
                 listOf(
                     ModelDownloader.SILERO_VAD,
                     ModelDownloader.WHISPER_TURBO_TOKENS,
@@ -77,8 +94,10 @@ class MainActivity : AppCompatActivity() {
                 "Whisper Large-v3-Turbo"
             )
         }
-        findViewById<Button>(R.id.btnDlStreamingDraft).setOnClickListener {
+        btnDlStreamingDraft.setOnClickListener {
+            if (ModelDownloader.isStreamingZipformerInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
             downloadBatch(
+                btnDlStreamingDraft,
                 listOf(
                     ModelDownloader.SILERO_VAD,
                     ModelDownloader.STREAMING_ZIP_TOKENS,
@@ -89,9 +108,11 @@ class MainActivity : AppCompatActivity() {
                 "Indian-EN Streaming Draft"
             )
         }
-        findViewById<Button>(R.id.btnDlParakeetIndic).setOnClickListener {
+        btnDlParakeetIndic.setOnClickListener {
+            if (ModelDownloader.isParakeetIndicInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
             Prefs.setHfToken(this, etHfToken.text.toString())
             downloadBatch(
+                btnDlParakeetIndic,
                 listOf(
                     ModelDownloader.SILERO_VAD,
                     ModelDownloader.PARAKEET_INDIC_TOKENS,
@@ -102,41 +123,27 @@ class MainActivity : AppCompatActivity() {
                 "Parakeet-Indic v1"
             )
         }
-        findViewById<Button>(R.id.btnDlMedAsr).setOnClickListener {
+        btnDlSraVaani.setOnClickListener {
+            if (ModelDownloader.isSraVaaniInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
             downloadBatch(
-                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.MEDASR_TOKENS, ModelDownloader.MEDASR_MODEL),
-                "Google MedASR CTC"
-            )
-        }
-        findViewById<Button>(R.id.btnDlParakeet06b).setOnClickListener {
-            downloadBatch(
-                listOf(
-                    ModelDownloader.SILERO_VAD,
-                    ModelDownloader.PARAKEET_06B_TOKENS,
-                    ModelDownloader.PARAKEET_06B_ENC,
-                    ModelDownloader.PARAKEET_06B_DEC,
-                    ModelDownloader.PARAKEET_06B_JOINER
-                ),
-                "Parakeet TDT 0.6B v2"
-            )
-        }
-        findViewById<Button>(R.id.btnDlIndicOr).setOnClickListener {
-            downloadBatch(
-                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_OR),
-                "Odia Offline Pack"
-            )
-        }
-        findViewById<Button>(R.id.btnDlSraVaani).setOnClickListener {
-            downloadBatch(
+                btnDlSraVaani,
                 listOf(ModelDownloader.SILERO_VAD, ModelDownloader.SRAVAANI_DEC, ModelDownloader.SRAVAANI_ENC),
-                "SraVaani 1.0 Odia Natural"
+                "SraVaani 1.0"
             )
         }
-        findViewById<Button>(R.id.btnCompare).setOnClickListener {
+        btnDlIndicOr.setOnClickListener {
+            if (ModelDownloader.isOdiaInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
+            downloadBatch(
+                btnDlIndicOr,
+                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_OR),
+                "IndicConformer 600M"
+            )
+        }
+        findViewById<View>(R.id.btnCompare).setOnClickListener {
             startActivity(Intent(this, CompareActivity::class.java))
         }
 
-        findViewById<Button>(R.id.btnSaveStart).setOnClickListener {
+        findViewById<View>(R.id.btnSaveStart).setOnClickListener {
             Prefs.setEngine(this, AsrEngineType.entries[spinnerEngine.selectedItemPosition])
             Prefs.setHfToken(this, etHfToken.text.toString())
             Prefs.setPersonalDict(this, etPersonalDict.text.toString())
@@ -161,20 +168,25 @@ class MainActivity : AppCompatActivity() {
         updateStatus()
     }
 
-    private fun downloadBatch(artifacts: List<ModelDownloader.ModelArtifact>, label: String) {
+    private fun downloadBatch(badgeView: TextView, artifacts: List<ModelDownloader.ModelArtifact>, label: String) {
         uiScope.launch {
+            tvStatus.visibility = View.VISIBLE
             for ((idx, art) in artifacts.withIndex()) {
                 if (ModelDownloader.isInstalled(this@MainActivity, art)) continue
                 tvStatus.text = "Downloading $label (${idx + 1}/${artifacts.size}: ${art.fileName})..."
                 val res = ModelDownloader.download(this@MainActivity, art) { p ->
+                    badgeView.text = "$p%"
                     tvStatus.text = "Downloading ${art.fileName}: $p%"
                 }
                 if (res.isFailure) {
-                    tvStatus.text = "Error: ${res.exceptionOrNull()?.message}"
-                    Toast.makeText(this@MainActivity, "Failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    val msg = res.exceptionOrNull()?.message ?: "Download failed"
+                    tvStatus.text = "Error: $msg"
+                    badgeView.text = "Retry"
+                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
                     return@launch
                 }
             }
+            tvStatus.visibility = View.GONE
             Toast.makeText(this@MainActivity, "$label ready offline!", Toast.LENGTH_SHORT).show()
             OfflineAsrEngines.preload(this@MainActivity)
             updateStatus()
@@ -186,29 +198,43 @@ class MainActivity : AppCompatActivity() {
         return imm.enabledInputMethodList.any { it.packageName == packageName }
     }
 
+    private fun styleModelBadge(view: TextView, installed: Boolean) {
+        if (installed) {
+            view.text = "✓ Ready"
+            view.setBackgroundResource(R.drawable.bg_badge_ready)
+            view.setTextColor(Color.parseColor("#6DD58C"))
+        } else {
+            view.text = "Download"
+            view.setBackgroundResource(R.drawable.bg_btn_compact)
+            view.setTextColor(Color.WHITE)
+        }
+    }
+
     private fun updateStatus() {
         val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val imeOk = isImeEnabled()
         val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
-        val turboOk = ModelDownloader.isWhisperTurboInstalled(this)
-        val streamOk = ModelDownloader.isStreamingZipformerInstalled(this)
-        val indicOk = ModelDownloader.isParakeetIndicInstalled(this)
-        val medOk = ModelDownloader.isMedAsrInstalled(this)
-        val p06bOk = ModelDownloader.isParakeet06bInstalled(this)
-        val odiaOk = ModelDownloader.isOdiaInstalled(this)
-        val sravaaniOk = ModelDownloader.isSraVaaniInstalled(this)
 
-        tvStatus.text = buildString {
-            appendLine("Active Mode: ${Prefs.getEngine(this@MainActivity).label}")
-            appendLine("Keyboard Enabled: ${if (imeOk) "YES" else "Tap '1. Enable Keyboard'"} | Mic: ${if (micOk) "OK" else "Needed"}")
-            appendLine("Whisper Large-v3-Turbo: ${if (turboOk) "Installed" else "Not downloaded"}")
-            appendLine("Indian-EN Streaming Draft: ${if (streamOk) "Installed" else "Not downloaded"}")
-            appendLine("Parakeet-Indic v1: ${if (indicOk) "Installed" else "Not downloaded"}")
-            appendLine("Google MedASR CTC: ${if (medOk) "Installed" else "Not downloaded"}")
-            appendLine("Parakeet TDT 0.6B v2: ${if (p06bOk) "Installed" else "Not downloaded"}")
-            appendLine("Odia (IndicConformer): ${if (odiaOk) "Installed" else "Not downloaded"}")
-            appendLine("Odia Natural (SraVaani 1.0): ${if (sravaaniOk) "Installed" else "Not downloaded"}")
-            appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
+        if (imeOk && micOk) {
+            tvSetupBadge.text = "✓ Active"
+            tvSetupBadge.setBackgroundResource(R.drawable.bg_badge_ready)
+            tvSetupBadge.setTextColor(Color.parseColor("#6DD58C"))
+        } else if (!imeOk) {
+            tvSetupBadge.text = "Enable KB"
+            tvSetupBadge.setBackgroundResource(R.drawable.bg_btn_compact)
+            tvSetupBadge.setTextColor(Color.WHITE)
+        } else {
+            tvSetupBadge.text = "Grant Mic"
+            tvSetupBadge.setBackgroundResource(R.drawable.bg_btn_compact)
+            tvSetupBadge.setTextColor(Color.WHITE)
         }
+
+        styleModelBadge(btnDlWhisperTurbo, vadOk && ModelDownloader.isWhisperTurboInstalled(this))
+        styleModelBadge(btnDlStreamingDraft, vadOk && ModelDownloader.isStreamingZipformerInstalled(this))
+        val indicOk = vadOk && ModelDownloader.isParakeetIndicInstalled(this)
+        styleModelBadge(btnDlParakeetIndic, indicOk)
+        etHfToken.visibility = if (indicOk) View.GONE else View.VISIBLE
+        styleModelBadge(btnDlSraVaani, vadOk && ModelDownloader.isSraVaaniInstalled(this))
+        styleModelBadge(btnDlIndicOr, vadOk && ModelDownloader.isOdiaInstalled(this))
     }
 }

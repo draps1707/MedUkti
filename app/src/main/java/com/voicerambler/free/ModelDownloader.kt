@@ -47,66 +47,6 @@ object ModelDownloader {
         "https://huggingface.co/killbanhar/sravaani-onnx/resolve/main/decoder_joint.onnx"
     )
 
-    val MEDASR_MODEL = ModelArtifact(
-        "medasr_model",
-        "medasr-model.int8.onnx",
-        "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/model.int8.onnx"
-    )
-
-    val MEDASR_TOKENS = ModelArtifact(
-        "medasr_tokens",
-        "medasr-tokens.txt",
-        "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/tokens.txt"
-    )
-
-    val PARAKEET_110M_ENC = ModelArtifact(
-        "parakeet_110m_enc",
-        "parakeet-110m-encoder.int8.onnx",
-        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/encoder.int8.onnx"
-    )
-
-    val PARAKEET_110M_DEC = ModelArtifact(
-        "parakeet_110m_dec",
-        "parakeet-110m-decoder.int8.onnx",
-        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/decoder.int8.onnx"
-    )
-
-    val PARAKEET_110M_JOINER = ModelArtifact(
-        "parakeet_110m_joiner",
-        "parakeet-110m-joiner.int8.onnx",
-        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/joiner.int8.onnx"
-    )
-
-    val PARAKEET_110M_TOKENS = ModelArtifact(
-        "parakeet_110m_tokens",
-        "parakeet-110m-tokens.txt",
-        "https://huggingface.co/akm9191/sherpa-onnx-parakeet-tdt-110m-int8/resolve/main/tokens.txt"
-    )
-
-    val PARAKEET_06B_ENC = ModelArtifact(
-        "parakeet_06b_enc",
-        "parakeet-06b-encoder.int8.onnx",
-        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/encoder.int8.onnx"
-    )
-
-    val PARAKEET_06B_DEC = ModelArtifact(
-        "parakeet_06b_dec",
-        "parakeet-06b-decoder.int8.onnx",
-        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/decoder.int8.onnx"
-    )
-
-    val PARAKEET_06B_JOINER = ModelArtifact(
-        "parakeet_06b_joiner",
-        "parakeet-06b-joiner.int8.onnx",
-        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/joiner.int8.onnx"
-    )
-
-    val PARAKEET_06B_TOKENS = ModelArtifact(
-        "parakeet_06b_tokens",
-        "parakeet-06b-tokens.txt",
-        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/tokens.txt"
-    )
-
     // Indian-English Streaming Zipformer (~71 MB INT8)
     val STREAMING_ZIP_ENC = ModelArtifact(
         "streaming_zip_enc",
@@ -195,21 +135,6 @@ object ModelDownloader {
     fun isSraVaaniInstalled(ctx: Context): Boolean =
         isInstalled(ctx, SRAVAANI_ENC) && isInstalled(ctx, SRAVAANI_DEC)
 
-    fun isMedAsrInstalled(ctx: Context): Boolean =
-        isInstalled(ctx, MEDASR_MODEL) && isInstalled(ctx, MEDASR_TOKENS)
-
-    fun isParakeet110mInstalled(ctx: Context): Boolean =
-        isInstalled(ctx, PARAKEET_110M_ENC) &&
-            isInstalled(ctx, PARAKEET_110M_DEC) &&
-            isInstalled(ctx, PARAKEET_110M_JOINER) &&
-            isInstalled(ctx, PARAKEET_110M_TOKENS)
-
-    fun isParakeet06bInstalled(ctx: Context): Boolean =
-        isInstalled(ctx, PARAKEET_06B_ENC) &&
-            isInstalled(ctx, PARAKEET_06B_DEC) &&
-            isInstalled(ctx, PARAKEET_06B_JOINER) &&
-            isInstalled(ctx, PARAKEET_06B_TOKENS)
-
     fun isStreamingZipformerInstalled(ctx: Context): Boolean =
         isInstalled(ctx, STREAMING_ZIP_ENC) &&
             isInstalled(ctx, STREAMING_ZIP_DEC) &&
@@ -234,16 +159,6 @@ object ModelDownloader {
             INDIC_OR.fileName,
             SRAVAANI_ENC.fileName,
             SRAVAANI_DEC.fileName,
-            MEDASR_MODEL.fileName,
-            MEDASR_TOKENS.fileName,
-            PARAKEET_110M_ENC.fileName,
-            PARAKEET_110M_DEC.fileName,
-            PARAKEET_110M_JOINER.fileName,
-            PARAKEET_110M_TOKENS.fileName,
-            PARAKEET_06B_ENC.fileName,
-            PARAKEET_06B_DEC.fileName,
-            PARAKEET_06B_JOINER.fileName,
-            PARAKEET_06B_TOKENS.fileName,
             STREAMING_ZIP_ENC.fileName,
             STREAMING_ZIP_DEC.fileName,
             STREAMING_ZIP_JOINER.fileName,
