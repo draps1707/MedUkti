@@ -1,4 +1,4 @@
-﻿Dyspnoea
+Dyspnoea
 Orthopnoea
 Paroxysmal nocturnal dyspnoea
 Tachypnoea
@@ -80,7 +80,8 @@ Deep vein thrombosis
 Pulmonary embolism
 Left ventricular hypertrophy
 Right ventricular hypertrophy
-Ejection fraction Electrocardiogram
+Ejection fraction
+Electrocardiogram
 Electrocardiography
 Echocardiogram
 Echocardiography
@@ -118,7 +119,8 @@ LVEF
 TAPSE
 Regional wall motion abnormality
 Diastolic dysfunction
-Systolic dysfunction Asthma
+Systolic dysfunction
+Asthma
 COPD
 Chronic bronchitis
 Emphysema
@@ -201,7 +203,8 @@ Metabolic alkalosis
 Haemodialysis
 Peritoneal dialysis
 Arteriovenous fistula
-Renal replacement therapy Gastroesophageal reflux disease
+Renal replacement therapy
+Gastroesophageal reflux disease
 GERD
 Peptic ulcer disease
 PUD
@@ -240,7 +243,8 @@ Malabsorption syndrome
 Colorectal carcinoma
 Hepatocellular carcinoma
 Upper gastrointestinal bleeding
-Lower gastrointestinal bleeding Diabetes mellitus
+Lower gastrointestinal bleeding
+Diabetes mellitus
 Type 1 diabetes
 Type 2 diabetes
 Gestational diabetes
@@ -282,7 +286,8 @@ Primary hyperaldosteronism
 Pheochromocytoma
 Acromegaly
 Hypopituitarism
-Hyperprolactinaemia Ischaemic stroke
+Hyperprolactinaemia
+Ischaemic stroke
 Haemorrhagic stroke
 Transient ischaemic attack
 TIA
@@ -316,7 +321,8 @@ Paraplegia
 Quadriplegia
 Radiculopathy
 Peripheral neuropathy
-Motor neuron disease Depression
+Motor neuron disease
+Depression
 Major depressive disorder
 Generalized anxiety disorder
 Panic disorder
@@ -336,7 +342,8 @@ Nicotine dependence
 Insomnia
 Somatic symptom disorder
 Conversion disorder
-Suicidal ideation Neonate
+Suicidal ideation
+Neonate
 Newborn
 Infant
 Toddler
@@ -370,7 +377,8 @@ Bronchiolitis
 Croup
 Epiglottitis
 Pertussis
-Rheumatic fever Antenatal care
+Rheumatic fever
+Antenatal care
 Postnatal care
 Postpartum haemorrhage
 PPH
@@ -440,7 +448,8 @@ Bullous pemphigoid
 Stevens Johnson syndrome
 Toxic epidermal necrolysis
 Drug eruption
-Erythema nodosum Osteoarthritis
+Erythema nodosum
+Osteoarthritis
 Rheumatoid arthritis
 Gout
 Pseudogout
@@ -467,7 +476,8 @@ Fracture
 Dislocation
 Sprain
 Strain
-Compartment syndrome Appendicitis
+Compartment syndrome
+Appendicitis
 Cholecystectomy
 Appendicectomy
 Hernia repair
@@ -488,7 +498,8 @@ Incision and drainage
 Biopsy
 Excision
 Suturing
-Dressing Complete blood count
+Dressing
+Complete blood count
 CBC
 Haemoglobin
 Haematocrit
@@ -532,7 +543,8 @@ MRI
 Ultrasonography
 Doppler ultrasound
 CT angiography
-MRI angiography Paracetamol
+MRI angiography
+Paracetamol
 Ibuprofen
 Diclofenac
 Naproxen
@@ -619,7 +631,8 @@ Budesonide
 Tiotropium
 Ipratropium
 Montelukast
-Theophylline Augmentin
+Theophylline
+Augmentin
 Clavam
 Moxikind CV
 Taxim O
@@ -962,7 +975,6 @@ khoon ki kami
 anemia
 infection
 allergy
-asthma
 dama
 TB
 lakwa
@@ -988,3 +1000,186 @@ din mein teen baar
 khane se pehle
 khane ke baad
 raat ko
+Remogliflozin
+Sotagliflozin
+Teneligliptin
+Saxagliptin
+Evogliptin
+Tirzepatide
+Ozempic
+Mounjaro
+Rybelsus
+Sacubitril
+Valsartan
+Vymada
+Edoxaban
+Ticagrelor
+Prasugrel
+Vonoprazan
+Ilaprazole
+Dexlansoprazole
+Faropenem
+Avibactam
+Colistin
+Januvia
+Dolo 650
+UDCA
+Ursodeoxycholic
+Telma H
+Telma CT
+Ecosprin AV
+Clopitab A
+Lasilactone
+Metolar XR
+Amlokind AT
+Cardivas
+Nikoran
+Sorbitrate
+Deplatt A
+Glycomet SR
+Janumet
+Gemer
+Glimestar M
+Galvus Met
+Oxra
+Mixtard
+Lantus
+Humalog
+Novomix
+Augmentin 625
+Clavam 625
+Magnex Forte
+Norflox TZ
+Metrogyl
+Piptaz
+Oflox OZ
+Ciplox
+Albendazole
+Ivermectin
+Primaquine
+Artemether
+Lumefantrine
+Artesunate
+Chloroquine
+Pantocid D
+Razo D
+Sucrafil O
+Cremaffin
+Udiliv
+Ondem
+Emeset
+Drotin M
+Meftal Spas
+Buscopan
+Rifaximin
+Duphalac
+Looz
+Liv 52
+Silymarin
+ORS
+Zerodol SP
+Zerodol P
+Combiflam
+Voveran
+Ultracet
+Pregaba
+Gabapin
+Levipil
+Levera
+Eptoin
+Gardenal
+Vertin
+Stugeron
+Montair LC
+Deriphyllin
+Levolin
+Allegra
+Atarax
+Ascoril
+Grilinctus
+Mucomix
+Shelcal
+Orofer XT
+Autrin
+Livogen
+Uprise D3
+Neurobion Forte
+Becosules
+Evion
+Folvite
+Limcee
+Zincovit
+Dexorange
+Pause
+Trapic
+Duvadilan
+Susten
+Scrub typhus
+Leptospirosis
+Enteric fever
+Falciparum malaria
+Vivax malaria
+Severe malaria
+Cerebral malaria
+Dengue haemorrhagic fever
+Dengue shock syndrome
+Chikungunya
+Japanese encephalitis
+Kala-azar
+Filariasis
+Lymphatic filariasis
+Sickle cell disease
+Sickle cell crisis
+Vaso-occlusive crisis
+Thalassaemia
+Snakebite
+Russell's viper
+Krait bite
+Cobra bite
+Organophosphate poisoning
+OP poisoning
+Paraquat poisoning
+Aluminium phosphide
+Celphos poisoning
+Heat stroke
+Heat exhaustion
+Decompensated CLD
+Upper GI bleed
+AKI on CKD
+AECOPD
+Acute LVF
+Urosepsis
+Necrotising fasciitis
+Rhabdomyolysis
+Acute febrile illness
+ASHA
+ANM
+AWW
+CHC
+PHC
+SDH
+DHH
+BSKY
+Niramaya
+Nidan
+108 ambulance
+MLC
+Brought dead
+LAMA
+Vitals
+Afebrile
+Febrile
+Pallor
+Icterus
+GCS
+Pupils
+Bilateral air entry
+Crepitations
+Rhonchi
+Wheeze
+Soft non-tender
+Guarding
+Rigidity
+Bowel sounds
+Organomegaly
+Hepatosplenomegaly

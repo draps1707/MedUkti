@@ -17,7 +17,14 @@ object MedicalNormalizer {
         "no", "not", "nil", "none", "never", "without", "negative", "positive",
         "normal", "absent", "present", "mild", "moderate", "severe",
         "mg", "mcg", "ml", "gm", "kg", "iu", "od", "bd", "tds", "qid", "hs", "sos", "stat",
-        "iv", "im", "sc", "po", "pr", "sl"
+        "iv", "im", "sc", "po", "pr", "sl",
+        // Everyday Hinglish words that must never be overwritten by medical acronyms
+        "aap", "hai", "hain", "main", "mere", "meri", "mera", "sahi", "nahi", "nahin", "haan",
+        "kya", "kyu", "kyon", "bhai", "yaar", "kar", "karo", "kiya", "bana", "banaaya",
+        "raha", "rahi", "rahe", "gaya", "gayi", "gaye", "lena", "dena", "wala", "wali", "wale",
+        "abhi", "kab", "jab", "tab", "par", "aur", "bhi", "tak", "liye", "saath", "baat",
+        "kaam", "din", "raat", "ghar", "log", "sab", "kuch", "koi", "yeh", "woh", "yah", "vah",
+        "hum", "tum", "iss", "uss", "kis", "jis", "se", "ko", "ka", "ke", "ki", "na", "ho", "to", "ha", "me"
     )
 
     private val PHONETIC_AND_SPELLING_BRIDGES = linkedMapOf(
@@ -50,6 +57,11 @@ object MedicalNormalizer {
         "cef triaxone" to "Ceftriaxone",
         "safe triaxone" to "Ceftriaxone",
         "ceftryaxone" to "Ceftriaxone",
+        "tapa glyphlogin" to "Dapagliflozin",
+        "tapa gliflozin" to "Dapagliflozin",
+        "dapa gliflozin" to "Dapagliflozin",
+        "sita glyptin" to "Sitagliptin",
+        "sita gliptin" to "Sitagliptin",
         "mono sef" to "Monocef",
         "taxim o" to "Taxim O",
         "moxikind cv" to "Moxikind CV",
@@ -91,7 +103,7 @@ object MedicalNormalizer {
         "milliliters" to "mL"
     )
 
-    private val ODIA_SUFFIXES = listOf("ଗୁଡ଼ିକ", "ଗୁଡିକ", "ରେ", "କୁ", "ର", "ଟା", "ଟି", "ଠାରୁ", "ଙ୍କ")
+    private val ODIA_SUFFIXES = listOf("ଗୁଡ଼ିକ", "ଗୁଡିକ", "ଠାରୁ", "ରେ", "କୁ", "ରୁ", "ର", "ଟା", "ଟି", "ଙ୍କ")
 
     /** Curated Odia-script -> English stems (works with suffixes like ଡ୍ୟୁଟିରେ -> dutyରେ). */
     private val ODIA_TO_ENGLISH_BRIDGE = linkedMapOf(
@@ -110,6 +122,9 @@ object MedicalNormalizer {
         "ଫୋନ" to "phone",
         "କଲ" to "call",
         "ମେସେଜ" to "message",
+        "ଆପ୍ପୁ" to "app ru",
+        "ଆପ୍" to "app",
+        "ଆପ" to "app",
         "ହ୍ୱାଟ୍ସଆପ" to "WhatsApp",
         "ହ୍ୱାଟ୍ସଆପ୍" to "WhatsApp",
         "ଫଟୋ" to "photo",
@@ -171,13 +186,33 @@ object MedicalNormalizer {
         "ସର୍ଜରୀ" to "surgery",
         "ଅପରେସନ" to "operation",
         "ଆଡମିଟ" to "admit",
-        "ଡିସଚାର୍ଜ" to "discharge"
+        "ଡିସଚାର୍ଜ" to "discharge",
+        "ଡିସ୍ଚାର୍ଜ" to "discharge",
+        "ରେଫର" to "refer",
+        "ସିକଲ ସେଲ" to "Sickle cell",
+        "ସ୍କ୍ରବ ଟାଇଫସ" to "Scrub typhus",
+        "ସାପ କାମୁଡ଼ା" to "snakebite",
+        "ଅର୍ଗାନୋଫସଫେଟ" to "Organophosphate",
+        "ପଏଜନିଂ" to "poisoning",
+        "ସେଲୁଲାଇଟିସ" to "Cellulitis",
+        "ଆସାଇଟିସ" to "Ascites",
+        "ପ୍ଲୁରାଲ ଇଫ୍ୟୁଜନ" to "Pleural effusion",
+        "ଆଇଭି ଫ୍ଲୁଇଡ" to "IV fluid",
+        "ଅକ୍ସିଜେନ" to "oxygen",
+        "ନେବୁଲାଇଜେସନ" to "nebulisation",
+        "କ୍ୟାଥେଟର" to "catheter",
+        "ଏନଜି ଟ୍ୟୁବ" to "NG tube",
+        "ବିଏସକେୱାଇ" to "BSKY",
+        "ନିରାମୟ" to "Niramaya",
+        "ଏମଏଲସି" to "MLC",
+        "ଲାମା" to "LAMA"
     )
 
     private fun englishSkeleton(word: String): String {
+        val norm = word.lowercase().replace("ph", "f")
         val sb = StringBuilder()
         var prev = '\u0000'
-        for (ch in word.lowercase()) {
+        for (ch in norm) {
             val mapped = when (ch) {
                 'a', 'e', 'i', 'o', 'u', 'y', 'h', 'w' -> continue
                 'c', 'k', 'q' -> 'k'
@@ -243,18 +278,18 @@ object MedicalNormalizer {
                         lineNo++
                         val term = raw.trim()
                         val lower = term.lowercase()
-                        if (lower.length >= 2 && lower.all { it.code < 128 }) {
+                        if (lower.length >= 2 && lower !in PROTECTED_WORDS && lower.all { it.code < 128 }) {
                             if (' ' in lower) {
                                 multiWordRules.add(Regex("\\b${Regex.escape(lower)}\\b", RegexOption.IGNORE_CASE) to Regex.escapeReplacement(term))
                             } else {
                                 singleWordMap.putIfAbsent(lower, term)
-                                if (lower.length >= 8 && lower !in PROTECTED_WORDS) {
+                                if (lower.length >= 8) {
                                     fuzzyBuckets.getOrPut(lower[0]) { ArrayList() }.add(lower to term)
                                 }
                                 if (lower.length >= 7) {
                                     val sk = englishSkeleton(lower)
                                     if (sk.length >= 5) {
-                                        if (lineNo <= 1000) {
+                                        if (lineNo <= 1500) {
                                             coreSkeletons.putIfAbsent(sk, term)
                                         } else {
                                             extraSkelCounts[sk] = (extraSkelCounts[sk] ?: 0) + 1
@@ -271,7 +306,6 @@ object MedicalNormalizer {
                         skeletonMap[sk] = extraSkelTerm[sk]!!
                     }
                 }
-                // Core 989 Indian clinical/drug terms always take priority over 98k-word collisions
                 skeletonMap.putAll(coreSkeletons)
             } catch (_: Exception) {
             }
@@ -325,7 +359,7 @@ object MedicalNormalizer {
         var stem = word
         var suffix = ""
         for (suf in ODIA_SUFFIXES) {
-            if (word.endsWith(suf) && word.length > suf.length + 2) {
+            if (word.endsWith(suf) && word.length > suf.length + 1) {
                 stem = word.substring(0, word.length - suf.length)
                 suffix = suf
                 break
@@ -348,7 +382,6 @@ object MedicalNormalizer {
         if (text.isEmpty()) return ""
 
         if (engine == AsrEngineType.INDIC_CONFORMER_OR) {
-            // Multi-word Odia phrases first
             for ((odia, eng) in ODIA_TO_ENGLISH_BRIDGE) {
                 if (' ' in odia && odia in text) {
                     text = text.replace(odia, eng)
@@ -383,7 +416,10 @@ object MedicalNormalizer {
                 val punct2 = w2.substring(clean2.length)
                 val low2 = clean2.lowercase()
                 if (clean2.all { it in 'a'..'z' || it in 'A'..'Z' } && low2 !in PROTECTED_WORDS) {
-                    val hit = singleWordMap[low1 + low2]
+                    val joined = low1 + low2
+                    val hit = singleWordMap[joined]
+                        ?: (if (joined.length >= 8) fuzzyLookup(joined) else null)
+                        ?: (if (joined.length >= 9) skeletonMap[englishSkeleton(joined)] else null)
                     if (hit != null) {
                         out.add(hit + punct2)
                         i += 2

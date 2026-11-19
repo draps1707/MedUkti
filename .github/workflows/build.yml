@@ -24,14 +24,47 @@ jobs:
           echo "Downloading $AAR_URL"
           curl -L -o app/libs/sherpa-onnx.aar "$AAR_URL"
 
-      - name: Merge 98,000+ open medical terms into dictionary
+      - name: Compile 3-layer medical dictionary (Indian core + 2026 molecules + 98k open list)
         run: |
           curl -fsSL https://raw.githubusercontent.com/glutanimate/wordlist-medicalterms-en/master/wordlist.txt -o /tmp/med_extra.txt || true
-          if [ -s /tmp/med_extra.txt ]; then
-            cat app/src/main/assets/medical_dictionary.txt /tmp/med_extra.txt | awk 'NF' | awk '!seen[tolower($0)]++' > /tmp/med_merged.txt
-            mv /tmp/med_merged.txt app/src/main/assets/medical_dictionary.txt
-          fi
-          wc -l app/src/main/assets/medical_dictionary.txt
+          python3 -c '
+          import os
+          core_path = "app/src/main/assets/medical_dictionary.txt"
+          extra_path = "/tmp/med_extra.txt"
+          hinglish_stop = {
+              "aap","hai","hain","main","mere","meri","mera","sahi","nahi","nahin","haan",
+              "kya","kyu","kyon","bhai","yaar","kar","karo","kiya","bana","banaaya",
+              "raha","rahi","rahe","gaya","gayi","gaye","lena","dena","wala","wali","wale",
+              "abhi","kab","jab","tab","par","aur","bhi","tak","liye","saath","baat",
+              "kaam","din","raat","ghar","log","sab","kuch","koi","yeh","woh","yah","vah",
+              "hum","tum","iss","uss","kis","jis","se","ko","ka","ke","ki","na","ho","to","ha","me"
+          }
+          seen = set()
+          out = []
+          with open(core_path, encoding="utf-8") as f:
+              for line in f:
+                  t = line.strip()
+                  if t and t.lower() not in seen:
+                      seen.add(t.lower())
+                      out.append(t)
+          if os.path.exists(extra_path) and os.path.getsize(extra_path) > 0:
+              with open(extra_path, encoding="utf-8", errors="ignore") as f:
+                  for line in f:
+                      t = line.strip()
+                      if not t or len(t) < 3:
+                          continue
+                      low = t.lower()
+                      if low in hinglish_stop or low in seen:
+                          continue
+                      # Skip short ALL-CAPS acronyms (e.g. AAP, HAI) from external list
+                      if len(t) <= 5 and t.isupper() and t.isalpha():
+                          continue
+                      seen.add(low)
+                      out.append(t)
+          with open(core_path, "w", encoding="utf-8") as f:
+              f.write("\n".join(out) + "\n")
+          print("Compiled medical_dictionary.txt entries:", len(out))
+          '
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
