@@ -53,6 +53,20 @@ class MainActivity : AppCompatActivity() {
         spinnerModel.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Prefs.AVAILABLE_MODELS)
         spinnerModel.setSelection(Prefs.AVAILABLE_MODELS.indexOf(Prefs.getModel(this)).coerceAtLeast(0))
 
+        findViewById<Button>(R.id.btnDlAll).setOnClickListener {
+            downloadBatch(
+                listOf(
+                    ModelDownloader.SILERO_VAD,
+                    ModelDownloader.WHISPER_SWIFT_TOKENS,
+                    ModelDownloader.WHISPER_SWIFT_ENC,
+                    ModelDownloader.WHISPER_SWIFT_DEC,
+                    ModelDownloader.INDIC_TOKENS,
+                    ModelDownloader.INDIC_HI,
+                    ModelDownloader.INDIC_OR
+                ),
+                "All Offline Models"
+            )
+        }
         findViewById<Button>(R.id.btnDlIndicOr).setOnClickListener {
             downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_OR), "IndicConformer Odia")
         }
@@ -61,9 +75,6 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnDlWhisperSwift).setOnClickListener {
             downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_SWIFT_TOKENS, ModelDownloader.WHISPER_SWIFT_ENC, ModelDownloader.WHISPER_SWIFT_DEC), "Whisper Hinglish Swift")
-        }
-        findViewById<Button>(R.id.btnDlShrutiHi).setOnClickListener {
-            downloadBatch(listOf(ModelDownloader.NEEDLE_BIN, ModelDownloader.SHRUTI_HI_EN), "Shruti Hindi/Hinglish")
         }
         findViewById<Button>(R.id.btnCompare).setOnClickListener {
             startActivity(Intent(this, CompareActivity::class.java))
@@ -151,15 +162,13 @@ class MainActivity : AppCompatActivity() {
         val indicOrOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_OR)
         val indicHiOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_HI)
         val swiftOk = ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_ENC) && ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_DEC)
-        val shrutiOk = ModelDownloader.isInstalled(this, ModelDownloader.SHRUTI_HI_EN)
 
         tvStatus.text = buildString {
             appendLine("Active Engine: ${Prefs.getEngine(this@MainActivity).label}")
             appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
-            appendLine("IndicConformer Odia: ${if (indicOrOk) "Installed" else "Not downloaded"}")
-            appendLine("IndicConformer Hindi: ${if (indicHiOk) "Installed" else "Not downloaded"}")
             appendLine("Whisper Hinglish Swift: ${if (swiftOk) "Installed" else "Not downloaded"}")
-            appendLine("Shruti Hindi/Hinglish: ${if (shrutiOk) "Installed" else "Not downloaded"}")
+            appendLine("IndicConformer Hindi: ${if (indicHiOk) "Installed" else "Not downloaded"}")
+            appendLine("IndicConformer Odia: ${if (indicOrOk) "Installed" else "Not downloaded"}")
             appendLine("Mic: ${if (micOk) "OK" else "Needed"} | Overlay: ${if (overlayOk) "OK" else "Needed"} | Accessibility: ${if (accOk) "OK" else "Needed"}")
         }
 

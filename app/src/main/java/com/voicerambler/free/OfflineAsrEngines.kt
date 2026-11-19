@@ -12,12 +12,23 @@ object OfflineAsrEngines {
         engine: AsrEngineType,
         wavFile: File
     ): Result<String> = withContext(Dispatchers.IO) {
-        when (engine) {
+        val resolved = if (engine == AsrEngineType.AUTO_OFFLINE) {
+            when {
+                ModelDownloader.isInstalled(ctx, ModelDownloader.WHISPER_SWIFT_ENC) &&
+                    ModelDownloader.isInstalled(ctx, ModelDownloader.WHISPER_SWIFT_DEC) -> AsrEngineType.WHISPER_HINGLISH_SWIFT
+                ModelDownloader.isInstalled(ctx, ModelDownloader.INDIC_HI) -> AsrEngineType.INDIC_CONFORMER_HI
+                ModelDownloader.isInstalled(ctx, ModelDownloader.INDIC_OR) -> AsrEngineType.INDIC_CONFORMER_OR
+                Prefs.getApiKey(ctx).isNotBlank() -> AsrEngineType.GEMINI_CLOUD
+                else -> return@withContext Result.failure(Exception("Tap 'Download All Offline Models' in VoiceRambler first"))
+            }
+        } else {
+            engine
+        }
+
+        when (resolved) {
             AsrEngineType.INDIC_CONFORMER_OR,
             AsrEngineType.INDIC_CONFORMER_HI,
-            AsrEngineType.WHISPER_HINGLISH_SWIFT -> SherpaOnnxEngine.transcribe(ctx, engine, wavFile)
-            AsrEngineType.SHRUTI_HI_EN -> runShrutiNeedle(ctx, ModelDownloader.SHRUTI_HI_EN, wavFile)
-            AsrEngineType.SHRUTI_ODIA -> runShrutiNeedle(ctx, ModelDownloader.SHRUTI_ODIA, wavFile)
+            AsrEngineType.WHISPER_HINGLISH_SWIFT -> SherpaOnnxEngine.transcribe(ctx, resolved, wavFile)
             AsrEngineType.GEMINI_CLOUD -> {
                 val key = Prefs.getApiKey(ctx)
                 if (key.isBlank()) {
@@ -26,39 +37,7 @@ object OfflineAsrEngines {
                     GeminiClient.transcribeWav(key, Prefs.getModel(ctx), wavFile)
                 }
             }
-        }
-    }
-
-    private fun runShrutiNeedle(
-        ctx: Context,
-        modelArtifact: ModelDownloader.ModelArtifact,
-        wavFile: File
-    ): Result<String> {
-        val bin = ModelDownloader.getFile(ctx, ModelDownloader.NEEDLE_BIN)
-        val model = ModelDownloader.getFile(ctx, modelArtifact)
-        if (!bin.exists() || !model.exists()) {
-            return Result.failure(Exception("Download ${modelArtifact.fileName} & needle engine first"))
-        }
-        bin.setExecutable(true, false)
-
-        return try {
-            val pb = ProcessBuilder(
-                bin.absolutePath,
-                "--model", model.absolutePath,
-                "--audio", wavFile.absolutePath
-            )
-            pb.redirectErrorStream(true)
-            val proc = pb.start()
-            val output = proc.inputStream.bufferedReader().use { it.readText() }.trim()
-            val exit = proc.waitFor()
-            if (exit != 0) {
-                Result.failure(Exception("Shruti exit $exit: $output"))
-            } else {
-                val cleaned = output.lines().lastOrNull { it.isNotBlank() }?.trim() ?: ""
-                Result.success(cleaned)
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
+            AsrEngineType.AUTO_OFFLINE -> Result.failure(Exception("No model installed"))
         }
     }
 }

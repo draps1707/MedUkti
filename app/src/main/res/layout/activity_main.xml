@@ -20,14 +20,21 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Offline sherpa-onnx (IndicConformer + Whisper Swift + Silero VAD) &amp; Shruti"
+            android:text="Offline sherpa-onnx (IndicConformer + Whisper Swift + Silero VAD)"
             android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnDlAll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Download All Offline Models (Recommended)" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Active ASR Engine"
+            android:layout_marginTop="14dp"
+            android:text="Active Engine (Default: Auto)"
             android:textStyle="bold" />
 
         <Spinner
@@ -35,40 +42,26 @@
             android:layout_width="match_parent"
             android:layout_height="48dp" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="Offline Model Manager"
-            android:textStyle="bold" />
-
         <Button
-            android:id="@+id/btnDlIndicOr"
+            android:id="@+id/btnDlWhisperSwift"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Download IndicConformer Odia + Silero VAD (~661 MB)" />
+            android:layout_marginTop="10dp"
+            android:text="Download Only Whisper Hinglish Swift (~152 MB)" />
 
         <Button
             android:id="@+id/btnDlIndicHi"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Download IndicConformer Hindi + Silero VAD (~661 MB)" />
+            android:text="Download Only IndicConformer Hindi (~661 MB)" />
 
         <Button
-            android:id="@+id/btnDlWhisperSwift"
+            android:id="@+id/btnDlIndicOr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Download Whisper Hinglish Swift + Silero VAD (~152 MB)" />
-
-        <Button
-            android:id="@+id/btnDlShrutiHi"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Download Shruti Hindi/Hinglish + Engine (~32 MB)" />
+            android:text="Download Only IndicConformer Odia (~661 MB)" />
 
         <Button
             android:id="@+id/btnCompare"

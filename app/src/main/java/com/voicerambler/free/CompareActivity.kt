@@ -46,30 +46,28 @@ class CompareActivity : AppCompatActivity() {
                 uiScope.launch {
                     val out = StringBuilder()
 
-                    val shrutiHi = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.SHRUTI_HI_EN, wav)
-                    out.appendLine("=== Shruti (Hindi/Hinglish/Eng) ===")
-                    shrutiHi.onSuccess { raw ->
+                    val swift = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_SWIFT, wav)
+                    out.appendLine("=== Whisper Hinglish Swift (sherpa-onnx + VAD) ===")
+                    swift.onSuccess { raw ->
                         out.appendLine("Raw: $raw")
-                        out.appendLine("Medical Layer: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
-                    }.onFailure { out.appendLine("Error: ${it.message}") }
+                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
+                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
+                    out.appendLine()
+
+                    val indicHi = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIC_CONFORMER_HI, wav)
+                    out.appendLine("=== IndicConformer Hindi (sherpa-onnx + VAD) ===")
+                    indicHi.onSuccess { raw ->
+                        out.appendLine("Raw: $raw")
+                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
+                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
                     out.appendLine()
 
                     val indicOr = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIC_CONFORMER_OR, wav)
-                    out.appendLine("=== IndicConformer Odia (sherpa-onnx) ===")
-                    indicOr.onSuccess { raw -> out.appendLine("Raw: $raw\nMedical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}") }.onFailure { out.appendLine("Skipped/Err: ${it.message}") }
-                    out.appendLine()
-
-                    val swift = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_SWIFT, wav)
-                    out.appendLine("=== Whisper Hinglish Swift (sherpa-onnx + VAD) ===")
-                    swift.onSuccess { raw -> out.appendLine("Raw: $raw\nMedical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}") }.onFailure { out.appendLine("Skipped/Err: ${it.message}") }
-                    out.appendLine()
-
-                    val shrutiOr = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.SHRUTI_ODIA, wav)
-                    out.appendLine("=== Shruti (Odia) ===")
-                    shrutiOr.onSuccess { raw ->
+                    out.appendLine("=== IndicConformer Odia (sherpa-onnx + VAD) ===")
+                    indicOr.onSuccess { raw ->
                         out.appendLine("Raw: $raw")
-                        out.appendLine("Medical Layer: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
-                    }.onFailure { out.appendLine("Error: ${it.message}") }
+                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
+                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
                     out.appendLine()
 
                     val key = Prefs.getApiKey(this@CompareActivity)
@@ -77,9 +75,6 @@ class CompareActivity : AppCompatActivity() {
                         val gem = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.GEMINI_CLOUD, wav)
                         out.appendLine("=== Optional Gemini Cloud ===")
                         gem.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Error: ${it.message}") }
-                    } else {
-                        out.appendLine("=== Optional Gemini Cloud ===")
-                        out.appendLine("(Skipped — no API key entered)")
                     }
 
                     wav.delete()
