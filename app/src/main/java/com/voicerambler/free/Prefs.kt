@@ -20,6 +20,7 @@ object Prefs {
     private const val KEY_ODIA_ENGINE = "odia_asr_engine"
     private const val KEY_PERSONAL_DICT = "personal_dictionary"
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
+    private const val KEY_STREAMING_DRAFT = "streaming_draft_med"
     private const val KEY_SNIPPETS = "rx_snippets"
     private const val KEY_RECENT_DICTATIONS = "recent_dictations_json"
 
@@ -76,6 +77,13 @@ object Prefs {
 
     fun setAutoListen(ctx: Context, enabled: Boolean) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean(KEY_AUTO_LISTEN, enabled).apply()
+    }
+
+    fun isStreamingDraftEnabled(ctx: Context): Boolean =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_STREAMING_DRAFT, false)
+
+    fun setStreamingDraftEnabled(ctx: Context, enabled: Boolean) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean(KEY_STREAMING_DRAFT, enabled).apply()
     }
 
     fun getPersonalDict(ctx: Context): String =

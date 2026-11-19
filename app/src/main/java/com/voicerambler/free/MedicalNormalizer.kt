@@ -64,6 +64,10 @@ object MedicalNormalizer {
         "paracitamol" to "Paracetamol",
         "para cetamol" to "Paracetamol",
         "dapaglyplogen" to "Dapagliflozin",
+        "dappa glyphlogine" to "Dapagliflozin",
+        "dapa griplogen" to "Dapagliflozin",
+        "herrick carboxymaltouch" to "Ferric carboxymaltose",
+        "carboxymaltouch" to "Ferric carboxymaltose",
         "dapaglyphrogen" to "Dapagliflozin",
         "tapagliprogene" to "Dapagliflozin",
         "pagluprogen" to "Dapagliflozin",
@@ -469,6 +473,7 @@ object MedicalNormalizer {
                     val hit = singleWordMap[joined]
                         ?: (if (joined.length >= 8) fuzzyLookup(joined) else null)
                         ?: (if (joined.length >= 9) skeletonMap[englishSkeleton(joined)] else null)
+                        ?: (if (joined.length >= 10) fuzzyCoreSkeleton(englishSkeleton(joined), 2) else null)
                     if (hit != null) {
                         out.add(hit + punct2)
                         i += 2
@@ -524,7 +529,9 @@ object MedicalNormalizer {
         t = t.replace(Regex("(?i)\\bspo2\\s+(\\d{2,3})\\s+percent\\b"), "SpO2 $1%")
         t = t.replace(Regex("(?i)(\\d{1,3}(?:\\.\\d+)?)\\s+percent\\b"), "$1%")
         // Fix common Rx mishearings
-        t = t.replace(Regex("(?i)\\b(?:one|1)\\s+tub\\b"), "1 tab")
+        t = t.replace(Regex("(?i)\\b(?:one|1)\\s+(?:tub|tap)\\b"), "1 tab")
+        t = t.replace(Regex("(?i)\\bdoublet\\s+(?=[A-Za-z])"), "Tab. ")
+        t = t.replace(Regex("(?i)\\bodi\\b"), "OD")
         t = t.replace(Regex("(?i)\\btub\\s+(od|bd|tds|qid)\\b")) { m -> "tab " + m.groupValues[1].uppercase() }
         t = t.replace(Regex("(?i)\\bb\\s+d\\b"), "BD")
         t = t.replace(Regex("(?i)\\bo\\s+d\\b"), "OD")
@@ -544,6 +551,25 @@ object MedicalNormalizer {
             t = t.replace(Regex("(?i)\\s*\\b${Regex.escape(phrase)}\\b[:.,]*\\s*"), "\n$heading ")
         }
         return t.trim()
+    }
+
+    private fun fuzzyCoreSkeleton(skel: String, maxDist: Int): String? {
+        if (skel.length < 6) return null
+        var best: String? = null
+        var bestD = maxDist + 1
+        var tie = false
+        for ((k, v) in coreSkeletonMap) {
+            if (abs(k.length - skel.length) > maxDist) continue
+            val d = levenshtein(skel, k, maxDist)
+            if (d < bestD) {
+                bestD = d
+                best = v
+                tie = false
+            } else if (d == bestD && d <= maxDist && best != v) {
+                tie = true
+            }
+        }
+        return if (!tie && bestD <= maxDist) best else null
     }
 
     fun isKnownMedicalWord(lowerWord: String): Boolean =

@@ -53,6 +53,13 @@
             android:layout_marginTop="10dp"
             android:text="Auto-listen when MedUkti keyboard opens" />
 
+        <Switch
+            android:id="@+id/switchStreamingDraft"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Live streaming draft in MED mode (Beta)" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

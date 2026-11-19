@@ -559,14 +559,17 @@ class MedUktiImeService : InputMethodService() {
         setMicUiState(MicUiState.LISTENING)
         val segmentChannel = Channel<FloatArray>(Channel.UNLIMITED)
 
-        val useStreamingDraft = !Prefs.isOdiaEngine(resolved) && ModelDownloader.isStreamingZipformerInstalled(this)
+        val useStreamingDraft = Prefs.isStreamingDraftEnabled(this) && !Prefs.isOdiaEngine(resolved) && ModelDownloader.isStreamingZipformerInstalled(this)
         var streamObj = if (useStreamingDraft) StreamingZipformerEngine.createStream(this) else null
         val streamLock = Any()
+        val pendingSegments = java.util.concurrent.atomic.AtomicInteger(0)
 
         vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
             try {
                 for (seg in segmentChannel) {
+                    pendingSegments.incrementAndGet()
                     val res = OfflineAsrEngines.transcribeSamples(this@MedUktiImeService, resolved, seg)
+                    try {
                     res.onSuccess { raw ->
                         val finalOut = raw.trim()
                         if (finalOut.isNotBlank()) {
@@ -576,6 +579,9 @@ class MedUktiImeService : InputMethodService() {
                         }
                     }.onFailure {
                         mainHandler.post { currentInputConnection?.finishComposingText() }
+                    }
+                    } finally {
+                        pendingSegments.decrementAndGet()
                     }
                 }
             } finally {
@@ -603,7 +609,7 @@ class MedUktiImeService : InputMethodService() {
                 val sampleRate = 16000
                 val minBuf = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                 val bufSize = maxOf(minBuf * 4, 16384)
-                ar = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
+                ar = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
                 if (ar.state != AudioRecord.STATE_INITIALIZED) {
                     throw IllegalStateException("Mic failed to initialize")
                 }
@@ -626,7 +632,7 @@ class MedUktiImeService : InputMethodService() {
                                 streamObj?.let { StreamingZipformerEngine.acceptAndDecode(it, floatBuf) } ?: ""
                             }
                             frameCount++
-                            if (frameCount % 5 == 0 && draftNow.isNotEmpty() && draftNow != lastDraft) {
+                            if (frameCount % 5 == 0 && pendingSegments.get() == 0 && draftNow.isNotEmpty() && draftNow != lastDraft) {
                                 lastDraft = draftNow
                                 mainHandler.post {
                                     if (isListening.get()) {

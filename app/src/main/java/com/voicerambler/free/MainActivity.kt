@@ -58,6 +58,7 @@ class MainActivity : AppCompatActivity() {
         val spinnerEngine = findViewById<Spinner>(R.id.spinnerEngine)
         val etPersonalDict = findViewById<EditText>(R.id.etPersonalDict)
         val switchAutoListen = findViewById<Switch>(R.id.switchAutoListen)
+        val switchStreamingDraft = findViewById<Switch>(R.id.switchStreamingDraft)
         etSnippets = findViewById(R.id.etSnippets)
         tvStatus = findViewById(R.id.tvStatus)
 
@@ -67,6 +68,10 @@ class MainActivity : AppCompatActivity() {
         switchAutoListen.isChecked = Prefs.isAutoListen(this)
         switchAutoListen.setOnCheckedChangeListener { _, isChecked ->
             Prefs.setAutoListen(this, isChecked)
+        }
+        switchStreamingDraft.isChecked = Prefs.isStreamingDraftEnabled(this)
+        switchStreamingDraft.setOnCheckedChangeListener { _, isChecked ->
+            Prefs.setStreamingDraftEnabled(this, isChecked)
         }
 
         etPersonalDict.setText(Prefs.getPersonalDict(this))
