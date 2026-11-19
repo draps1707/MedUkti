@@ -20,29 +20,69 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Auto English, Hindi, Hinglish, Odia + Medical Terminology\n(Free-tier cloud API: avoid identifiable patient names or IDs)"
+            android:text="Offline-First Indic + Medical ASR (Shruti &amp; IndicConformer)"
             android:textSize="14sp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Google AI Studio API Key (Free Tier)"
+            android:layout_marginTop="18dp"
+            android:text="Active ASR Engine"
             android:textStyle="bold" />
 
-        <EditText
-            android:id="@+id/etApiKey"
+        <Spinner
+            android:id="@+id/spinnerEngine"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Paste your AIza... key from aistudio.google.com"
-            android:inputType="textPassword" />
+            android:layout_height="48dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Gemini Model"
+            android:text="Offline Model Downloads"
             android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnDlShrutiHi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download Shruti Hindi/Hinglish + Engine (~32 MB)" />
+
+        <Button
+            android:id="@+id/btnDlShrutiOr"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download Shruti Odia (~30 MB)" />
+
+        <Button
+            android:id="@+id/btnDlIndicOr"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download IndicConformer Odia ONNX (~659 MB)" />
+
+        <Button
+            android:id="@+id/btnCompare"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Open Side-by-Side Engine Compare" />
+
+        <CheckBox
+            android:id="@+id/cbGeminiOptional"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Optional: Polish offline transcript with Gemini Cloud" />
+
+        <EditText
+            android:id="@+id/etApiKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Optional Gemini API key (not required for offline)"
+            android:inputType="textPassword" />
 
         <Spinner
             android:id="@+id/spinnerModel"
@@ -53,14 +93,14 @@
             android:id="@+id/btnSaveStart"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="14dp"
             android:text="Save &amp; Start Floating Mic" />
 
         <TextView
             android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="14dp"
             android:textSize="13sp" />
     </LinearLayout>
 </ScrollView>

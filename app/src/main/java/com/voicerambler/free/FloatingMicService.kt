@@ -29,10 +29,12 @@ import kotlin.math.abs
 
 class FloatingMicService : Service() {
 
+    private enum class MicUiState { IDLE, LISTENING, POLISHING }
+
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
     private var ivMic: ImageView? = null
-    private lateinit var recorder: AudioRecorderHelper
+    private lateinit var recorder: WavRecorderHelper
     private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -47,7 +49,7 @@ class FloatingMicService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        recorder = AudioRecorderHelper(this)
+        recorder = WavRecorderHelper(this)
         startForegroundNotification()
         showFloatingBubble()
 
@@ -83,13 +85,11 @@ class FloatingMicService : Service() {
         }
         val notification = Notification.Builder(this, channelId)
             .setContentTitle("VoiceRambler Free is active")
-            .setContentText("Mic appears when typing. Tap to dictate, hold to undo, drag to move.")
+            .setContentText("Offline-first dictation. Tap to dictate, hold to undo, drag to move.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
         startForeground(101, notification)
     }
-
-    private enum class MicUiState { IDLE, LISTENING, POLISHING }
 
     private fun setMicUiState(state: MicUiState) {
         val res = when (state) {
@@ -145,10 +145,8 @@ class FloatingMicService : Service() {
         touchTarget.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    initX = params.x
-                    initY = params.y
-                    touchX = event.rawX
-                    touchY = event.rawY
+                    initX = params.x; initY = params.y
+                    touchX = event.rawX; touchY = event.rawY
                     isDragging = false
                     longPressTriggered = false
                     mainHandler.postDelayed(longPressRunnable, 600L)
@@ -217,41 +215,41 @@ class FloatingMicService : Service() {
     }
 
     private fun stopAndTranscribe() {
-        val file = recorder.stopRecording()
+        val wavFile = recorder.stopRecording()
         isListening = false
-        setMicUiState(MicUiState.IDLE)
-        if (file == null || !file.exists()) {
-            Toast.makeText(this, "Recording failed", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val apiKey = Prefs.getApiKey(this)
-        if (apiKey.isBlank()) {
-            file.delete()
-            Toast.makeText(this, "Add your Gemini API key in VoiceRambler first", Toast.LENGTH_LONG).show()
+        if (wavFile == null || !wavFile.exists()) {
+            setMicUiState(MicUiState.IDLE)
             return
         }
 
         isProcessing = true
         setMicUiState(MicUiState.POLISHING)
-        val model = Prefs.getModel(this)
+
+        val engine = Prefs.getEngine(this)
+        val useOptionalGemini = Prefs.isGeminiPolishEnabled(this) && Prefs.getApiKey(this).isNotBlank()
 
         serviceScope.launch {
-            val result = GeminiClient.transcribeAudio(apiKey, model, file)
-            file.delete()
-            isProcessing = false
-            setMicUiState(MicUiState.IDLE)
+            val rawResult = OfflineAsrEngines.transcribe(this@FloatingMicService, engine, wavFile)
+            wavFile.delete()
 
-            result.onSuccess { cleaned ->
-                if (cleaned.isNotBlank()) {
-                    val (full, pos) = spliceAtCursor(cleaned)
-                    val ok = DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos) ?: false
-                    if (!ok) {
-                        Toast.makeText(this@FloatingMicService, "Enable Accessibility Injector to paste", Toast.LENGTH_SHORT).show()
-                    }
+            rawResult.onSuccess { raw ->
+                var finalOut = MedicalNormalizer.normalize(raw)
+                if (useOptionalGemini && engine != AsrEngineType.GEMINI_CLOUD && finalOut.isNotBlank()) {
+                    GeminiClient.polishOfflineTranscript(Prefs.getApiKey(this@FloatingMicService), Prefs.getModel(this@FloatingMicService), finalOut)
+                        .onSuccess { polished ->
+                            if (polished.isNotBlank()) finalOut = polished
+                        }
+                }
+                isProcessing = false
+                setMicUiState(MicUiState.IDLE)
+                if (finalOut.isNotBlank()) {
+                    val (full, pos) = spliceAtCursor(finalOut)
+                    DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
                 }
             }.onFailure { err ->
-                Toast.makeText(this@FloatingMicService, "Error: ${err.message}", Toast.LENGTH_SHORT).show()
+                isProcessing = false
+                setMicUiState(MicUiState.IDLE)
+                Toast.makeText(this@FloatingMicService, err.message ?: "Transcription error", Toast.LENGTH_SHORT).show()
             }
         }
     }

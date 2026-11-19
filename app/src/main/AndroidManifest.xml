@@ -26,6 +26,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".CompareActivity"
+            android:exported="false" />
+
         <service
             android:name=".FloatingMicService"
             android:enabled="true"

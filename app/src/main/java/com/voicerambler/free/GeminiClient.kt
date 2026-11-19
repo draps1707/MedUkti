@@ -13,32 +13,53 @@ import java.net.URL
 object GeminiClient {
 
     private val SYSTEM_PROMPT = """
-        You are a strict speech-to-text transcription and cleanup engine.
+        You are an ultra-accurate multilingual and medical text cleanup engine.
         Supported languages ONLY: English, Hindi, Hinglish (Hindi in Roman script), and Odia.
 
-        STRICT ANTI-HALLUCINATION RULES (HIGHEST PRIORITY):
-        1. Transcribe ONLY the exact words actually spoken in the attached audio.
-        2. NEVER invent, autocomplete, continue, or generate any sentence, vital sign, examination finding, or clinical note that was NOT explicitly spoken in the audio.
-        3. If the audio is silent, unclear, or contains only background noise with no speech, return an empty response ("").
-
-        LANGUAGE, MEDICAL & FORMATTING RULES:
-        4. Automatically detect English, Hindi, Hinglish (Roman script), and Odia (ଓଡ଼ିଆ script), including mid-sentence switching.
-        5. Accurately spell all medical, anatomical, lab, imaging, and drug names spoken in the audio.
-        6. NEVER alter spoken numbers, decimals, units, drug doses, laterality, or negations.
-        7. Remove only filler sounds (um, uh, ah) and add natural punctuation, capitalization, and list/paragraph formatting where spoken.
-        8. Output ONLY the transcribed text—no quotes, no labels, no explanations.
+        STRICT CLINICAL & ANTI-HALLUCINATION RULES:
+        1. Output ONLY what was spoken or provided—NEVER invent, autocomplete, or add clinical findings.
+        2. NEVER alter numbers, decimals, lab values, vitals, units, laterality, or negations (no, not, nil, absent, nahi).
+        3. Keep English in English, Hinglish in Roman script, and Odia in Odia script (ଓଡ଼ିଆ).
+        4. Add natural punctuation, capitalization, and list/paragraph formatting.
+        5. Return ONLY the cleaned text with no quotes or explanations.
     """.trimIndent()
 
-    suspend fun transcribeAudio(
+    suspend fun transcribeWav(
         apiKey: String,
         preferredModel: String,
-        audioFile: File
-    ): Result<String> = withContext(Dispatchers.IO) {
-        val audioBytes = audioFile.readBytes()
-        if (audioBytes.size < 2500) {
-            return@withContext Result.failure(Exception("Recording too short"))
+        wavFile: File
+    ): Result<String> {
+        val bytes = wavFile.readBytes()
+        if (bytes.size < 3200) return Result.failure(Exception("Recording too short"))
+        val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+        val parts = JSONArray().apply {
+            put(JSONObject().apply {
+                put("inline_data", JSONObject().apply {
+                    put("mime_type", "audio/wav")
+                    put("data", b64)
+                })
+            })
+            put(JSONObject().put("text", "Transcribe ONLY what is spoken in this audio."))
         }
-        val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
+        return callGenerateContent(apiKey, preferredModel, parts)
+    }
+
+    suspend fun polishOfflineTranscript(
+        apiKey: String,
+        preferredModel: String,
+        rawText: String
+    ): Result<String> {
+        val parts = JSONArray().put(
+            JSONObject().put("text", "Clean punctuation and medical spelling without changing any numbers or negations:\n$rawText")
+        )
+        return callGenerateContent(apiKey, preferredModel, parts)
+    }
+
+    private suspend fun callGenerateContent(
+        apiKey: String,
+        preferredModel: String,
+        parts: JSONArray
+    ): Result<String> = withContext(Dispatchers.IO) {
         val modelsToTry = (listOf(preferredModel) + Prefs.AVAILABLE_MODELS).distinct()
         var lastError: Exception = Exception("Unknown error")
 
@@ -48,23 +69,12 @@ object GeminiClient {
                 attempts++
                 try {
                     val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
-                    val url = URL(endpoint)
-                    val conn = (url.openConnection() as HttpURLConnection).apply {
+                    val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
                         requestMethod = "POST"
                         setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                         connectTimeout = 12000
                         readTimeout = 30000
                         doOutput = true
-                    }
-
-                    val parts = JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("inline_data", JSONObject().apply {
-                                put("mime_type", "audio/mp4")
-                                put("data", base64Audio)
-                            })
-                        })
-                        put(JSONObject().put("text", "Transcribe ONLY what is spoken in this audio. Do not add or invent anything."))
                     }
 
                     val payload = JSONObject().apply {
@@ -83,9 +93,7 @@ object GeminiClient {
                         }
                     }
 
-                    conn.outputStream.use { os ->
-                        os.write(payload.toString().toByteArray(Charsets.UTF_8))
-                    }
+                    conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
 
                     val code = conn.responseCode
                     val stream = if (code in 200..299) conn.inputStream else conn.errorStream
@@ -111,7 +119,6 @@ object GeminiClient {
                         .getJSONObject(0)
                         .getString("text")
                         .trim()
-
                     return@withContext Result.success(text)
                 } catch (e: Exception) {
                     lastError = e
