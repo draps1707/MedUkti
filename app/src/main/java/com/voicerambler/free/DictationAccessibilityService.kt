@@ -36,6 +36,7 @@ class DictationAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var lastEventCheckMs = 0L
+    @Volatile private var lastEditableNode: AccessibilityNodeInfo? = null
     private val hideRunnable = Runnable {
         if (getFreshEditableNode() == null) {
             onEditableFocusChanged?.invoke(false)
@@ -94,7 +95,15 @@ class DictationAccessibilityService : AccessibilityService() {
 
     private fun getFreshEditableNode(): AccessibilityNodeInfo? {
         val focused = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        return if (focused != null && focused.isEditable) focused else null
+        if (focused != null && focused.isEditable) {
+            lastEditableNode = focused
+            return focused
+        }
+        val cached = lastEditableNode
+        if (cached != null && cached.refresh() && cached.isEditable) {
+            return cached
+        }
+        return null
     }
 
     private fun getRealText(node: AccessibilityNodeInfo): String {

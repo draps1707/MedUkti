@@ -208,7 +208,7 @@ object SherpaOnnxEngine {
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = vadFile.absolutePath,
                     threshold = 0.45f,
-                    minSilenceDuration = 0.45f,
+                    minSilenceDuration = 0.32f,
                     minSpeechDuration = 0.18f,
                     maxSpeechDuration = 6.0f,
                     windowSize = 512

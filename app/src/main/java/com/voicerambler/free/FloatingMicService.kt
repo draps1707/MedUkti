@@ -25,6 +25,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.TextView
 import android.widget.Toast
@@ -67,6 +68,13 @@ class FloatingMicService : Service() {
                 if (isListening.get()) stopContinuousDictation()
                 SherpaOnnxEngine.releaseRecognizer()
             }
+        }
+    }
+
+    private val processingWatchdog = Runnable {
+        if (isProcessing && !isListening.get()) {
+            isProcessing = false
+            setMicUiState(MicUiState.IDLE)
         }
     }
 
@@ -229,6 +237,7 @@ class FloatingMicService : Service() {
         var initY = 0
         var touchX = 0f
         var touchY = 0f
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop.coerceAtLeast(32)
         var isDragging = false
         var longPressTriggered = false
         val longPressRunnable = Runnable {
@@ -259,7 +268,7 @@ class FloatingMicService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - touchX).toInt()
                     val dy = (event.rawY - touchY).toInt()
-                    if (abs(dx) > 12 || abs(dy) > 12) {
+                    if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
                         isDragging = true
                         mainHandler.removeCallbacks(longPressRunnable)
                     }
@@ -378,19 +387,23 @@ class FloatingMicService : Service() {
         val segmentChannel = Channel<FloatArray>(Channel.UNLIMITED)
 
         vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
-            for (seg in segmentChannel) {
-                val res = OfflineAsrEngines.transcribeSamples(this@FloatingMicService, resolved, seg)
-                res.onSuccess { raw ->
-                    val finalOut = raw.trim()
-                    if (finalOut.isNotBlank()) {
-                        appendPhraseAtLiveCursor(finalOut)
+            try {
+                for (seg in segmentChannel) {
+                    val res = OfflineAsrEngines.transcribeSamples(this@FloatingMicService, resolved, seg)
+                    res.onSuccess { raw ->
+                        val finalOut = raw.trim()
+                        if (finalOut.isNotBlank()) {
+                            appendPhraseAtLiveCursor(finalOut)
+                        }
                     }
                 }
-            }
-            withContext(Dispatchers.Main) {
-                isProcessing = false
-                setMicUiState(MicUiState.IDLE)
-                resetIdleSleepTimer()
+            } finally {
+                withContext(Dispatchers.Main + kotlinx.coroutines.NonCancellable) {
+                    mainHandler.removeCallbacks(processingWatchdog)
+                    isProcessing = false
+                    setMicUiState(MicUiState.IDLE)
+                    resetIdleSleepTimer()
+                }
             }
         }
 
@@ -469,8 +482,15 @@ class FloatingMicService : Service() {
     private fun stopContinuousDictation() {
         if (!isFallbackMode) {
             isListening.set(false)
-            isProcessing = true
-            setMicUiState(MicUiState.POLISHING)
+            if (vadConsumerJob?.isActive == true) {
+                isProcessing = true
+                setMicUiState(MicUiState.POLISHING)
+                mainHandler.removeCallbacks(processingWatchdog)
+                mainHandler.postDelayed(processingWatchdog, 6000L)
+            } else {
+                isProcessing = false
+                setMicUiState(MicUiState.IDLE)
+            }
             return
         }
 
