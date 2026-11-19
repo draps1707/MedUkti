@@ -14,15 +14,12 @@ import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.File
 import java.text.Normalizer
-import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 import kotlin.math.sqrt
 
 object SherpaOnnxEngine {
 
     private val recognizers = ConcurrentHashMap<String, OfflineRecognizer>()
-    private val dualPool = Executors.newFixedThreadPool(2)
     private var vad: Vad? = null
 
     @Synchronized
@@ -256,59 +253,6 @@ object SherpaOnnxEngine {
                     nemo = OfflineNemoEncDecCtcModelConfig(model = model.absolutePath),
                     tokens = tokens.absolutePath,
                     numThreads = 4,
-                    debug = false
-                )
-            }
-            "medasr" -> {
-                val model = ModelDownloader.getFile(ctx, ModelDownloader.MEDASR_MODEL)
-                val tokens = ModelDownloader.getFile(ctx, ModelDownloader.MEDASR_TOKENS)
-                if (!model.exists() || !tokens.exists()) {
-                    throw IllegalStateException("Download Google MedASR Pack first")
-                }
-                OfflineModelConfig(
-                    medasr = OfflineMedAsrCtcModelConfig(model = model.absolutePath),
-                    tokens = tokens.absolutePath,
-                    numThreads = 2,
-                    debug = false
-                )
-            }
-            "parakeet_110m" -> {
-                val enc = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_110M_ENC)
-                val dec = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_110M_DEC)
-                val joiner = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_110M_JOINER)
-                val tok = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_110M_TOKENS)
-                if (!enc.exists() || !dec.exists() || !joiner.exists() || !tok.exists()) {
-                    throw IllegalStateException("Download Parakeet 110M Pack first")
-                }
-                OfflineModelConfig(
-                    transducer = OfflineTransducerModelConfig(
-                        encoder = enc.absolutePath,
-                        decoder = dec.absolutePath,
-                        joiner = joiner.absolutePath
-                    ),
-                    tokens = tok.absolutePath,
-                    modelType = "nemo_transducer",
-                    numThreads = 2,
-                    debug = false
-                )
-            }
-            "parakeet_06b" -> {
-                val enc = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_06B_ENC)
-                val dec = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_06B_DEC)
-                val joiner = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_06B_JOINER)
-                val tok = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_06B_TOKENS)
-                if (!enc.exists() || !dec.exists() || !joiner.exists() || !tok.exists()) {
-                    throw IllegalStateException("Download Parakeet 0.6B v2 Pack first")
-                }
-                OfflineModelConfig(
-                    transducer = OfflineTransducerModelConfig(
-                        encoder = enc.absolutePath,
-                        decoder = dec.absolutePath,
-                        joiner = joiner.absolutePath
-                    ),
-                    tokens = tok.absolutePath,
-                    modelType = "nemo_transducer",
-                    numThreads = 2,
                     debug = false
                 )
             }
