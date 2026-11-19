@@ -8,6 +8,7 @@ import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
+import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
@@ -46,6 +47,8 @@ object SherpaOnnxEngine {
             AsrEngineType.PARAKEET_110M -> setOf("parakeet_110m")
             AsrEngineType.PARAKEET_06B_V2 -> setOf("parakeet_06b")
             AsrEngineType.DUAL_PARAKEET_110M_MEDASR -> setOf("parakeet_110m", "medasr")
+            AsrEngineType.WHISPER_TURBO -> setOf("whisper_turbo")
+            AsrEngineType.PARAKEET_INDIC -> setOf("parakeet_indic")
             AsrEngineType.DUAL_PARAKEET_06B_MEDASR -> setOf("parakeet_06b", "medasr")
         }
         val toRemove = recognizers.keys.filter { it !in keepKeys }
@@ -119,11 +122,12 @@ object SherpaOnnxEngine {
         if (text.isEmpty()) return ""
 
         text = text
-            .replace(Regex("\\[[^\\]]*\\]"), " ")
-            .replace(Regex("\\{[^}]*\\}"), " ")
+            .replace(Regex("<[a-z]{2,3}>", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("\\[[^\\]]*\\]?"), " ")
+            .replace(Regex("\\{[^}]*\\}?"), " ")
             .replace(Regex("\\bAIName\\]?\\s*", RegexOption.IGNORE_CASE), " ")
             .replace(Regex("\\s*[\\]\\}]\\s*"), " ")
-            .replace(Regex("\\b(\\w+)(?:\\s+\\1){2,}\\b", RegexOption.IGNORE_CASE), "$1")
+            .replace(Regex("\\b(\\w+)\\b(?:[.,!?\\s]+\\1\\b)+", RegexOption.IGNORE_CASE), "$1")
 
         text = text.replace(Regex("(?i)\\b(?:umm+|uhh+|err+m*|ahh+)\\b[,\\s]*"), " ")
 
@@ -316,6 +320,45 @@ object SherpaOnnxEngine {
                     debug = false
                 )
             }
+            "whisper_turbo" -> {
+                val enc = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_TURBO_ENC)
+                val dec = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_TURBO_DEC)
+                val tok = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_TURBO_TOKENS)
+                if (!enc.exists() || !dec.exists() || !tok.exists()) {
+                    throw IllegalStateException("Download Whisper Large-v3-Turbo Pack first")
+                }
+                OfflineModelConfig(
+                    whisper = OfflineWhisperModelConfig(
+                        encoder = enc.absolutePath,
+                        decoder = dec.absolutePath,
+                        language = "en",
+                        task = "transcribe"
+                    ),
+                    tokens = tok.absolutePath,
+                    numThreads = 4,
+                    debug = false
+                )
+            }
+            "parakeet_indic" -> {
+                val enc = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_INDIC_ENC)
+                val dec = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_INDIC_DEC)
+                val joiner = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_INDIC_JOINER)
+                val tok = ModelDownloader.getFile(ctx, ModelDownloader.PARAKEET_INDIC_TOKENS)
+                if (!enc.exists() || !dec.exists() || !joiner.exists() || !tok.exists()) {
+                    throw IllegalStateException("Download Parakeet-Indic v1 Pack first")
+                }
+                OfflineModelConfig(
+                    transducer = OfflineTransducerModelConfig(
+                        encoder = enc.absolutePath,
+                        decoder = dec.absolutePath,
+                        joiner = joiner.absolutePath
+                    ),
+                    tokens = tok.absolutePath,
+                    modelType = "nemo_transducer",
+                    numThreads = 4,
+                    debug = false
+                )
+            }
             else -> throw IllegalArgumentException("Unknown model key: $key")
         }
 
@@ -345,6 +388,8 @@ object SherpaOnnxEngine {
             AsrEngineType.SRAVAANI_OR -> SraVaaniEngine.transcribeSamples(ctx, boosted)
             AsrEngineType.MEDASR_CTC -> decodeSingle(getOrCreateModel(ctx, "medasr"), boosted)
             AsrEngineType.PARAKEET_110M -> decodeSingle(getOrCreateModel(ctx, "parakeet_110m"), boosted)
+            AsrEngineType.WHISPER_TURBO -> decodeSingle(getOrCreateModel(ctx, "whisper_turbo"), boosted)
+            AsrEngineType.PARAKEET_INDIC -> decodeSingle(getOrCreateModel(ctx, "parakeet_indic"), boosted)
             AsrEngineType.PARAKEET_06B_V2 -> decodeSingle(getOrCreateModel(ctx, "parakeet_06b"), boosted)
             AsrEngineType.DUAL_PARAKEET_110M_MEDASR, AsrEngineType.DUAL_PARAKEET_06B_MEDASR -> {
                 val parakeetKey = if (engine == AsrEngineType.DUAL_PARAKEET_06B_MEDASR) "parakeet_06b" else "parakeet_110m"
@@ -368,6 +413,8 @@ object SherpaOnnxEngine {
                 AsrEngineType.SRAVAANI_OR -> SraVaaniEngine.preload(ctx)
                 AsrEngineType.MEDASR_CTC -> getOrCreateModel(ctx, "medasr")
                 AsrEngineType.PARAKEET_110M -> getOrCreateModel(ctx, "parakeet_110m")
+                AsrEngineType.WHISPER_TURBO -> getOrCreateModel(ctx, "whisper_turbo")
+                AsrEngineType.PARAKEET_INDIC -> getOrCreateModel(ctx, "parakeet_indic")
                 AsrEngineType.PARAKEET_06B_V2 -> getOrCreateModel(ctx, "parakeet_06b")
                 AsrEngineType.DUAL_PARAKEET_110M_MEDASR -> {
                     getOrCreateModel(ctx, "parakeet_110m")

@@ -24,7 +24,6 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
-    private lateinit var etSnippets: EditText
     private val uiScope = CoroutineScope(Dispatchers.Main + Job())
 
     private val permLauncher = registerForActivityResult(
@@ -33,33 +32,15 @@ class MainActivity : AppCompatActivity() {
         updateStatus()
     }
 
-    private val importSnippetsLauncher = registerForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri == null) return@registerForActivityResult
-        try {
-            val imported = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
-            if (imported.isNotBlank()) {
-                val existing = etSnippets.text.toString().trim()
-                val merged = if (existing.isEmpty()) imported.trim() else "$existing\n${imported.trim()}"
-                etSnippets.setText(merged)
-                Prefs.setSnippetsRaw(this, merged)
-                Toast.makeText(this, "Imported snippets! Tap Save to confirm.", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val spinnerEngine = findViewById<Spinner>(R.id.spinnerEngine)
         val etPersonalDict = findViewById<EditText>(R.id.etPersonalDict)
+        val etHfToken = findViewById<EditText>(R.id.etHfToken)
         val switchAutoListen = findViewById<Switch>(R.id.switchAutoListen)
         val switchStreamingDraft = findViewById<Switch>(R.id.switchStreamingDraft)
-        etSnippets = findViewById(R.id.etSnippets)
         tvStatus = findViewById(R.id.tvStatus)
 
         spinnerEngine.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
@@ -74,8 +55,8 @@ class MainActivity : AppCompatActivity() {
             Prefs.setStreamingDraftEnabled(this, isChecked)
         }
 
+        etHfToken.setText(Prefs.getHfToken(this))
         etPersonalDict.setText(Prefs.getPersonalDict(this))
-        etSnippets.setText(Prefs.getSnippetsRaw(this))
 
         findViewById<Button>(R.id.btnEnableKb).setOnClickListener {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
@@ -84,10 +65,18 @@ class MainActivity : AppCompatActivity() {
             val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
             imm.showInputMethodPicker()
         }
-        findViewById<Button>(R.id.btnImportSnippets).setOnClickListener {
-            importSnippetsLauncher.launch(arrayOf("text/plain", "text/csv", "text/*"))
-        }
 
+        findViewById<Button>(R.id.btnDlWhisperTurbo).setOnClickListener {
+            downloadBatch(
+                listOf(
+                    ModelDownloader.SILERO_VAD,
+                    ModelDownloader.WHISPER_TURBO_TOKENS,
+                    ModelDownloader.WHISPER_TURBO_DEC,
+                    ModelDownloader.WHISPER_TURBO_ENC
+                ),
+                "Whisper Large-v3-Turbo"
+            )
+        }
         findViewById<Button>(R.id.btnDlStreamingDraft).setOnClickListener {
             downloadBatch(
                 listOf(
@@ -97,25 +86,26 @@ class MainActivity : AppCompatActivity() {
                     ModelDownloader.STREAMING_ZIP_DEC,
                     ModelDownloader.STREAMING_ZIP_JOINER
                 ),
-                "Live Streaming Draft"
+                "Indian-EN Streaming Draft"
+            )
+        }
+        findViewById<Button>(R.id.btnDlParakeetIndic).setOnClickListener {
+            Prefs.setHfToken(this, etHfToken.text.toString())
+            downloadBatch(
+                listOf(
+                    ModelDownloader.SILERO_VAD,
+                    ModelDownloader.PARAKEET_INDIC_TOKENS,
+                    ModelDownloader.PARAKEET_INDIC_DEC,
+                    ModelDownloader.PARAKEET_INDIC_JOINER,
+                    ModelDownloader.PARAKEET_INDIC_ENC
+                ),
+                "Parakeet-Indic v1"
             )
         }
         findViewById<Button>(R.id.btnDlMedAsr).setOnClickListener {
             downloadBatch(
                 listOf(ModelDownloader.SILERO_VAD, ModelDownloader.MEDASR_TOKENS, ModelDownloader.MEDASR_MODEL),
                 "Google MedASR CTC"
-            )
-        }
-        findViewById<Button>(R.id.btnDlParakeet110m).setOnClickListener {
-            downloadBatch(
-                listOf(
-                    ModelDownloader.SILERO_VAD,
-                    ModelDownloader.PARAKEET_110M_TOKENS,
-                    ModelDownloader.PARAKEET_110M_ENC,
-                    ModelDownloader.PARAKEET_110M_DEC,
-                    ModelDownloader.PARAKEET_110M_JOINER
-                ),
-                "Parakeet TDT 110M"
             )
         }
         findViewById<Button>(R.id.btnDlParakeet06b).setOnClickListener {
@@ -148,8 +138,8 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnSaveStart).setOnClickListener {
             Prefs.setEngine(this, AsrEngineType.entries[spinnerEngine.selectedItemPosition])
+            Prefs.setHfToken(this, etHfToken.text.toString())
             Prefs.setPersonalDict(this, etPersonalDict.text.toString())
-            Prefs.setSnippetsRaw(this, etSnippets.text.toString())
             Prefs.setAutoListen(this, switchAutoListen.isChecked)
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 permLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -200,9 +190,10 @@ class MainActivity : AppCompatActivity() {
         val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val imeOk = isImeEnabled()
         val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
+        val turboOk = ModelDownloader.isWhisperTurboInstalled(this)
         val streamOk = ModelDownloader.isStreamingZipformerInstalled(this)
+        val indicOk = ModelDownloader.isParakeetIndicInstalled(this)
         val medOk = ModelDownloader.isMedAsrInstalled(this)
-        val p110Ok = ModelDownloader.isParakeet110mInstalled(this)
         val p06bOk = ModelDownloader.isParakeet06bInstalled(this)
         val odiaOk = ModelDownloader.isOdiaInstalled(this)
         val sravaaniOk = ModelDownloader.isSraVaaniInstalled(this)
@@ -210,10 +201,10 @@ class MainActivity : AppCompatActivity() {
         tvStatus.text = buildString {
             appendLine("Active Mode: ${Prefs.getEngine(this@MainActivity).label}")
             appendLine("Keyboard Enabled: ${if (imeOk) "YES" else "Tap '1. Enable Keyboard'"} | Mic: ${if (micOk) "OK" else "Needed"}")
-            appendLine("Loaded Snippets: ${Prefs.getSnippets(this@MainActivity).size}")
-            appendLine("Live Streaming Draft (MED): ${if (streamOk) "Installed" else "Not downloaded"}")
+            appendLine("Whisper Large-v3-Turbo: ${if (turboOk) "Installed" else "Not downloaded"}")
+            appendLine("Indian-EN Streaming Draft: ${if (streamOk) "Installed" else "Not downloaded"}")
+            appendLine("Parakeet-Indic v1: ${if (indicOk) "Installed" else "Not downloaded"}")
             appendLine("Google MedASR CTC: ${if (medOk) "Installed" else "Not downloaded"}")
-            appendLine("Parakeet TDT 110M: ${if (p110Ok) "Installed" else "Not downloaded"}")
             appendLine("Parakeet TDT 0.6B v2: ${if (p06bOk) "Installed" else "Not downloaded"}")
             appendLine("Odia (IndicConformer): ${if (odiaOk) "Installed" else "Not downloaded"}")
             appendLine("Odia Natural (SraVaani 1.0): ${if (sravaaniOk) "Installed" else "Not downloaded"}")

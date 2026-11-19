@@ -4,6 +4,8 @@ import android.content.Context
 import org.json.JSONArray
 
 enum class AsrEngineType(val label: String) {
+    WHISPER_TURBO("Indian/Medical Pro — Whisper Large-v3-Turbo"),
+    PARAKEET_INDIC("Indian English Fast — Parakeet-Indic v1"),
     DUAL_PARAKEET_110M_MEDASR("Medical Dual Fast — Parakeet 110M + Google MedASR"),
     DUAL_PARAKEET_06B_MEDASR("Medical Dual Pro — Parakeet 0.6B v2 + Google MedASR"),
     MEDASR_CTC("Medical Only — Google MedASR CTC"),
@@ -19,29 +21,19 @@ object Prefs {
     private const val KEY_MED_ENGINE = "med_asr_engine"
     private const val KEY_ODIA_ENGINE = "odia_asr_engine"
     private const val KEY_PERSONAL_DICT = "personal_dictionary"
+    private const val KEY_HF_TOKEN = "hf_token"
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
     private const val KEY_STREAMING_DRAFT = "streaming_draft_med"
     private const val KEY_SNIPPETS = "rx_snippets"
     private const val KEY_RECENT_DICTATIONS = "recent_dictations_json"
 
-    val DEFAULT_SNIPPETS = """
-        OD @ 8AM | OD (ONCE A DAY) @ 8AM [ଦିନକୁ ଥରେ (ସକାଳେ ୮ଟା) | दिन में 1 बार (सुबह 8 बजे)]
-        BD AF 8-8 | BD (TWICE A DAY) AF (AFTER FOOD) @ 8AM - 8PM [ଦିନକୁ ୨ ଥର - ଖାଇବା ପରେ (ସକାଳେ ୮ଟା - ରାତି ୮ଟା) | दिन में 2 बार - खाने के बाद (सुबह 8 बजे - रात 8 बजे)]
-        BD AF (Short) | BD (TWICE A DAY) AF (AFTER FOOD) @ 8AM - 8PM [ଦିନକୁ ୨ ଥର - ଖାଇବା ପରେ | दिन में 2 बार - खाने के बाद]
-        BD BF 7-7 | BD (TWICE A DAY) BF (BEFORE FOOD) @ 7AM - 7PM [ଦିନକୁ ୨ ଥର - ଖାଇବା ପୂର୍ବରୁ (ସକାଳେ ୭ଟା - ରାତି ୭ଟା) | दिन में 2 बार - खाने से पहले (सुबह 7 बजे - रात 7 बजे)]
-        BD BF (Short) | BD (TWICE A DAY) BF (BEFORE FOOD) @ 7AM - 7PM [ଦିନକୁ ୨ ଥର - ଖାଇବା ପୂର୍ବରୁ | दिन में 2 बार - खाने से पहले]
-        HS @ 10PM | HS (AT BEDTIME) @ 10PM [ରାତିରେ ଶୋଇବା ପୂର୍ବରୁ (ରାତି ୧୦ଟା) | रात को सोने से पहले (रात 10 बजे)]
-        OD BBF 7AM | OD (ONCE A DAY) BBF (BEFORE BREAKFAST) @ 7AM [ଦିନକୁ ଥରେ - ଜଳଖିଆ ପୂର୍ବରୁ / ଖାଲି ପେଟରେ (ସକାଳେ ୭ଟା) | दिन में 1 बार - नाश्ते से पहले / खाली पेट (सुबह 7 बजे)]
-        Template: OPD Note | Chief Complaints:\nHistory of Present Illness:\nOn Examination:\nVitals: BP  | PR  | SpO2 %\nProvisional Diagnosis:\nRx:\nAdvice:
-        Template: Casualty Note | Presenting Complaints:\nVitals on Arrival: BP  | PR  | RR  | SpO2 % | GRBS \nPrimary Survey & O/E:\nProvisional Diagnosis:\nTreatment Given:\nPlan / Disposition:
-        Template: Discharge Summary | Final Diagnosis:\nChief Complaints & Course in Hospital:\nSignificant Investigations:\nCondition at Discharge:\nDischarge Medications:\nFollow-up Advice:
-    """.trimIndent()
+    val DEFAULT_SNIPPETS = ""
 
     fun getEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_ENGINE, AsrEngineType.DUAL_PARAKEET_06B_MEDASR.name)
+            .getString(KEY_ENGINE, AsrEngineType.WHISPER_TURBO.name)
         return AsrEngineType.entries.firstOrNull { it.name == raw }
-            ?: AsrEngineType.DUAL_PARAKEET_06B_MEDASR
+            ?: AsrEngineType.WHISPER_TURBO
     }
 
     fun isOdiaEngine(e: AsrEngineType): Boolean =
@@ -60,9 +52,9 @@ object Prefs {
 
     fun getMedEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_MED_ENGINE, AsrEngineType.DUAL_PARAKEET_06B_MEDASR.name)
+            .getString(KEY_MED_ENGINE, AsrEngineType.WHISPER_TURBO.name)
         val parsed = AsrEngineType.entries.firstOrNull { it.name == raw }
-        return if (parsed != null && !isOdiaEngine(parsed)) parsed else AsrEngineType.DUAL_PARAKEET_06B_MEDASR
+        return if (parsed != null && !isOdiaEngine(parsed)) parsed else AsrEngineType.WHISPER_TURBO
     }
 
     fun getOdiaEngine(ctx: Context): AsrEngineType {
@@ -86,6 +78,13 @@ object Prefs {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean(KEY_STREAMING_DRAFT, enabled).apply()
     }
 
+    fun getHfToken(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_HF_TOKEN, "") ?: ""
+
+    fun setHfToken(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_HF_TOKEN, value.trim()).apply()
+    }
+
     fun getPersonalDict(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_PERSONAL_DICT, "") ?: ""
 
@@ -102,47 +101,9 @@ object Prefs {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_SNIPPETS, value).apply()
     }
 
-    fun getSnippets(ctx: Context): List<Pair<String, String>> {
-        val out = ArrayList<Pair<String, String>>()
-        for (rawLine in getSnippetsRaw(ctx).lines()) {
-            val line = rawLine.trim()
-            if (line.isEmpty()) continue
-            val sepIdx = when {
-                '|' in line -> line.indexOf('|')
-                '\t' in line -> line.indexOf('\t')
-                '=' in line -> line.indexOf('=')
-                else -> -1
-            }
-            if (sepIdx > 0 && sepIdx < line.length - 1) {
-                val label = line.substring(0, sepIdx).trim()
-                val expansion = line.substring(sepIdx + 1).trim().replace("\\n", "\n")
-                if (label.isNotEmpty() && expansion.isNotEmpty()) {
-                    out.add(label to expansion)
-                }
-            }
-        }
-        return out
-    }
+    fun getSnippets(ctx: Context): List<Pair<String, String>> = emptyList()
 
-    fun getRecentDictations(ctx: Context): List<String> {
-        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_RECENT_DICTATIONS, "[]") ?: "[]"
-        return try {
-            val arr = JSONArray(raw)
-            List(arr.length()) { idx -> arr.getString(idx) }
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
+    fun getRecentDictations(ctx: Context): List<String> = emptyList()
 
-    fun addRecentDictation(ctx: Context, text: String) {
-        val clean = text.trim()
-        if (clean.length < 2) return
-        val list = getRecentDictations(ctx).toMutableList()
-        list.remove(clean)
-        list.add(0, clean)
-        while (list.size > 8) list.removeAt(list.lastIndex)
-        val arr = JSONArray()
-        list.forEach { arr.put(it) }
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_RECENT_DICTATIONS, arr.toString()).apply()
-    }
+    fun addRecentDictation(ctx: Context, text: String) {}
 }

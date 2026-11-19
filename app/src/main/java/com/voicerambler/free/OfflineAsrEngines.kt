@@ -9,6 +9,14 @@ object OfflineAsrEngines {
 
     fun resolveEngine(ctx: Context, engine: AsrEngineType): Result<AsrEngineType> {
         return when (engine) {
+            AsrEngineType.WHISPER_TURBO -> {
+                if (ModelDownloader.isWhisperTurboInstalled(ctx)) Result.success(engine)
+                else Result.failure(Exception("Download Whisper Large-v3-Turbo Pack first"))
+            }
+            AsrEngineType.PARAKEET_INDIC -> {
+                if (ModelDownloader.isParakeetIndicInstalled(ctx)) Result.success(engine)
+                else Result.failure(Exception("Download Parakeet-Indic v1 Pack first"))
+            }
             AsrEngineType.INDIC_CONFORMER_OR -> {
                 if (ModelDownloader.isOdiaInstalled(ctx)) Result.success(engine)
                 else Result.failure(Exception("Download Odia Offline Pack first"))

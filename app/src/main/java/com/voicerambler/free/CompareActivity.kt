@@ -47,11 +47,11 @@ class CompareActivity : AppCompatActivity() {
                     val out = StringBuilder()
 
                     val tests = listOf(
+                        "Whisper Large-v3-Turbo (Indian/Med)" to AsrEngineType.WHISPER_TURBO,
+                        "Parakeet-Indic v1 (Indian EN)" to AsrEngineType.PARAKEET_INDIC,
                         "Dual Pro (Parakeet 0.6B + MedASR)" to AsrEngineType.DUAL_PARAKEET_06B_MEDASR,
-                        "Dual Fast (Parakeet 110M + MedASR)" to AsrEngineType.DUAL_PARAKEET_110M_MEDASR,
                         "Google MedASR Only" to AsrEngineType.MEDASR_CTC,
                         "Parakeet 0.6B v2 Only" to AsrEngineType.PARAKEET_06B_V2,
-                        "Parakeet 110M Only" to AsrEngineType.PARAKEET_110M,
                         "Odia (IndicConformer 600M)" to AsrEngineType.INDIC_CONFORMER_OR,
                         "Odia Natural (SraVaani 1.0)" to AsrEngineType.SRAVAANI_OR
                     )

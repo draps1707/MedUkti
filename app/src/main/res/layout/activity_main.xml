@@ -20,7 +20,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="100% Offline Medical &amp; Odia Voice Keyboard (Zero Banking Warnings)"
+            android:text="100% Offline Indian English &amp; Odia Voice Keyboard"
             android:textSize="13sp" />
 
         <LinearLayout
@@ -58,7 +58,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Live streaming draft in MED mode (Beta)" />
+            android:text="Live Indian-English streaming draft (Beta)" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -73,32 +73,54 @@
             android:layout_height="48dp" />
 
         <Button
-            android:id="@+id/btnDlStreamingDraft"
+            android:id="@+id/btnDlWhisperTurbo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Download Live Streaming Draft (~73 MB - Optional MED)" />
+            android:text="Download Whisper Large-v3-Turbo (~1.04 GB - Best Open Indian EN)" />
+
+        <Button
+            android:id="@+id/btnDlStreamingDraft"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download Indian-EN Streaming Draft (~71 MB)" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Hugging Face Token (only needed for gated Parakeet-Indic v1)"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/etHfToken"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="hf_..."
+            android:inputType="textNoSuggestions"
+            android:singleLine="true" />
+
+        <Button
+            android:id="@+id/btnDlParakeetIndic"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download Parakeet-Indic v1 (~850 MB - Needs HF Approval)" />
 
         <Button
             android:id="@+id/btnDlMedAsr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Download Google MedASR CTC (Clinical Core)" />
-
-        <Button
-            android:id="@+id/btnDlParakeet110m"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Download Parakeet TDT 110M (~137 MB - Fastest)" />
+            android:text="Download Google MedASR CTC (Optional Clinical)" />
 
         <Button
             android:id="@+id/btnDlParakeet06b"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Download Parakeet TDT 0.6B v2 (~661 MB - Pro English)" />
+            android:text="Download Parakeet TDT 0.6B v2 (~661 MB)" />
 
         <Button
             android:id="@+id/btnDlIndicOr"
@@ -119,7 +141,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Compare Medical &amp; Odia Engines (Lab)" />
+            android:text="Compare Engines Side-by-Side (Lab)" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -136,36 +158,6 @@
             android:hint="Example:\nsubhu = Subhu\naau kana = ଆଉ କଣ"
             android:inputType="textMultiLine"
             android:minLines="3" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Rx Snippets &amp; Templates (Label | Text)"
-                android:textStyle="bold" />
-
-            <Button
-                android:id="@+id/btnImportSnippets"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Import .txt/.csv" />
-        </LinearLayout>
-
-        <EditText
-            android:id="@+id/etSnippets"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="top|start"
-            android:hint="Format: Label | Full expansion text"
-            android:inputType="textMultiLine"
-            android:minLines="5" />
 
         <Button
             android:id="@+id/btnSaveStart"
