@@ -9,6 +9,7 @@ object MedicalNormalizer {
     private val multiWordRules = ArrayList<Pair<Regex, String>>()
     private val fuzzyBuckets = HashMap<Char, ArrayList<Pair<String, String>>>()
     private val skeletonMap = HashMap<String, String>()
+    private val coreSkeletonMap = HashMap<String, String>()
 
     @Volatile
     private var loaded = false
@@ -324,6 +325,7 @@ object MedicalNormalizer {
                         skeletonMap[sk] = extraSkelTerm[sk]!!
                     }
                 }
+                coreSkeletonMap.putAll(coreSkeletons)
                 skeletonMap.putAll(coreSkeletons)
             } catch (_: Exception) {
             }
@@ -388,7 +390,7 @@ object MedicalNormalizer {
 
         if (stem.length >= 7 && stem.any { it in '\u0B00'..'\u0B7F' }) {
             val sk = odiaSkeleton(stem)
-            val hit = if (sk.length >= 5) skeletonMap[sk] else null
+            val hit = if (sk.length >= 5) coreSkeletonMap[sk] else null
             if (hit != null) return hit + suffix
         }
         return word
@@ -410,7 +412,7 @@ object MedicalNormalizer {
             for (w in words) {
                 out.add(mapOdiaWordWithSuffix(w))
             }
-            return out.joinToString(" ").replace(Regex("\\s{2,}"), " ").trim()
+            return cleanBrokenOdiaMatras(out.joinToString(" "))
         }
 
         // Split glued "tablet..." prefixes (e.g. "Tabletapagliprogene" -> "Tab. Dapagliflozin")
@@ -627,8 +629,20 @@ object MedicalNormalizer {
 
     fun cleanBrokenOdiaMatras(text: String): String {
         return text
-            .replace(Regex("(?<=\\s)[\\u0B3E-\\u0B4C\\u0B56\\u0B57\\u0B01-\\u0B03]+"), "")
-            .replace(Regex("([\\u0B3E-\\u0B4C\\u0B56\\u0B57])\\1+"), "$1")
+            // Remove stray Devanagari leaks (e.g. हम्म, कथू)
+            .replace(Regex("[\\u0900-\\u097F]+"), " ")
+            // Remove standalone candrabindu/anusvara tokens (e.g. ଁଁଁଁ)
+            .replace(Regex("(?<=^|\\s)[\\u0B01-\\u0B03]+(?=\\s|$)"), " ")
+            // Collapse repeated candrabindu/anusvara
+            .replace(Regex("([\\u0B01-\\u0B03])\\1+"), "$1")
+            // Strip leading orphaned matras at word start
+            .replace(Regex("(?<=^|\\s)[\\u0B3E-\\u0B4C\\u0B56\\u0B57]+"), "")
+            // Collapse any stacked dependent vowel signs (e.g. େି -> େ, ିୁ -> ି)
+            .replace(Regex("([\\u0B3E-\\u0B4C\\u0B56\\u0B57])[\\u0B3E-\\u0B4C\\u0B56\\u0B57]+"), "$1")
+            // Strip vowel sign immediately after independent vowel (e.g. ଓୋ -> ଓ)
+            .replace(Regex("([\\u0B05-\\u0B14])[\\u0B3E-\\u0B4C\\u0B56\\u0B57]+"), "$1")
+            // Collapse repeated filler loops (ହୁଁ ହୁଁ -> single or drop)
+            .replace(Regex("(?<=^|\\s)(?:ହୁଁ|ଉଁ)(?:\\s+(?:ହୁଁ|ଉଁ))+(?=\\s|$)"), " ")
             .replace(Regex("[ \\t]{2,}"), " ")
             .trim()
     }
