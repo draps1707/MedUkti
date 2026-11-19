@@ -17,16 +17,6 @@ object OfflineAsrEngines {
                 if (ModelDownloader.isSraVaaniInstalled(ctx)) Result.success(engine)
                 else Result.failure(Exception("Download SraVaani 1.0 Odia Pack first"))
             }
-            AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI -> {
-                val iOk = ModelDownloader.isOdiaInstalled(ctx)
-                val sOk = ModelDownloader.isSraVaaniInstalled(ctx)
-                when {
-                    iOk && sOk -> Result.success(engine)
-                    iOk -> Result.success(AsrEngineType.INDIC_CONFORMER_OR)
-                    sOk -> Result.success(AsrEngineType.SRAVAANI_OR)
-                    else -> Result.failure(Exception("Download Odia Offline Pack or SraVaani 1.0 first"))
-                }
-            }
             AsrEngineType.MEDASR_CTC -> {
                 if (ModelDownloader.isMedAsrInstalled(ctx)) Result.success(engine)
                 else Result.failure(Exception("Download Google MedASR Pack first"))

@@ -9,7 +9,6 @@ enum class AsrEngineType(val label: String) {
     PARAKEET_110M("English Fast — Parakeet TDT 110M"),
     PARAKEET_06B_V2("English Pro — Parakeet TDT 0.6B v2"),
     INDIC_CONFORMER_OR("Odia — AI4Bharat IndicConformer 600M (~661 MB)"),
-    DUAL_ODIA_INDIC_SRAVAANI("Odia Dual — IndicConformer + SraVaani 1.0"),
     SRAVAANI_OR("Odia Natural — SraVaani 1.0 (~1.81 GB)")
 }
 
@@ -32,7 +31,7 @@ object Prefs {
     fun setEngine(ctx: Context, engine: AsrEngineType) {
         val editor = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString(KEY_ENGINE, engine.name)
-        if (engine == AsrEngineType.INDIC_CONFORMER_OR || engine == AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI || engine == AsrEngineType.SRAVAANI_OR) {
+        if (engine == AsrEngineType.INDIC_CONFORMER_OR || engine == AsrEngineType.SRAVAANI_OR) {
             editor.putString(KEY_ODIA_ENGINE, engine.name)
         } else {
             editor.putString(KEY_MED_ENGINE, engine.name)
@@ -44,7 +43,7 @@ object Prefs {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
             .getString(KEY_MED_ENGINE, AsrEngineType.DUAL_PARAKEET_06B_MEDASR.name)
         val parsed = AsrEngineType.entries.firstOrNull { it.name == raw }
-        return if (parsed != null && parsed != AsrEngineType.INDIC_CONFORMER_OR && parsed != AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI && parsed != AsrEngineType.SRAVAANI_OR) {
+        return if (parsed != null && parsed != AsrEngineType.INDIC_CONFORMER_OR && parsed != AsrEngineType.SRAVAANI_OR) {
             parsed
         } else {
             AsrEngineType.DUAL_PARAKEET_06B_MEDASR
@@ -52,7 +51,7 @@ object Prefs {
     }
 
     fun isOdiaEngine(e: AsrEngineType): Boolean =
-        e == AsrEngineType.INDIC_CONFORMER_OR || e == AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI || e == AsrEngineType.SRAVAANI_OR
+        e == AsrEngineType.INDIC_CONFORMER_OR || e == AsrEngineType.SRAVAANI_OR
 
     fun getOdiaEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)

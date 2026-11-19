@@ -41,7 +41,6 @@ object SherpaOnnxEngine {
         val keepKeys = when (active) {
             AsrEngineType.INDIC_CONFORMER_OR -> setOf("odia")
             AsrEngineType.SRAVAANI_OR -> emptySet()
-            AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI -> setOf("odia")
             AsrEngineType.MEDASR_CTC -> setOf("medasr")
             AsrEngineType.PARAKEET_110M -> setOf("parakeet_110m")
             AsrEngineType.PARAKEET_06B_V2 -> setOf("parakeet_06b")
@@ -52,7 +51,7 @@ object SherpaOnnxEngine {
         for (k in toRemove) {
             try { recognizers.remove(k)?.release() } catch (_: Exception) {}
         }
-        if (active != AsrEngineType.SRAVAANI_OR && active != AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI) {
+        if (active != AsrEngineType.SRAVAANI_OR) {
             SraVaaniEngine.release()
         }
     }
@@ -259,7 +258,7 @@ object SherpaOnnxEngine {
                 OfflineModelConfig(
                     nemo = OfflineNemoEncDecCtcModelConfig(model = model.absolutePath),
                     tokens = tokens.absolutePath,
-                    numThreads = 2,
+                    numThreads = 4,
                     debug = false
                 )
             }
@@ -343,12 +342,6 @@ object SherpaOnnxEngine {
         return when (engine) {
             AsrEngineType.INDIC_CONFORMER_OR -> decodeSingle(getOrCreateModel(ctx, "odia"), boosted)
             AsrEngineType.SRAVAANI_OR -> SraVaaniEngine.transcribeSamples(ctx, boosted)
-            AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI -> {
-                val oRec = getOrCreateModel(ctx, "odia")
-                val iFuture = dualPool.submit(Callable { decodeSingle(oRec, boosted) })
-                val sFuture = dualPool.submit(Callable { SraVaaniEngine.transcribeSamples(ctx, boosted) })
-                MedicalNormalizer.mergeOdiaIndicAndSraVaani(iFuture.get(), sFuture.get())
-            }
             AsrEngineType.MEDASR_CTC -> decodeSingle(getOrCreateModel(ctx, "medasr"), boosted)
             AsrEngineType.PARAKEET_110M -> decodeSingle(getOrCreateModel(ctx, "parakeet_110m"), boosted)
             AsrEngineType.PARAKEET_06B_V2 -> decodeSingle(getOrCreateModel(ctx, "parakeet_06b"), boosted)
@@ -372,10 +365,6 @@ object SherpaOnnxEngine {
             when (engine) {
                 AsrEngineType.INDIC_CONFORMER_OR -> getOrCreateModel(ctx, "odia")
                 AsrEngineType.SRAVAANI_OR -> SraVaaniEngine.preload(ctx)
-                AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI -> {
-                    getOrCreateModel(ctx, "odia")
-                    SraVaaniEngine.preload(ctx)
-                }
                 AsrEngineType.MEDASR_CTC -> getOrCreateModel(ctx, "medasr")
                 AsrEngineType.PARAKEET_110M -> getOrCreateModel(ctx, "parakeet_110m")
                 AsrEngineType.PARAKEET_06B_V2 -> getOrCreateModel(ctx, "parakeet_06b")

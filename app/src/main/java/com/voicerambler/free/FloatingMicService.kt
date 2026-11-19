@@ -108,6 +108,7 @@ class FloatingMicService : Service() {
                     refreshLangBadge()
                     floatingView?.visibility = View.VISIBLE
                     resetIdleSleepTimer()
+                    serviceScope.launch { OfflineAsrEngines.preload(this@FloatingMicService) }
                 } else {
                     if (isListening.get()) {
                         stopContinuousDictation()

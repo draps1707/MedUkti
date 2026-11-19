@@ -630,7 +630,7 @@ object MedicalNormalizer {
     fun cleanBrokenOdiaMatras(text: String): String {
         return text
             // Remove stray Devanagari leaks (e.g. हम्म, कथू)
-            .replace(Regex("[\\u0900-\\u097F]+"), " ")
+            .replace(Regex("[\\u0900-\\u097F\\u1C50-\\u1C7F]+"), " ")
             // Remove standalone candrabindu/anusvara tokens (e.g. ଁଁଁଁ)
             .replace(Regex("(?<=^|\\s)[\\u0B01-\\u0B03]+(?=\\s|$)"), " ")
             // Collapse repeated candrabindu/anusvara
