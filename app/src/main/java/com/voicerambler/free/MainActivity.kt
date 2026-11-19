@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         val spinnerEngine = findViewById<Spinner>(R.id.spinnerEngine)
+        val etPersonalDict = findViewById<EditText>(R.id.etPersonalDict)
         val cbGemini = findViewById<CheckBox>(R.id.cbGeminiOptional)
         val etApiKey = findViewById<EditText>(R.id.etApiKey)
         val spinnerModel = findViewById<Spinner>(R.id.spinnerModel)
@@ -48,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         spinnerEngine.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
         spinnerEngine.setSelection(AsrEngineType.entries.indexOf(Prefs.getEngine(this)).coerceAtLeast(0))
 
+        etPersonalDict.setText(Prefs.getPersonalDict(this))
         cbGemini.isChecked = Prefs.isGeminiPolishEnabled(this)
         etApiKey.setText(Prefs.getApiKey(this))
         spinnerModel.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Prefs.AVAILABLE_MODELS)
@@ -57,12 +59,6 @@ class MainActivity : AppCompatActivity() {
             downloadBatch(
                 listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_APEX_TOKENS, ModelDownloader.WHISPER_APEX_ENC, ModelDownloader.WHISPER_APEX_DEC),
                 "Hinglish Apex"
-            )
-        }
-        findViewById<Button>(R.id.btnDlWhisperSwift).setOnClickListener {
-            downloadBatch(
-                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_SWIFT_TOKENS, ModelDownloader.WHISPER_SWIFT_ENC, ModelDownloader.WHISPER_SWIFT_DEC),
-                "Hinglish Swift"
             )
         }
         findViewById<Button>(R.id.btnDlIndicOr).setOnClickListener {
@@ -77,6 +73,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnSaveStart).setOnClickListener {
             Prefs.setEngine(this, AsrEngineType.entries[spinnerEngine.selectedItemPosition])
+            Prefs.setPersonalDict(this, etPersonalDict.text.toString())
             Prefs.setGeminiPolishEnabled(this, cbGemini.isChecked)
             Prefs.setApiKey(this, etApiKey.text.toString())
             Prefs.setModel(this, Prefs.AVAILABLE_MODELS[spinnerModel.selectedItemPosition])
@@ -86,6 +83,7 @@ class MainActivity : AppCompatActivity() {
             uiScope.launch { OfflineAsrEngines.preload(this@MainActivity) }
         }
 
+        ModelDownloader.cleanupUnusedModels(this)
         checkAndRequestNextMissingPermission()
     }
 
@@ -157,13 +155,11 @@ class MainActivity : AppCompatActivity() {
         val accOk = DictationAccessibilityService.instance != null
         val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
         val apexOk = ModelDownloader.isWhisperApexInstalled(this)
-        val swiftOk = ModelDownloader.isWhisperSwiftInstalled(this)
         val odiaOk = ModelDownloader.isOdiaInstalled(this)
 
         tvStatus.text = buildString {
             appendLine("Active Language: ${Prefs.getEngine(this@MainActivity).label}")
             appendLine("Hinglish Apex: ${if (apexOk) "Installed" else "Not downloaded"}")
-            appendLine("Hinglish Swift: ${if (swiftOk) "Installed" else "Not downloaded"}")
             appendLine("Odia (IndicConformer): ${if (odiaOk) "Installed" else "Not downloaded"}")
             appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
             appendLine("Mic: ${if (micOk) "OK" else "Needed"} | Overlay: ${if (overlayOk) "OK" else "Needed"} | Accessibility: ${if (accOk) "OK" else "Needed"}")

@@ -4,7 +4,6 @@ import android.content.Context
 
 enum class AsrEngineType(val label: String) {
     WHISPER_HINGLISH_APEX("Hinglish — Whisper Apex (Offline ~1.03 GB)"),
-    WHISPER_HINGLISH_SWIFT("Hinglish — Whisper Swift (Offline ~152 MB)"),
     INDIC_CONFORMER_OR("Odia — AI4Bharat IndicConformer 600M (Offline ~661 MB)"),
     GEMINI_CLOUD("Gemini Cloud Audio (Optional)")
 }
@@ -17,6 +16,7 @@ object Prefs {
     private const val KEY_MODEL = "gemini_model"
     private const val KEY_BUBBLE_X = "bubble_x"
     private const val KEY_BUBBLE_Y = "bubble_y"
+    private const val KEY_PERSONAL_DICT = "personal_dictionary"
 
     val AVAILABLE_MODELS = listOf(
         "gemini-2.5-flash",
@@ -65,5 +65,12 @@ object Prefs {
             .putInt(KEY_BUBBLE_X, x)
             .putInt(KEY_BUBBLE_Y, y)
             .apply()
+    }
+
+    fun getPersonalDict(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_PERSONAL_DICT, "") ?: ""
+
+    fun setPersonalDict(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_PERSONAL_DICT, value).apply()
     }
 }

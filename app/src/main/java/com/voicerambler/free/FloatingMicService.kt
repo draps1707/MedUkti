@@ -50,16 +50,23 @@ class FloatingMicService : Service() {
     private var isProcessing = false
     private var isFallbackMode = false
 
-    private var sessionBeforeCursor = ""
-    private var sessionAfterCursor = ""
-    private val committedText = StringBuilder()
-    private var lastRenderedInserted = ""
-
     private var lastUndoFullText: String? = null
     private var lastUndoCursor: Int = 0
+    private var lastPhraseInserted: String = ""
 
     private var liveLoopJob: Job? = null
     private var vadConsumerJob: Job? = null
+
+    private val idleSleepRunnable = Runnable {
+        if (!isListening.get() && !isProcessing) {
+            SherpaOnnxEngine.releaseRecognizer()
+        }
+    }
+
+    private fun resetIdleSleepTimer() {
+        mainHandler.removeCallbacks(idleSleepRunnable)
+        mainHandler.postDelayed(idleSleepRunnable, 10 * 60 * 1000L) // 10 min RAM auto-sleep
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -68,6 +75,7 @@ class FloatingMicService : Service() {
         fallbackRecorder = WavRecorderHelper(this)
         startForegroundNotification()
         showFloatingBubble()
+        resetIdleSleepTimer()
 
         serviceScope.launch {
             OfflineAsrEngines.preload(this@FloatingMicService)
@@ -78,6 +86,8 @@ class FloatingMicService : Service() {
                 if (focused) {
                     refreshLangBadge()
                     floatingView?.visibility = View.VISIBLE
+                    resetIdleSleepTimer()
+                    serviceScope.launch { OfflineAsrEngines.preload(this@FloatingMicService) }
                 } else {
                     if (isListening.get()) {
                         stopContinuousDictation()
@@ -139,8 +149,7 @@ class FloatingMicService : Service() {
         if (isListening.get() || isProcessing) return
         val cur = Prefs.getEngine(this)
         val next = if (cur == AsrEngineType.INDIC_CONFORMER_OR) {
-            if (ModelDownloader.isWhisperApexInstalled(this)) AsrEngineType.WHISPER_HINGLISH_APEX
-            else AsrEngineType.WHISPER_HINGLISH_SWIFT
+            AsrEngineType.WHISPER_HINGLISH_APEX
         } else {
             AsrEngineType.INDIC_CONFORMER_OR
         }
@@ -149,7 +158,7 @@ class FloatingMicService : Service() {
         buzz(25L)
         Toast.makeText(
             this,
-            if (next == AsrEngineType.INDIC_CONFORMER_OR) "Switched to Odia" else "Switched to Hinglish",
+            if (next == AsrEngineType.INDIC_CONFORMER_OR) "Switched to Odia" else "Switched to Hinglish Apex",
             Toast.LENGTH_SHORT
         ).show()
         serviceScope.launch { OfflineAsrEngines.preload(this@FloatingMicService) }
@@ -196,6 +205,7 @@ class FloatingMicService : Service() {
                     buzz(35L)
                     DictationAccessibilityService.instance?.setFullTextWithCursor(undo, lastUndoCursor)
                     lastUndoFullText = null
+                    lastPhraseInserted = ""
                     Toast.makeText(this@FloatingMicService, "Restored previous text", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -243,38 +253,77 @@ class FloatingMicService : Service() {
         windowManager.addView(view, params)
     }
 
-    private fun renderInlineText() {
-        val combined = committedText.toString().trim()
-        if (combined == lastRenderedInserted || combined.isEmpty()) return
-        lastRenderedInserted = combined
-
-        val needLeadingSpace = sessionBeforeCursor.isNotEmpty() && !sessionBeforeCursor.endsWith(" ") && !sessionBeforeCursor.endsWith("\n")
-        val needTrailingSpace = sessionAfterCursor.isNotEmpty() && !sessionAfterCursor.startsWith(" ") && !sessionAfterCursor.startsWith("\n")
-        val mid = buildString {
-            if (needLeadingSpace) append(" ")
-            append(combined)
-            if (needTrailingSpace) append(" ")
-        }
-        val full = sessionBeforeCursor + mid + sessionAfterCursor
-        val cursorEnd = sessionBeforeCursor.length + (if (needLeadingSpace) 1 else 0) + combined.length
+    /** Inserts each spoken phrase at the LIVE cursor, and handles hands-free "undo that" / "delete last". */
+    private fun appendPhraseAtLiveCursor(phrase: String) {
+        val rawClean = phrase.trim()
+        if (rawClean.isEmpty()) return
         mainHandler.post {
-            DictationAccessibilityService.instance?.setFullTextWithCursor(full, cursorEnd)
+            resetIdleSleepTimer()
+            val svc = DictationAccessibilityService.instance ?: return@post
+            val ctx = svc.getCursorContext() ?: return@post
+            val before = ctx.first
+            val after = ctx.second
+
+            val lowerCmd = rawClean.lowercase().trimEnd('.', ',', '!', '?')
+            if (lowerCmd == "undo that" || lowerCmd == "delete last" || lowerCmd == "undo last") {
+                if (lastPhraseInserted.isNotEmpty() && before.endsWith(lastPhraseInserted)) {
+                    val newBefore = before.substring(0, before.length - lastPhraseInserted.length).trimEnd()
+                    val full = newBefore + after
+                    svc.setFullTextWithCursor(full, newBefore.length)
+                    lastPhraseInserted = ""
+                    buzz(25L)
+                }
+                return@post
+            }
+
+            val trimmedBefore = before.trimEnd()
+            val atSentenceStart = trimmedBefore.isEmpty() ||
+                trimmedBefore.endsWith(".") ||
+                trimmedBefore.endsWith("।") ||
+                trimmedBefore.endsWith("?") ||
+                trimmedBefore.endsWith("!") ||
+                before.endsWith("\n")
+
+            val formatted = if (atSentenceStart && rawClean[0] in 'a'..'z') {
+                rawClean[0].uppercaseChar() + rawClean.substring(1)
+            } else {
+                rawClean
+            }
+
+            val startsWithPunct = formatted[0] in listOf('.', '।', ',', '?', '!', '\n')
+            val needLeadingSpace = !startsWithPunct &&
+                before.isNotEmpty() &&
+                !before.endsWith(" ") &&
+                !before.endsWith("\n")
+            val needTrailingSpace = after.isNotEmpty() &&
+                !after.startsWith(" ") &&
+                !after.startsWith("\n")
+
+            val mid = buildString {
+                if (needLeadingSpace) append(" ")
+                append(formatted)
+                if (needTrailingSpace) append(" ")
+            }
+            val full = before + mid + after
+            val cursorEnd = before.length + (if (needLeadingSpace) 1 else 0) + formatted.length
+            lastPhraseInserted = formatted
+            svc.setFullTextWithCursor(full, cursorEnd)
         }
     }
 
     private fun startContinuousDictation() {
+        resetIdleSleepTimer()
         val ctx = DictationAccessibilityService.instance?.getCursorContext()
-        sessionBeforeCursor = ctx?.first ?: ""
-        sessionAfterCursor = ctx?.second ?: ""
-        lastUndoFullText = sessionBeforeCursor + sessionAfterCursor
-        lastUndoCursor = sessionBeforeCursor.length
-        committedText.clear()
-        lastRenderedInserted = ""
+        val before = ctx?.first ?: ""
+        val after = ctx?.second ?: ""
+        lastUndoFullText = before + after
+        lastUndoCursor = before.length
+        lastPhraseInserted = ""
 
         val selected = Prefs.getEngine(this)
         val resolvedRes = OfflineAsrEngines.resolveEngine(this, selected)
         if (resolvedRes.isFailure) {
-            Toast.makeText(this, resolvedRes.exceptionOrNull()?.message ?: "Download Hinglish or Odia pack first", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, resolvedRes.exceptionOrNull()?.message ?: "Download Hinglish Apex or Odia pack first", Toast.LENGTH_LONG).show()
             return
         }
         val resolved = resolvedRes.getOrThrow()
@@ -305,15 +354,14 @@ class FloatingMicService : Service() {
                             .onSuccess { polished -> if (polished.isNotBlank()) finalOut = polished }
                     }
                     if (finalOut.isNotBlank()) {
-                        if (committedText.isNotEmpty()) committedText.append(" ")
-                        committedText.append(finalOut)
-                        renderInlineText()
+                        appendPhraseAtLiveCursor(finalOut)
                     }
                 }
             }
             withContext(Dispatchers.Main) {
                 isProcessing = false
                 setMicUiState(MicUiState.IDLE)
+                resetIdleSleepTimer()
             }
         }
 
@@ -423,9 +471,7 @@ class FloatingMicService : Service() {
                 isProcessing = false
                 setMicUiState(MicUiState.IDLE)
                 if (finalOut.isNotBlank()) {
-                    committedText.clear()
-                    committedText.append(finalOut)
-                    renderInlineText()
+                    appendPhraseAtLiveCursor(finalOut)
                 }
             }.onFailure { err ->
                 isProcessing = false
@@ -436,12 +482,14 @@ class FloatingMicService : Service() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(idleSleepRunnable)
         DictationAccessibilityService.onEditableFocusChanged = null
         isListening.set(false)
         liveLoopJob?.cancel()
         vadConsumerJob?.cancel()
         fallbackRecorder.stopRecording()
         floatingView?.let { windowManager.removeView(it) }
+        SherpaOnnxEngine.releaseRecognizer()
         serviceScope.cancel()
         super.onDestroy()
     }

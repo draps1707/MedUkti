@@ -43,13 +43,6 @@
             android:text="Download Hinglish Apex (~1.03 GB - Best Quality)" />
 
         <Button
-            android:id="@+id/btnDlWhisperSwift"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Download Hinglish Swift (~152 MB - Fast)" />
-
-        <Button
             android:id="@+id/btnDlIndicOr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -62,6 +55,22 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="Compare Hinglish &amp; Odia (Lab)" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Personal Dictionary (one per line: wrong = right)"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/etPersonalDict"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top|start"
+            android:hint="Example:\nsubhu = Subhu\naau kana = ଆଉ କଣ"
+            android:inputType="textMultiLine"
+            android:minLines="3" />
 
         <CheckBox
             android:id="@+id/cbGeminiOptional"

@@ -52,24 +52,6 @@ object ModelDownloader {
         "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-apex/tokens.txt"
     )
 
-    val WHISPER_SWIFT_ENC = ModelArtifact(
-        "whisper_swift_enc",
-        "hinglish-swift-encoder.int8.onnx",
-        "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-swift/encoder.int8.onnx"
-    )
-
-    val WHISPER_SWIFT_DEC = ModelArtifact(
-        "whisper_swift_dec",
-        "hinglish-swift-decoder.int8.onnx",
-        "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-swift/decoder.int8.onnx"
-    )
-
-    val WHISPER_SWIFT_TOKENS = ModelArtifact(
-        "whisper_swift_tok",
-        "hinglish-swift-tokens.txt",
-        "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-swift/tokens.txt"
-    )
-
     fun modelsDir(ctx: Context): File = File(ctx.filesDir, "models").apply { mkdirs() }
 
     fun getFile(ctx: Context, artifact: ModelArtifact): File = File(modelsDir(ctx), artifact.fileName)
@@ -84,13 +66,24 @@ object ModelDownloader {
             isInstalled(ctx, WHISPER_APEX_DEC) &&
             isInstalled(ctx, WHISPER_APEX_TOKENS)
 
-    fun isWhisperSwiftInstalled(ctx: Context): Boolean =
-        isInstalled(ctx, WHISPER_SWIFT_ENC) &&
-            isInstalled(ctx, WHISPER_SWIFT_DEC) &&
-            isInstalled(ctx, WHISPER_SWIFT_TOKENS)
-
     fun isOdiaInstalled(ctx: Context): Boolean =
         isInstalled(ctx, INDIC_OR) && isInstalled(ctx, INDIC_TOKENS)
+
+    fun cleanupUnusedModels(ctx: Context) {
+        val keep = setOf(
+            SILERO_VAD.fileName,
+            INDIC_TOKENS.fileName,
+            INDIC_OR.fileName,
+            WHISPER_APEX_ENC.fileName,
+            WHISPER_APEX_DEC.fileName,
+            WHISPER_APEX_TOKENS.fileName
+        )
+        modelsDir(ctx).listFiles()?.forEach { f ->
+            if (f.name !in keep && !f.name.endsWith(".tmp")) {
+                f.delete()
+            }
+        }
+    }
 
     private fun openWithRedirects(startUrl: String): HttpURLConnection {
         var current = startUrl

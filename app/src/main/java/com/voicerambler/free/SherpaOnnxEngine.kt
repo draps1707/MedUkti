@@ -11,6 +11,7 @@ import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.File
+import java.text.Normalizer
 import kotlin.math.sqrt
 
 object SherpaOnnxEngine {
@@ -19,6 +20,16 @@ object SherpaOnnxEngine {
     private var recognizer: OfflineRecognizer? = null
     private var vad: Vad? = null
 
+    @Synchronized
+    fun releaseRecognizer() {
+        try {
+            recognizer?.release()
+        } catch (_: Exception) {
+        }
+        recognizer = null
+        cachedEngineType = null
+    }
+
     private fun normalizeGainAndPad(samples: FloatArray): FloatArray {
         if (samples.isEmpty()) return samples
         var sumSq = 0.0
@@ -26,7 +37,7 @@ object SherpaOnnxEngine {
         val rms = sqrt(sumSq / samples.size).toFloat()
         val gain = if (rms in 0.002f..0.08f) (0.08f / rms).coerceAtMost(6.0f) else 1.0f
 
-        val padSamples = 4800 // 0.3s trailing silence so final syllable isn't clipped
+        val padSamples = 4800 // 0.3s trailing silence
         val out = FloatArray(samples.size + padSamples)
         for (i in samples.indices) {
             out[i] = (samples[i] * gain).coerceIn(-0.95f, 0.95f)
@@ -34,16 +45,75 @@ object SherpaOnnxEngine {
         return out
     }
 
-    private fun cleanTranscript(raw: String): String {
-        var text = raw.trim()
+    private val EMOJI_MAP = linkedMapOf(
+        "laughing emoji" to "😂",
+        "smile emoji" to "😊",
+        "smiling emoji" to "😊",
+        "thumbs up" to "👍",
+        "heart emoji" to "❤️",
+        "love emoji" to "❤️",
+        "namaste emoji" to "🙏",
+        "folded hands" to "🙏",
+        "sad emoji" to "😢",
+        "crying emoji" to "😭",
+        "fire emoji" to "🔥",
+        "clap emoji" to "👏",
+        "ok emoji" to "👌"
+    )
+
+    fun postProcessTranscript(ctx: Context, raw: String, engine: AsrEngineType): String {
+        var text = Normalizer.normalize(raw.trim(), Normalizer.Form.NFC)
         if (text.isEmpty()) return ""
+
+        // Strip Whisper noise/hallucination artifacts & 3x+ repetitions
         text = text
             .replace(Regex("\\[(?:BLANK_AUDIO|unintelligible|unk|noise|silence|inaudible)\\]", RegexOption.IGNORE_CASE), "")
             .replace(Regex("(?i)\\b(?:thanks for watching|thank you for watching|subscribe to my channel)\\b[.!]*"), "")
             .replace(Regex("\\b(\\w+)(?:\\s+\\1){2,}\\b", RegexOption.IGNORE_CASE), "$1")
-            .replace(Regex("\\s{2,}"), " ")
-            .trim()
-        return text
+
+        // Strip standalone hesitation fillers
+        text = text.replace(Regex("(?i)\\b(?:umm+|uhh+|err+m*|ahh+)\\b[,\\s]*"), " ")
+
+        // Self-correction: "wait no <new>" or "sorry i mean <new>"
+        val selfCorr = Regex("(?i).*?\\b(?:wait no|sorry i mean|i mean)\\b[,\\s]+(.+)$").find(text)
+        if (selfCorr != null) {
+            text = selfCorr.groupValues[1].trim()
+        }
+
+        // Paragraph, bullet, and punctuation voice commands
+        val fullStopChar = if (engine == AsrEngineType.INDIC_CONFORMER_OR) "।" else "."
+        text = text
+            .replace(Regex("\\s*\\bnew paragraph\\b\\s*", RegexOption.IGNORE_CASE), "\n\n")
+            .replace(Regex("\\s*\\bnew line\\b\\s*", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("\\s*\\b(?:bullet point|next point)\\b\\s*", RegexOption.IGNORE_CASE), "\n• ")
+            .replace(Regex("\\s*\\b(?:full stop|purna chheda)\\b[.!]*", RegexOption.IGNORE_CASE), fullStopChar)
+            .replace(Regex("\\s*\\bquestion mark\\b[.?]*", RegexOption.IGNORE_CASE), "?")
+            .replace(Regex("\\s*\\bcomma\\b,*", RegexOption.IGNORE_CASE), ",")
+
+        // Voice emoji shortcuts
+        for ((phrase, emoji) in EMOJI_MAP) {
+            text = text.replace(Regex("\\b${Regex.escape(phrase)}\\b", RegexOption.IGNORE_CASE), emoji)
+        }
+
+        // Personal dictionary replacements (wrong = right, one per line)
+        val dictRaw = Prefs.getPersonalDict(ctx)
+        if (dictRaw.isNotBlank()) {
+            for (line in dictRaw.lines()) {
+                val idx = line.indexOf('=')
+                if (idx > 0) {
+                    val wrong = line.substring(0, idx).trim()
+                    val right = line.substring(idx + 1).trim()
+                    if (wrong.isNotEmpty() && right.isNotEmpty()) {
+                        text = text.replace(Regex(Regex.escape(wrong), RegexOption.IGNORE_CASE), Regex.escapeReplacement(right))
+                    }
+                }
+            }
+        }
+
+        return Normalizer.normalize(
+            text.replace(Regex("[ \\t]{2,}"), " ").trim(),
+            Normalizer.Form.NFC
+        )
     }
 
     fun readWavAsFloats(wavFile: File): FloatArray {
@@ -150,25 +220,6 @@ object SherpaOnnxEngine {
                     debug = false
                 )
             }
-            AsrEngineType.WHISPER_HINGLISH_SWIFT -> {
-                val enc = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_SWIFT_ENC)
-                val dec = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_SWIFT_DEC)
-                val tok = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_SWIFT_TOKENS)
-                if (!enc.exists() || !dec.exists() || !tok.exists()) {
-                    throw IllegalStateException("Download Hinglish Swift Pack first")
-                }
-                OfflineModelConfig(
-                    whisper = OfflineWhisperModelConfig(
-                        encoder = enc.absolutePath,
-                        decoder = dec.absolutePath,
-                        language = "en",
-                        task = "transcribe"
-                    ),
-                    tokens = tok.absolutePath,
-                    numThreads = 4,
-                    debug = false
-                )
-            }
             else -> throw IllegalArgumentException("Unsupported sherpa-onnx engine: $engine")
         }
 
@@ -200,7 +251,7 @@ object SherpaOnnxEngine {
             val stream = rec.createStream()
             stream.acceptWaveform(boosted, 16000)
             rec.decode(stream)
-            val text = cleanTranscript(rec.getResult(stream).text)
+            val text = postProcessTranscript(ctx, rec.getResult(stream).text, engine)
             stream.release()
             Result.success(text)
         } catch (e: Exception) {
@@ -225,7 +276,7 @@ object SherpaOnnxEngine {
                 val stream = rec.createStream()
                 stream.acceptWaveform(boosted, 16000)
                 rec.decode(stream)
-                val text = cleanTranscript(rec.getResult(stream).text)
+                val text = postProcessTranscript(ctx, rec.getResult(stream).text, engine)
                 stream.release()
                 if (text.isNotEmpty()) {
                     if (sb.isNotEmpty()) sb.append(" ")

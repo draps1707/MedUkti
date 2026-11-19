@@ -11,17 +11,8 @@ object OfflineAsrEngines {
     fun resolveEngine(ctx: Context, engine: AsrEngineType): Result<AsrEngineType> {
         return when (engine) {
             AsrEngineType.WHISPER_HINGLISH_APEX -> {
-                if (ModelDownloader.isWhisperApexInstalled(ctx)) {
-                    Result.success(engine)
-                } else if (ModelDownloader.isWhisperSwiftInstalled(ctx)) {
-                    Result.success(AsrEngineType.WHISPER_HINGLISH_SWIFT)
-                } else {
-                    Result.failure(Exception("Download Hinglish Apex or Swift Pack first"))
-                }
-            }
-            AsrEngineType.WHISPER_HINGLISH_SWIFT -> {
-                if (ModelDownloader.isWhisperSwiftInstalled(ctx)) Result.success(engine)
-                else Result.failure(Exception("Download Hinglish Swift Pack first"))
+                if (ModelDownloader.isWhisperApexInstalled(ctx)) Result.success(engine)
+                else Result.failure(Exception("Download Hinglish Apex Pack first"))
             }
             AsrEngineType.INDIC_CONFORMER_OR -> {
                 if (ModelDownloader.isOdiaInstalled(ctx)) Result.success(engine)
@@ -47,7 +38,6 @@ object OfflineAsrEngines {
         val resolved = resolveEngine(ctx, engine).getOrElse { return@withContext Result.failure(it) }
         when (resolved) {
             AsrEngineType.WHISPER_HINGLISH_APEX,
-            AsrEngineType.WHISPER_HINGLISH_SWIFT,
             AsrEngineType.INDIC_CONFORMER_OR -> SherpaOnnxEngine.transcribeSamples(ctx, resolved, samples)
             AsrEngineType.GEMINI_CLOUD -> {
                 val key = Prefs.getApiKey(ctx)
@@ -68,7 +58,6 @@ object OfflineAsrEngines {
         val resolved = resolveEngine(ctx, engine).getOrElse { return@withContext Result.failure(it) }
         when (resolved) {
             AsrEngineType.WHISPER_HINGLISH_APEX,
-            AsrEngineType.WHISPER_HINGLISH_SWIFT,
             AsrEngineType.INDIC_CONFORMER_OR -> SherpaOnnxEngine.transcribe(ctx, resolved, wavFile)
             AsrEngineType.GEMINI_CLOUD -> GeminiClient.transcribeWav(Prefs.getApiKey(ctx), Prefs.getModel(ctx), wavFile)
         }

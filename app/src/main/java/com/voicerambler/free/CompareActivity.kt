@@ -51,11 +51,6 @@ class CompareActivity : AppCompatActivity() {
                     apex.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
                     out.appendLine()
 
-                    val swift = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_SWIFT, wav)
-                    out.appendLine("=== Hinglish Swift ===")
-                    swift.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
-                    out.appendLine()
-
                     val indicOr = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIC_CONFORMER_OR, wav)
                     out.appendLine("=== Odia (IndicConformer 600M) ===")
                     indicOr.onSuccess { out.appendLine(it) }.onFailure { out.appendLine("Skipped: ${it.message}") }
