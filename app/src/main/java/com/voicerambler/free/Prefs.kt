@@ -21,9 +21,9 @@ object Prefs {
 
     fun getEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_ENGINE, AsrEngineType.DUAL_PARAKEET_110M_MEDASR.name)
+            .getString(KEY_ENGINE, AsrEngineType.DUAL_PARAKEET_06B_MEDASR.name)
         return AsrEngineType.entries.firstOrNull { it.name == raw }
-            ?: AsrEngineType.DUAL_PARAKEET_110M_MEDASR
+            ?: AsrEngineType.DUAL_PARAKEET_06B_MEDASR
     }
 
     fun setEngine(ctx: Context, engine: AsrEngineType) {
@@ -37,12 +37,12 @@ object Prefs {
 
     fun getMedEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_MED_ENGINE, AsrEngineType.DUAL_PARAKEET_110M_MEDASR.name)
+            .getString(KEY_MED_ENGINE, AsrEngineType.DUAL_PARAKEET_06B_MEDASR.name)
         val parsed = AsrEngineType.entries.firstOrNull { it.name == raw }
         return if (parsed != null && parsed != AsrEngineType.INDIC_CONFORMER_OR) {
             parsed
         } else {
-            AsrEngineType.DUAL_PARAKEET_110M_MEDASR
+            AsrEngineType.DUAL_PARAKEET_06B_MEDASR
         }
     }
 

@@ -62,6 +62,17 @@ object MedicalNormalizer {
         "para sitamol" to "Paracetamol",
         "paracitamol" to "Paracetamol",
         "para cetamol" to "Paracetamol",
+        "dapaglyplogen" to "Dapagliflozin",
+        "dapaglyphrogen" to "Dapagliflozin",
+        "tapagliprogene" to "Dapagliflozin",
+        "pagluprogen" to "Dapagliflozin",
+        "semaglott" to "Semaglutide",
+        "proclor peragin" to "Prochlorperazine",
+        "chlorperagine" to "Chlorpromazine",
+        "clover sol" to "Clobetasol",
+        "rectal sheets" to "rectus sheath",
+        "rectus seath" to "rectus sheath",
+        "rectus sheet" to "rectus sheath",
         "tapa glyphlogin" to "Dapagliflozin",
         "tapa gliflozin" to "Dapagliflozin",
         "dapa gliflozin" to "Dapagliflozin",
@@ -402,6 +413,11 @@ object MedicalNormalizer {
             return out.joinToString(" ").replace(Regex("\\s{2,}"), " ").trim()
         }
 
+        // Split glued "tablet..." prefixes (e.g. "Tabletapagliprogene" -> "Tab. Dapagliflozin")
+        text = text.replace(Regex("(?i)\\btablet([a-z]{6,})\\b")) { m ->
+            "Tab. " + m.groupValues[1]
+        }
+
         for ((regex, replacement) in multiWordRules) {
             if (regex.containsMatchIn(text)) {
                 text = regex.replace(text, replacement)
@@ -467,6 +483,7 @@ object MedicalNormalizer {
                     out.add(exact + punct1)
                 } else {
                     val fuzzy = fuzzyLookup(low1)
+                        ?: (if (low1.length >= 9) skeletonMap[englishSkeleton(low1)] else null)
                     out.add((fuzzy ?: clean1) + punct1)
                 }
             }
@@ -504,6 +521,13 @@ object MedicalNormalizer {
         // SpO2 98 percent -> SpO2 98%
         t = t.replace(Regex("(?i)\\bspo2\\s+(\\d{2,3})\\s+percent\\b"), "SpO2 $1%")
         t = t.replace(Regex("(?i)(\\d{1,3}(?:\\.\\d+)?)\\s+percent\\b"), "$1%")
+        // Fix common Rx mishearings
+        t = t.replace(Regex("(?i)\\b(?:one|1)\\s+tub\\b"), "1 tab")
+        t = t.replace(Regex("(?i)\\btub\\s+(od|bd|tds|qid)\\b")) { m -> "tab " + m.groupValues[1].uppercase() }
+        t = t.replace(Regex("(?i)\\bb\\s+d\\b"), "BD")
+        t = t.replace(Regex("(?i)\\bo\\s+d\\b"), "OD")
+        t = t.replace(Regex("(?i)\\bt\\s+d\\s+s\\b"), "TDS")
+        t = t.replace(Regex("(?i)\\b(?:vanampyl|one ample|1 ample)\\b"), "1 ampoule")
         // Rx prefixes before drug/word
         t = t.replace(Regex("(?i)\\b(?:tab|tablet)\\s+(?=[A-Za-z])"), "Tab. ")
         t = t.replace(Regex("(?i)\\b(?:inj|injection)\\s+(?=[A-Za-z])"), "Inj. ")
@@ -564,7 +588,8 @@ object MedicalNormalizer {
 
             var bestIdx = -1
             var bestSpan = 1
-            var bestDist = 2
+            val maxAllowed = if (targetSkel.length >= 6) 2 else 1
+            var bestDist = maxAllowed + 1
 
             for (i in pWords.indices) {
                 for (span in 1..3) {
@@ -575,7 +600,7 @@ object MedicalNormalizer {
                     val joined = slice.joinToString("")
                     if (joined.length < 4) continue
                     val sk = englishSkeleton(joined)
-                    val d = levenshtein(sk, targetSkel, 1)
+                    val d = levenshtein(sk, targetSkel, maxAllowed)
                     if (d < bestDist) {
                         bestDist = d
                         bestIdx = i

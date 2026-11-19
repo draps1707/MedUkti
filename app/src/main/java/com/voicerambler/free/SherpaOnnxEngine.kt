@@ -97,7 +97,10 @@ object SherpaOnnxEngine {
         if (text.isEmpty()) return ""
 
         text = text
-            .replace(Regex("\\[(?:BLANK_AUDIO|unintelligible|unk|noise|silence|inaudible)\\]", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\[[^\\]]*\\]"), " ")
+            .replace(Regex("\\{[^}]*\\}"), " ")
+            .replace(Regex("\\bAIName\\]?\\s*", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("\\s*[\\]\\}]\\s*"), " ")
             .replace(Regex("\\b(\\w+)(?:\\s+\\1){2,}\\b", RegexOption.IGNORE_CASE), "$1")
 
         text = text.replace(Regex("(?i)\\b(?:umm+|uhh+|err+m*|ahh+)\\b[,\\s]*"), " ")
