@@ -2,14 +2,16 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#121417"
+    android:background="#0F1115"
     android:orientation="vertical"
-    android:padding="8dp">
+    android:paddingHorizontal="8dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="6dp">
 
-    <!-- Top Toolbar: Mode Toggle, Status, Drawers, Settings -->
+    <!-- Top Toolbar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="38dp"
+        android:layout_height="36dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -17,9 +19,9 @@
             android:id="@+id/btnModeToggle"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:background="#1E88E5"
+            android:background="@drawable/bg_key_accent"
             android:gravity="center"
-            android:paddingHorizontal="12dp"
+            android:paddingHorizontal="14dp"
             android:text="MED"
             android:textColor="#FFFFFF"
             android:textSize="12sp"
@@ -29,12 +31,12 @@
             android:id="@+id/tvImeStatus"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="10dp"
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
-            android:text="Tap mic to speak"
-            android:textColor="#B0BEC5"
+            android:text="Ready"
+            android:textColor="#9AA0A6"
             android:textSize="12sp" />
 
         <TextView
@@ -42,11 +44,11 @@
             android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:layout_marginEnd="6dp"
-            android:background="#263238"
+            android:background="@drawable/bg_key_action"
             android:gravity="center"
-            android:paddingHorizontal="10dp"
+            android:paddingHorizontal="12dp"
             android:text="Rx"
-            android:textColor="#FFFFFF"
+            android:textColor="#8AB4F8"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -55,11 +57,11 @@
             android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:layout_marginEnd="6dp"
-            android:background="#263238"
+            android:background="@drawable/bg_key_action"
             android:gravity="center"
-            android:paddingHorizontal="10dp"
+            android:paddingHorizontal="11dp"
             android:text="123"
-            android:textColor="#FFFFFF"
+            android:textColor="#E8EAED"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -68,29 +70,30 @@
             android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:layout_marginEnd="6dp"
-            android:background="#263238"
+            android:background="@drawable/bg_key_action"
             android:gravity="center"
-            android:paddingHorizontal="10dp"
+            android:paddingHorizontal="11dp"
             android:text="Recent"
-            android:textColor="#FFFFFF"
+            android:textColor="#E8EAED"
             android:textSize="12sp" />
 
         <TextView
             android:id="@+id/btnOpenSettings"
-            android:layout_width="32dp"
+            android:layout_width="34dp"
             android:layout_height="32dp"
-            android:background="#263238"
+            android:background="@drawable/bg_key_action"
             android:gravity="center"
             android:text="⚙"
-            android:textColor="#FFFFFF"
+            android:textColor="#E8EAED"
             android:textSize="15sp" />
     </LinearLayout>
 
-    <!-- Context-Aware Quick Shortcut Chips -->
+    <!-- Shortcut Chips -->
     <HorizontalScrollView
         android:layout_width="match_parent"
-        android:layout_height="38dp"
+        android:layout_height="36dp"
         android:layout_marginTop="6dp"
+        android:overScrollMode="never"
         android:scrollbars="none">
 
         <LinearLayout
@@ -101,13 +104,13 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
-    <!-- Center Dynamic Panel (Voice / Rx Snippets / Numpad / Recent) -->
+    <!-- Center Dynamic Panel -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="146dp"
+        android:layout_height="108dp"
         android:layout_marginTop="6dp">
 
-        <!-- 1. Voice Panel -->
+        <!-- 1. Sleek 120Hz Voice Pill (No Ring) -->
         <LinearLayout
             android:id="@+id/panelVoice"
             android:layout_width="match_parent"
@@ -115,21 +118,33 @@
             android:gravity="center"
             android:orientation="vertical">
 
-            <FrameLayout
+            <LinearLayout
                 android:id="@+id/micRingContainer"
-                android:layout_width="86dp"
-                android:layout_height="86dp"
-                android:background="@drawable/bg_mic_ring">
+                android:layout_width="210dp"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_mic_pill_idle"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingHorizontal="18dp">
 
                 <ImageView
                     android:id="@+id/ivKeyboardMic"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:layout_gravity="center"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:contentDescription="Speak"
                     android:src="@android:drawable/ic_btn_speak_now"
                     android:tint="#FFFFFF" />
-            </FrameLayout>
+
+                <TextView
+                    android:id="@+id/tvMicPillLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:text="Tap to Speak"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tvVoiceHint"
@@ -137,7 +152,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="MedUkti • 100% Offline"
-                android:textColor="#90A4AE"
+                android:textColor="#80868B"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -153,12 +168,12 @@
                 android:id="@+id/etSnippetSearch"
                 android:layout_width="match_parent"
                 android:layout_height="34dp"
-                android:background="#1E242B"
+                android:background="@drawable/bg_key_dark"
                 android:hint="Search Rx snippets / templates..."
-                android:paddingHorizontal="10dp"
+                android:paddingHorizontal="12dp"
                 android:singleLine="true"
                 android:textColor="#FFFFFF"
-                android:textColorHint="#78909C"
+                android:textColorHint="#80868B"
                 android:textSize="12sp" />
 
             <ScrollView
@@ -187,21 +202,21 @@
             <LinearLayout
                 android:id="@+id/numRow1"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="33dp"
                 android:orientation="horizontal" />
 
             <LinearLayout
                 android:id="@+id/numRow2"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="4dp"
+                android:layout_height="33dp"
+                android:layout_marginTop="3dp"
                 android:orientation="horizontal" />
 
             <LinearLayout
                 android:id="@+id/numRow3"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="4dp"
+                android:layout_height="33dp"
+                android:layout_marginTop="3dp"
                 android:orientation="horizontal" />
         </LinearLayout>
 
@@ -220,7 +235,7 @@
         </ScrollView>
     </FrameLayout>
 
-    <!-- Fixed Bottom Bar (Gboard / Samsung style) -->
+    <!-- Fixed Bottom Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="44dp"
@@ -231,8 +246,8 @@
         <TextView
             android:id="@+id/keySwitchKb"
             android:layout_width="46dp"
-            android:layout_height="40dp"
-            android:background="#263238"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_key_action"
             android:gravity="center"
             android:text="🌐"
             android:textSize="16sp" />
@@ -240,66 +255,66 @@
         <TextView
             android:id="@+id/keyComma"
             android:layout_width="38dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="4dp"
-            android:background="#1E242B"
+            android:layout_height="42dp"
+            android:layout_marginStart="5dp"
+            android:background="@drawable/bg_key_dark"
             android:gravity="center"
             android:text=","
-            android:textColor="#FFFFFF"
+            android:textColor="#E8EAED"
             android:textSize="16sp" />
 
         <TextView
             android:id="@+id/keySpace"
             android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="4dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="5dp"
             android:layout_weight="1"
-            android:background="#1E242B"
+            android:background="@drawable/bg_key_dark"
             android:gravity="center"
-            android:text="Space"
-            android:textColor="#B0BEC5"
+            android:text="MedUkti"
+            android:textColor="#9AA0A6"
             android:textSize="13sp" />
 
         <TextView
             android:id="@+id/keyPeriod"
             android:layout_width="38dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="4dp"
-            android:background="#1E242B"
+            android:layout_height="42dp"
+            android:layout_marginStart="5dp"
+            android:background="@drawable/bg_key_dark"
             android:gravity="center"
             android:text="."
-            android:textColor="#FFFFFF"
+            android:textColor="#E8EAED"
             android:textSize="16sp" />
 
         <TextView
             android:id="@+id/keyUndo"
             android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="4dp"
-            android:background="#263238"
+            android:layout_height="42dp"
+            android:layout_marginStart="5dp"
+            android:background="@drawable/bg_key_action"
             android:gravity="center"
             android:text="Undo"
-            android:textColor="#FFCC80"
+            android:textColor="#FDD663"
             android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/keyBackspace"
             android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="4dp"
-            android:background="#263238"
+            android:layout_height="42dp"
+            android:layout_marginStart="5dp"
+            android:background="@drawable/bg_key_action"
             android:gravity="center"
             android:text="⌫"
-            android:textColor="#FFFFFF"
+            android:textColor="#E8EAED"
             android:textSize="16sp" />
 
         <TextView
             android:id="@+id/keyEnter"
             android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="4dp"
-            android:background="#1E88E5"
+            android:layout_height="42dp"
+            android:layout_marginStart="5dp"
+            android:background="@drawable/bg_key_accent"
             android:gravity="center"
             android:text="↵"
             android:textColor="#FFFFFF"

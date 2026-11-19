@@ -83,6 +83,18 @@ class MainActivity : AppCompatActivity() {
             importSnippetsLauncher.launch(arrayOf("text/plain", "text/csv", "text/*"))
         }
 
+        findViewById<Button>(R.id.btnDlStreamingDraft).setOnClickListener {
+            downloadBatch(
+                listOf(
+                    ModelDownloader.SILERO_VAD,
+                    ModelDownloader.STREAMING_ZIP_TOKENS,
+                    ModelDownloader.STREAMING_ZIP_ENC,
+                    ModelDownloader.STREAMING_ZIP_DEC,
+                    ModelDownloader.STREAMING_ZIP_JOINER
+                ),
+                "Live Streaming Draft"
+            )
+        }
         findViewById<Button>(R.id.btnDlMedAsr).setOnClickListener {
             downloadBatch(
                 listOf(ModelDownloader.SILERO_VAD, ModelDownloader.MEDASR_TOKENS, ModelDownloader.MEDASR_MODEL),
@@ -183,6 +195,7 @@ class MainActivity : AppCompatActivity() {
         val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val imeOk = isImeEnabled()
         val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
+        val streamOk = ModelDownloader.isStreamingZipformerInstalled(this)
         val medOk = ModelDownloader.isMedAsrInstalled(this)
         val p110Ok = ModelDownloader.isParakeet110mInstalled(this)
         val p06bOk = ModelDownloader.isParakeet06bInstalled(this)
@@ -193,6 +206,7 @@ class MainActivity : AppCompatActivity() {
             appendLine("Active Mode: ${Prefs.getEngine(this@MainActivity).label}")
             appendLine("Keyboard Enabled: ${if (imeOk) "YES" else "Tap '1. Enable Keyboard'"} | Mic: ${if (micOk) "OK" else "Needed"}")
             appendLine("Loaded Snippets: ${Prefs.getSnippets(this@MainActivity).size}")
+            appendLine("Live Streaming Draft (MED): ${if (streamOk) "Installed" else "Not downloaded"}")
             appendLine("Google MedASR CTC: ${if (medOk) "Installed" else "Not downloaded"}")
             appendLine("Parakeet TDT 110M: ${if (p110Ok) "Installed" else "Not downloaded"}")
             appendLine("Parakeet TDT 0.6B v2: ${if (p06bOk) "Installed" else "Not downloaded"}")

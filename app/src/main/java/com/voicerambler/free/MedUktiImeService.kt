@@ -26,7 +26,6 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -41,7 +40,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.sqrt
 
 class MedUktiImeService : InputMethodService() {
 
@@ -59,7 +57,8 @@ class MedUktiImeService : InputMethodService() {
     private var rootView: View? = null
     private var btnModeToggle: TextView? = null
     private var tvImeStatus: TextView? = null
-    private var micRingContainer: FrameLayout? = null
+    private var micRingContainer: LinearLayout? = null
+    private var tvMicPillLabel: TextView? = null
     private var chipRow: LinearLayout? = null
     private var keyPeriod: TextView? = null
     private var panelVoice: View? = null
@@ -135,6 +134,7 @@ class MedUktiImeService : InputMethodService() {
         btnModeToggle = view.findViewById(R.id.btnModeToggle)
         tvImeStatus = view.findViewById(R.id.tvImeStatus)
         micRingContainer = view.findViewById(R.id.micRingContainer)
+        tvMicPillLabel = view.findViewById(R.id.tvMicPillLabel)
         chipRow = view.findViewById(R.id.chipRow)
         keyPeriod = view.findViewById(R.id.keyPeriod)
         panelVoice = view.findViewById(R.id.panelVoice)
@@ -293,7 +293,7 @@ class MedUktiImeService : InputMethodService() {
                 text = label
                 setTextColor(Color.WHITE)
                 textSize = 12f
-                setBackgroundColor(Color.parseColor("#263238"))
+                setBackgroundResource(R.drawable.bg_chip_pill)
                 setPadding((10 * dp).toInt(), (6 * dp).toInt(), (10 * dp).toInt(), (6 * dp).toInt())
                 val lp = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -320,7 +320,7 @@ class MedUktiImeService : InputMethodService() {
         for ((label, expansion) in items) {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor("#1E242B"))
+                setBackgroundResource(R.drawable.bg_key_dark)
                 setPadding((10 * dp).toInt(), (7 * dp).toInt(), (10 * dp).toInt(), (7 * dp).toInt())
                 val lp = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -365,7 +365,8 @@ class MedUktiImeService : InputMethodService() {
                     setTextColor(Color.WHITE)
                     textSize = 14f
                     gravity = android.view.Gravity.CENTER
-                    setBackgroundColor(Color.parseColor("#263238"))
+                    setBackgroundResource(R.drawable.bg_chip_pill)
+                    setBackgroundResource(R.drawable.bg_key_dark)
                     val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
                         marginStart = (2 * dp).toInt()
                         marginEnd = (2 * dp).toInt()
@@ -406,7 +407,7 @@ class MedUktiImeService : InputMethodService() {
                 setTextColor(Color.WHITE)
                 textSize = 12f
                 maxLines = 2
-                setBackgroundColor(Color.parseColor("#1E242B"))
+                setBackgroundResource(R.drawable.bg_key_dark)
                 setPadding((10 * dp).toInt(), (8 * dp).toInt(), (10 * dp).toInt(), (8 * dp).toInt())
                 val lp = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -437,18 +438,20 @@ class MedUktiImeService : InputMethodService() {
 
     private fun setMicUiState(state: MicUiState) {
         val res = when (state) {
-            MicUiState.IDLE -> R.drawable.bg_mic_ring
-            MicUiState.LISTENING -> R.drawable.bg_mic_ring_active
-            MicUiState.POLISHING -> R.drawable.bg_mic_ring_polishing
+            MicUiState.IDLE -> R.drawable.bg_mic_pill_idle
+            MicUiState.LISTENING -> R.drawable.bg_mic_pill_active
+            MicUiState.POLISHING -> R.drawable.bg_mic_pill_polishing
         }
         micRingContainer?.setBackgroundResource(res)
-        if (state != MicUiState.LISTENING) {
-            micRingContainer?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(120)?.start()
+        tvMicPillLabel?.text = when (state) {
+            MicUiState.IDLE -> "Tap to Speak"
+            MicUiState.LISTENING -> "Listening... (Tap to Stop)"
+            MicUiState.POLISHING -> "Finishing..."
         }
         tvImeStatus?.text = when (state) {
-            MicUiState.IDLE -> "Tap mic to speak"
+            MicUiState.IDLE -> "Ready"
             MicUiState.LISTENING -> "Listening..."
-            MicUiState.POLISHING -> "Finishing..."
+            MicUiState.POLISHING -> "Finalizing..."
         }
     }
 
@@ -556,6 +559,10 @@ class MedUktiImeService : InputMethodService() {
         setMicUiState(MicUiState.LISTENING)
         val segmentChannel = Channel<FloatArray>(Channel.UNLIMITED)
 
+        val useStreamingDraft = !Prefs.isOdiaEngine(resolved) && ModelDownloader.isStreamingZipformerInstalled(this)
+        var streamObj = if (useStreamingDraft) StreamingZipformerEngine.createStream(this) else null
+        val streamLock = Any()
+
         vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
             try {
                 for (seg in segmentChannel) {
@@ -564,11 +571,20 @@ class MedUktiImeService : InputMethodService() {
                         val finalOut = raw.trim()
                         if (finalOut.isNotBlank()) {
                             commitSpokenText(finalOut)
+                        } else {
+                            mainHandler.post { currentInputConnection?.finishComposingText() }
                         }
+                    }.onFailure {
+                        mainHandler.post { currentInputConnection?.finishComposingText() }
                     }
                 }
             } finally {
+                synchronized(streamLock) {
+                    try { streamObj?.release() } catch (_: Exception) {}
+                    streamObj = null
+                }
                 withContext(Dispatchers.Main + NonCancellable) {
+                    currentInputConnection?.finishComposingText()
                     mainHandler.removeCallbacks(processingWatchdog)
                     isProcessing = false
                     setMicUiState(MicUiState.IDLE)
@@ -586,8 +602,8 @@ class MedUktiImeService : InputMethodService() {
 
                 val sampleRate = 16000
                 val minBuf = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                val bufSize = maxOf(minBuf, 4096)
-                ar = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
+                val bufSize = maxOf(minBuf * 4, 16384)
+                ar = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
                 if (ar.state != AudioRecord.STATE_INITIALIZED) {
                     throw IllegalStateException("Mic failed to initialize")
                 }
@@ -597,34 +613,44 @@ class MedUktiImeService : InputMethodService() {
                 val shortBuf = ShortArray(windowSize)
                 val floatBuf = FloatArray(windowSize)
                 var frameCount = 0
+                var lastDraft = ""
 
                 while (isListening.get()) {
                     val read = ar.read(shortBuf, 0, windowSize)
                     if (read == windowSize) {
-                        var sumSq = 0.0
                         for (i in 0 until windowSize) {
-                            val f = shortBuf[i] / 32768.0f
-                            floatBuf[i] = f
-                            sumSq += f * f
+                            floatBuf[i] = shortBuf[i] / 32768.0f
                         }
-                        frameCount++
-                        if (frameCount % 3 == 0) {
-                            val rms = sqrt(sumSq / windowSize).toFloat()
-                            val scale = (1.0f + (rms * 4.0f).coerceAtMost(0.22f))
-                            mainHandler.post {
-                                if (isListening.get()) {
-                                    micRingContainer?.scaleX = scale
-                                    micRingContainer?.scaleY = scale
+                        if (useStreamingDraft) {
+                            val draftNow = synchronized(streamLock) {
+                                streamObj?.let { StreamingZipformerEngine.acceptAndDecode(it, floatBuf) } ?: ""
+                            }
+                            frameCount++
+                            if (frameCount % 5 == 0 && draftNow.isNotEmpty() && draftNow != lastDraft) {
+                                lastDraft = draftNow
+                                mainHandler.post {
+                                    if (isListening.get()) {
+                                        currentInputConnection?.setComposingText(draftNow, 1)
+                                    }
                                 }
                             }
                         }
                         vad.acceptWaveform(floatBuf)
+                        var emitted = false
                         while (!vad.empty()) {
                             val seg = vad.front()
                             if (seg.samples.isNotEmpty()) {
                                 segmentChannel.trySend(seg.samples)
+                                emitted = true
                             }
                             vad.pop()
+                        }
+                        if (emitted && useStreamingDraft) {
+                            synchronized(streamLock) {
+                                try { streamObj?.release() } catch (_: Exception) {}
+                                streamObj = StreamingZipformerEngine.createStream(this@MedUktiImeService)
+                            }
+                            lastDraft = ""
                         }
                     }
                 }

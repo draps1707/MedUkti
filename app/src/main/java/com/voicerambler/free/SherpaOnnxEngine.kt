@@ -34,6 +34,7 @@ object SherpaOnnxEngine {
         }
         recognizers.clear()
         SraVaaniEngine.release()
+        StreamingZipformerEngine.release()
     }
 
     @Synchronized
@@ -66,7 +67,7 @@ object SherpaOnnxEngine {
     private fun normalizeGainAndPad(samples: FloatArray): FloatArray {
         if (samples.isEmpty()) return samples
         val rms = computeRms(samples)
-        val gain = if (rms in 0.002f..0.08f) (0.08f / rms).coerceAtMost(6.0f) else 1.0f
+        val gain = if (rms in 0.0008f..0.08f) (0.09f / rms).coerceAtMost(10.0f) else 1.0f
 
         val leadPad = 2560  // 0.16s leading silence so soft plosives ("Pa-") aren't clipped
         val tailPad = 4800  // 0.30s trailing silence
@@ -207,9 +208,9 @@ object SherpaOnnxEngine {
             val vadConfig = VadModelConfig(
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = vadFile.absolutePath,
-                    threshold = 0.45f,
+                    threshold = 0.30f,
                     minSilenceDuration = 0.32f,
-                    minSpeechDuration = 0.18f,
+                    minSpeechDuration = 0.12f,
                     maxSpeechDuration = 6.0f,
                     windowSize = 512
                 ),
@@ -383,7 +384,7 @@ object SherpaOnnxEngine {
 
     fun transcribeSamples(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            if (samples.size < 4800 || computeRms(samples) < 0.003f) {
+            if (samples.size < 2400 || computeRms(samples) < 0.001f) {
                 return Result.success("")
             }
             val boosted = normalizeGainAndPad(samples)

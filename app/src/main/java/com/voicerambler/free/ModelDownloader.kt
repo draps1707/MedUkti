@@ -106,6 +106,30 @@ object ModelDownloader {
         "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/tokens.txt"
     )
 
+    val STREAMING_ZIP_ENC = ModelArtifact(
+        "streaming_zip_enc",
+        "streaming-zipformer-en-encoder.int8.onnx",
+        "https://huggingface.co/akm9191/sherpa-onnx-streaming-zipformer-en-int8/resolve/main/encoder.int8.onnx"
+    )
+
+    val STREAMING_ZIP_DEC = ModelArtifact(
+        "streaming_zip_dec",
+        "streaming-zipformer-en-decoder.int8.onnx",
+        "https://huggingface.co/akm9191/sherpa-onnx-streaming-zipformer-en-int8/resolve/main/decoder.int8.onnx"
+    )
+
+    val STREAMING_ZIP_JOINER = ModelArtifact(
+        "streaming_zip_joiner",
+        "streaming-zipformer-en-joiner.int8.onnx",
+        "https://huggingface.co/akm9191/sherpa-onnx-streaming-zipformer-en-int8/resolve/main/joiner.int8.onnx"
+    )
+
+    val STREAMING_ZIP_TOKENS = ModelArtifact(
+        "streaming_zip_tok",
+        "streaming-zipformer-en-tokens.txt",
+        "https://huggingface.co/akm9191/sherpa-onnx-streaming-zipformer-en-int8/resolve/main/tokens.txt"
+    )
+
     fun modelsDir(ctx: Context): File = File(ctx.filesDir, "models").apply { mkdirs() }
 
     fun getFile(ctx: Context, artifact: ModelArtifact): File = File(modelsDir(ctx), artifact.fileName)
@@ -135,6 +159,12 @@ object ModelDownloader {
             isInstalled(ctx, PARAKEET_06B_DEC) &&
             isInstalled(ctx, PARAKEET_06B_JOINER) &&
             isInstalled(ctx, PARAKEET_06B_TOKENS)
+
+    fun isStreamingZipformerInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, STREAMING_ZIP_ENC) &&
+            isInstalled(ctx, STREAMING_ZIP_DEC) &&
+            isInstalled(ctx, STREAMING_ZIP_JOINER) &&
+            isInstalled(ctx, STREAMING_ZIP_TOKENS)
 
     fun cleanupUnusedModels(ctx: Context) {
         val keep = setOf(
