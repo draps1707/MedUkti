@@ -27,6 +27,14 @@ object SherpaOnnxEngine {
     private var onlineRecognizer: OnlineRecognizer? = null
     private var vad: Vad? = null
 
+    private fun cleanRawOutput(text: String): String {
+        return text
+            .replace(Regex("\\[(?:unintelligible|unk|noise|silence|inaudible)\\]", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("<unk>", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s{2,}"), " ")
+            .trim()
+    }
+
     fun readWavAsFloats(wavFile: File): FloatArray {
         val bytes = wavFile.readBytes()
         if (bytes.size <= 44) return FloatArray(0)
@@ -54,8 +62,8 @@ object SherpaOnnxEngine {
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = vadFile.absolutePath,
                     threshold = 0.45f,
-                    minSilenceDuration = 0.45f,
-                    minSpeechDuration = 0.20f,
+                    minSilenceDuration = 0.85f,
+                    minSpeechDuration = 0.25f,
                     windowSize = 512
                 ),
                 sampleRate = 16000,
@@ -243,6 +251,25 @@ object SherpaOnnxEngine {
                     debug = false
                 )
             }
+            AsrEngineType.WHISPER_HINGLISH_APEX -> {
+                val enc = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_APEX_ENC)
+                val dec = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_APEX_DEC)
+                val tok = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_APEX_TOKENS)
+                if (!enc.exists() || !dec.exists() || !tok.exists()) {
+                    throw IllegalStateException("Download Whisper Hinglish Apex model first")
+                }
+                OfflineModelConfig(
+                    whisper = OfflineWhisperModelConfig(
+                        encoder = enc.absolutePath,
+                        decoder = dec.absolutePath,
+                        language = "en",
+                        task = "transcribe"
+                    ),
+                    tokens = tok.absolutePath,
+                    numThreads = 4,
+                    debug = false
+                )
+            }
             AsrEngineType.WHISPER_HINGLISH_SWIFT -> {
                 val enc = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_SWIFT_ENC)
                 val dec = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_SWIFT_DEC)
@@ -283,6 +310,7 @@ object SherpaOnnxEngine {
                 AsrEngineType.INDIAN_EN_STREAMING -> getOrCreateOnlineRecognizer(ctx)
                 AsrEngineType.MEDASR_EN,
                 AsrEngineType.PARAKEET_TDT_110M,
+                AsrEngineType.WHISPER_HINGLISH_APEX,
                 AsrEngineType.WHISPER_HINGLISH_SWIFT,
                 AsrEngineType.INDIC_CONFORMER_HI,
                 AsrEngineType.INDIC_CONFORMER_OR -> getOrCreateRecognizer(ctx, engine)
@@ -302,7 +330,7 @@ object SherpaOnnxEngine {
             while (rec.isReady(stream)) {
                 rec.decode(stream)
             }
-            val text = rec.getResult(stream).text.trim()
+            val text = cleanRawOutput(rec.getResult(stream).text)
             stream.release()
             Result.success(text)
         } catch (e: Exception) {
@@ -320,7 +348,7 @@ object SherpaOnnxEngine {
             val stream = rec.createStream()
             stream.acceptWaveform(samples, 16000)
             rec.decode(stream)
-            val text = rec.getResult(stream).text.trim()
+            val text = cleanRawOutput(rec.getResult(stream).text)
             stream.release()
             Result.success(text)
         } catch (e: Exception) {
@@ -348,7 +376,7 @@ object SherpaOnnxEngine {
                 val stream = rec.createStream()
                 stream.acceptWaveform(seg, 16000)
                 rec.decode(stream)
-                val text = rec.getResult(stream).text.trim()
+                val text = cleanRawOutput(rec.getResult(stream).text)
                 stream.release()
                 if (text.isNotEmpty()) {
                     if (sb.isNotEmpty()) sb.append(" ")

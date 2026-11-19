@@ -3,13 +3,14 @@ package com.voicerambler.free
 import android.content.Context
 
 enum class AsrEngineType(val label: String) {
-    AUTO_OFFLINE("Auto (Best Installed Offline Engine)"),
-    MEDASR_EN("Google MedASR Medical English + Silero VAD (Offline)"),
-    PARAKEET_TDT_110M("Parakeet TDT 110M English + Silero VAD (Offline ~136 MB)"),
-    INDIAN_EN_STREAMING("English (India) Live Streaming + Hotwords (Offline ~71 MB)"),
-    WHISPER_HINGLISH_SWIFT("Whisper Hinglish Swift + Silero VAD (Offline)"),
-    INDIC_CONFORMER_OR("AI4Bharat IndicConformer Odia + Silero VAD (Offline)"),
-    INDIC_CONFORMER_HI("AI4Bharat IndicConformer Hindi + Silero VAD (Offline)"),
+    AUTO_OFFLINE("Smart Clinical Auto (Uses Best Installed Pack)"),
+    PARAKEET_TDT_110M("Parakeet TDT 110M English (Offline ~136 MB)"),
+    WHISPER_HINGLISH_APEX("Whisper Hinglish Apex (Offline ~1.03 GB - Best Hinglish)"),
+    WHISPER_HINGLISH_SWIFT("Whisper Hinglish Swift (Offline ~152 MB)"),
+    INDIAN_EN_STREAMING("English (India) Live Streaming (Offline ~71 MB)"),
+    MEDASR_EN("Google MedASR Medical English (Offline)"),
+    INDIC_CONFORMER_OR("AI4Bharat IndicConformer Odia (Offline)"),
+    INDIC_CONFORMER_HI("AI4Bharat IndicConformer Hindi (Offline)"),
     GEMINI_CLOUD("Gemini Cloud Audio (Optional)")
 }
 

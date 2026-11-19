@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -46,16 +47,26 @@ class DictationAccessibilityService : AccessibilityService() {
         return if (focused != null && focused.isEditable) focused else null
     }
 
-    /** Returns (beforeCursor, afterCursor) so dictation never overwrites surrounding text. */
+    private fun getRealText(node: AccessibilityNodeInfo): String {
+        val isHint = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && node.isShowingHintText) ||
+            (node.hintText != null && node.text?.toString() == node.hintText?.toString())
+        return if (isHint) "" else (node.text?.toString() ?: "")
+    }
+
+    /** Returns (beforeCursor, afterCursor) without ever capturing placeholder hint text. */
     fun getCursorContext(): Pair<String, String>? {
         val node = getFreshEditableNode() ?: return null
-        val full = node.text?.toString() ?: ""
+        val full = getRealText(node)
+        if (full.isEmpty()) return Pair("", "")
         val start = node.textSelectionStart.coerceIn(0, full.length)
         val end = node.textSelectionEnd.coerceIn(start, full.length)
         return Pair(full.substring(0, start), full.substring(end))
     }
 
-    fun getActiveFieldText(): String? = getFreshEditableNode()?.text?.toString()
+    fun getActiveFieldText(): String? {
+        val node = getFreshEditableNode() ?: return null
+        return getRealText(node)
+    }
 
     fun setFullTextWithCursor(fullText: String, cursorPos: Int): Boolean {
         val node = getFreshEditableNode() ?: return false

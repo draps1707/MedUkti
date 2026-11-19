@@ -70,6 +70,14 @@ class CompareActivity : AppCompatActivity() {
                     }.onFailure { out.appendLine("Skipped: ${it.message}") }
                     out.appendLine()
 
+                    val apex = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_APEX, wav)
+                    out.appendLine("=== Whisper Hinglish Apex (~1.03 GB) ===")
+                    apex.onSuccess { raw ->
+                        out.appendLine("Raw: $raw")
+                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
+                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
+                    out.appendLine()
+
                     val swift = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_SWIFT, wav)
                     out.appendLine("=== Whisper Hinglish Swift (sherpa-onnx + VAD) ===")
                     swift.onSuccess { raw ->

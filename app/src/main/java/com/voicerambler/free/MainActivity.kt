@@ -106,6 +106,9 @@ class MainActivity : AppCompatActivity() {
                     ModelDownloader.INDIAN_EN_ENC,
                     ModelDownloader.INDIAN_EN_DEC,
                     ModelDownloader.INDIAN_EN_JOINER,
+                    ModelDownloader.WHISPER_APEX_TOKENS,
+                    ModelDownloader.WHISPER_APEX_ENC,
+                    ModelDownloader.WHISPER_APEX_DEC,
                     ModelDownloader.WHISPER_SWIFT_TOKENS,
                     ModelDownloader.WHISPER_SWIFT_ENC,
                     ModelDownloader.WHISPER_SWIFT_DEC,
@@ -122,8 +125,14 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnDlIndicHi).setOnClickListener {
             downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_HI), "IndicConformer Hindi")
         }
+        findViewById<Button>(R.id.btnDlWhisperApex).setOnClickListener {
+            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_APEX_TOKENS, ModelDownloader.WHISPER_APEX_ENC, ModelDownloader.WHISPER_APEX_DEC), "Whisper Hinglish Apex")
+        }
         findViewById<Button>(R.id.btnDlWhisperSwift).setOnClickListener {
-            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_SWIFT_TOKENS, ModelDownloader.WHISPER_SWIFT_ENC, ModelDownloader.WHISPER_SWIFT_DEC), "Whisper Hinglish Swift")
+            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_APEX_TOKENS,
+                    ModelDownloader.WHISPER_APEX_ENC,
+                    ModelDownloader.WHISPER_APEX_DEC,
+                    ModelDownloader.WHISPER_SWIFT_TOKENS, ModelDownloader.WHISPER_SWIFT_ENC, ModelDownloader.WHISPER_SWIFT_DEC), "Whisper Hinglish Swift")
         }
         findViewById<Button>(R.id.btnCompare).setOnClickListener {
             startActivity(Intent(this, CompareActivity::class.java))
@@ -215,6 +224,7 @@ class MainActivity : AppCompatActivity() {
         val indianEnOk = ModelDownloader.isIndianEnInstalled(this)
         val indicOrOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_OR)
         val indicHiOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_HI)
+        val apexOk = ModelDownloader.isWhisperApexInstalled(this)
         val swiftOk = ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_ENC) && ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_DEC)
 
         tvStatus.text = buildString {
@@ -223,6 +233,7 @@ class MainActivity : AppCompatActivity() {
             appendLine("Parakeet TDT 110M: ${if (parakeetOk) "Installed" else "Not downloaded"}")
             appendLine("English (India) Live: ${if (indianEnOk) "Installed" else "Not downloaded"}")
             appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
+            appendLine("Whisper Hinglish Apex: ${if (apexOk) "Installed" else "Not downloaded"}")
             appendLine("Whisper Hinglish Swift: ${if (swiftOk) "Installed" else "Not downloaded"}")
             appendLine("IndicConformer Hindi: ${if (indicHiOk) "Installed" else "Not downloaded"}")
             appendLine("IndicConformer Odia: ${if (indicOrOk) "Installed" else "Not downloaded"}")

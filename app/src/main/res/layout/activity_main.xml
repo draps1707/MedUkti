@@ -49,13 +49,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Download All Offline Models (Full Suite)" />
+            android:text="Download All Offline Packs (Automatic Setup)" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:text="Active Engine (Default: Auto)"
+            android:text="Dictation Mode (Automatic by default)"
             android:textStyle="bold" />
 
         <Spinner
@@ -64,7 +64,14 @@
             android:layout_height="48dp" />
 
         <Button
-            android:id="@+id/btnDlWhisperSwift"
+            android:id="@+id/btnDlWhisperApex"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Download Whisper Hinglish Apex (~1.03 GB - Best Hinglish)" />
+
+        <Button
+            android:id="@+id/btnDlWhisperSwift" 
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"

@@ -263,7 +263,7 @@ class FloatingMicService : Service() {
             startStreamingIndianEnglish()
         } else if (SherpaOnnxEngine.getOrCreateVad(this) != null) {
             isFallbackMode = false
-            startContinuousVadLoop(resolved)
+            startContinuousVadLoop(selected, resolved)
         } else {
             isFallbackMode = true
             startFallbackTapToStop()
@@ -364,7 +364,7 @@ class FloatingMicService : Service() {
     }
 
     @SuppressLint("MissingPermission")
-    private fun startContinuousVadLoop(resolved: AsrEngineType) {
+    private fun startContinuousVadLoop(selected: AsrEngineType, resolved: AsrEngineType) {
         isListening.set(true)
         setMicUiState(MicUiState.LISTENING)
         val segmentChannel = Channel<FloatArray>(Channel.UNLIMITED)
@@ -372,7 +372,7 @@ class FloatingMicService : Service() {
 
         vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
             for (seg in segmentChannel) {
-                val res = OfflineAsrEngines.transcribeSamples(this@FloatingMicService, resolved, seg)
+                val res = OfflineAsrEngines.transcribeSamples(this@FloatingMicService, selected, seg)
                 res.onSuccess { raw ->
                     var finalOut = MedicalNormalizer.normalize(this@FloatingMicService, raw)
                     if (useOptionalGemini && resolved != AsrEngineType.GEMINI_CLOUD && finalOut.isNotBlank()) {

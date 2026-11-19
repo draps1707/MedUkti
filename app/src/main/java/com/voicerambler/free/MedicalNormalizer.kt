@@ -194,6 +194,17 @@ object MedicalNormalizer {
      * 3. Applies O(1) dictionary casing + conservative fuzzy matching (edit distance <= 1-2).
      * 4. NEVER alters digits, decimals, doses, units, or negations.
      */
+        fun countMedicalHits(ctx: Context, text: String): Int {
+        init(ctx)
+        if (text.isBlank()) return 0
+        var hits = 0
+        for (w in text.lowercase().split(Regex("\\s+"))) {
+            val c = w.trimEnd('.', ',', ';', ':', '?', '!')
+            if (c.length >= 4 && singleWordMap.containsKey(c)) hits++
+        }
+        return hits
+    }
+
     fun normalize(ctx: Context, raw: String): String {
         init(ctx)
         var text = raw.trim()
