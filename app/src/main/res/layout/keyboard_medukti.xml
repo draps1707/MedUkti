@@ -8,7 +8,7 @@
     android:paddingTop="8dp"
     android:paddingBottom="6dp">
 
-    <!-- Top Toolbar -->
+    <!-- Row 1: Mode Toggle + Status + Settings -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="36dp"
@@ -40,44 +40,6 @@
             android:textSize="12sp" />
 
         <TextView
-            android:id="@+id/btnDrawerRx"
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_key_action"
-            android:gravity="center"
-            android:paddingHorizontal="12dp"
-            android:text="Rx"
-            android:textColor="#8AB4F8"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnDrawerNum"
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_key_action"
-            android:gravity="center"
-            android:paddingHorizontal="11dp"
-            android:text="123"
-            android:textColor="#E8EAED"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnDrawerHistory"
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_key_action"
-            android:gravity="center"
-            android:paddingHorizontal="11dp"
-            android:text="Recent"
-            android:textColor="#E8EAED"
-            android:textSize="12sp" />
-
-        <TextView
             android:id="@+id/btnOpenSettings"
             android:layout_width="34dp"
             android:layout_height="32dp"
@@ -88,158 +50,58 @@
             android:textSize="15sp" />
     </LinearLayout>
 
-    <!-- Shortcut Chips -->
-    <HorizontalScrollView
+    <!-- Row 2: Clean 120Hz Voice Pill -->
+    <LinearLayout
+        android:id="@+id/panelVoice"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:layout_marginTop="6dp"
-        android:overScrollMode="never"
-        android:scrollbars="none">
+        android:layout_height="98dp"
+        android:layout_marginTop="4dp"
+        android:gravity="center"
+        android:orientation="vertical">
 
         <LinearLayout
-            android:id="@+id/chipRow"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="horizontal" />
-    </HorizontalScrollView>
-
-    <!-- Center Dynamic Panel -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="108dp"
-        android:layout_marginTop="6dp">
-
-        <!-- 1. Sleek 120Hz Voice Pill (No Ring) -->
-        <LinearLayout
-            android:id="@+id/panelVoice"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:id="@+id/micRingContainer"
+            android:layout_width="216dp"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_mic_pill_idle"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:paddingHorizontal="18dp">
 
-            <LinearLayout
-                android:id="@+id/micRingContainer"
-                android:layout_width="210dp"
-                android:layout_height="52dp"
-                android:background="@drawable/bg_mic_pill_idle"
-                android:gravity="center"
-                android:orientation="horizontal"
-                android:paddingHorizontal="18dp">
-
-                <ImageView
-                    android:id="@+id/ivKeyboardMic"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:contentDescription="Speak"
-                    android:src="@android:drawable/ic_btn_speak_now"
-                    android:tint="#FFFFFF" />
-
-                <TextView
-                    android:id="@+id/tvMicPillLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:text="Tap to Speak"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
+            <ImageView
+                android:id="@+id/ivKeyboardMic"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription="Speak"
+                android:src="@android:drawable/ic_btn_speak_now"
+                android:tint="#FFFFFF" />
 
             <TextView
-                android:id="@+id/tvVoiceHint"
+                android:id="@+id/tvMicPillLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="MedUkti • 100% Offline"
-                android:textColor="#80868B"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <!-- 2. Rx Snippets & Templates Drawer -->
-        <LinearLayout
-            android:id="@+id/panelRx"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <EditText
-                android:id="@+id/etSnippetSearch"
-                android:layout_width="match_parent"
-                android:layout_height="34dp"
-                android:background="@drawable/bg_key_dark"
-                android:hint="Search Rx snippets / templates..."
-                android:paddingHorizontal="12dp"
-                android:singleLine="true"
+                android:layout_marginStart="10dp"
+                android:text="Tap to Speak"
                 android:textColor="#FFFFFF"
-                android:textColorHint="#80868B"
-                android:textSize="12sp" />
-
-            <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_marginTop="4dp"
-                android:layout_weight="1">
-
-                <LinearLayout
-                    android:id="@+id/rxListContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-            </ScrollView>
+                android:textSize="14sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 3. Clinical Numpad & Units Panel -->
-        <LinearLayout
-            android:id="@+id/panelNumpad"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:visibility="gone">
+        <TextView
+            android:id="@+id/tvVoiceHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Swipe Space for cursor • 100% Offline"
+            android:textColor="#80868B"
+            android:textSize="11sp" />
+    </LinearLayout>
 
-            <LinearLayout
-                android:id="@+id/numRow1"
-                android:layout_width="match_parent"
-                android:layout_height="33dp"
-                android:orientation="horizontal" />
-
-            <LinearLayout
-                android:id="@+id/numRow2"
-                android:layout_width="match_parent"
-                android:layout_height="33dp"
-                android:layout_marginTop="3dp"
-                android:orientation="horizontal" />
-
-            <LinearLayout
-                android:id="@+id/numRow3"
-                android:layout_width="match_parent"
-                android:layout_height="33dp"
-                android:layout_marginTop="3dp"
-                android:orientation="horizontal" />
-        </LinearLayout>
-
-        <!-- 4. Recent Dictations Panel -->
-        <ScrollView
-            android:id="@+id/panelHistory"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:id="@+id/historyListContainer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </ScrollView>
-    </FrameLayout>
-
-    <!-- Fixed Bottom Bar -->
+    <!-- Row 3: Essential Action Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="44dp"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -271,7 +133,7 @@
             android:layout_weight="1"
             android:background="@drawable/bg_key_dark"
             android:gravity="center"
-            android:text="MedUkti"
+            android:text="Space"
             android:textColor="#9AA0A6"
             android:textSize="13sp" />
 

@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -18,14 +17,12 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -40,11 +37,12 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.abs
 
 class MedUktiImeService : InputMethodService() {
 
     private enum class MicUiState { IDLE, LISTENING, POLISHING }
-    private enum class DrawerMode { VOICE, RX, NUMPAD, HISTORY }
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -54,21 +52,11 @@ class MedUktiImeService : InputMethodService() {
     private var vadConsumerJob: Job? = null
     private var liveLoopJob: Job? = null
 
-    private var rootView: View? = null
     private var btnModeToggle: TextView? = null
     private var tvImeStatus: TextView? = null
     private var micRingContainer: LinearLayout? = null
     private var tvMicPillLabel: TextView? = null
-    private var chipRow: LinearLayout? = null
     private var keyPeriod: TextView? = null
-    private var panelVoice: View? = null
-    private var panelRx: View? = null
-    private var panelNumpad: View? = null
-    private var panelHistory: View? = null
-    private var rxListContainer: LinearLayout? = null
-    private var historyListContainer: LinearLayout? = null
-    private var etSnippetSearch: EditText? = null
-    private var activeDrawer = DrawerMode.VOICE
 
     private val idleSleepRunnable = Runnable {
         if (!isListening.get() && !isProcessing) {
@@ -130,31 +118,13 @@ class MedUktiImeService : InputMethodService() {
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.keyboard_medukti, null)
-        rootView = view
         btnModeToggle = view.findViewById(R.id.btnModeToggle)
         tvImeStatus = view.findViewById(R.id.tvImeStatus)
         micRingContainer = view.findViewById(R.id.micRingContainer)
         tvMicPillLabel = view.findViewById(R.id.tvMicPillLabel)
-        chipRow = view.findViewById(R.id.chipRow)
         keyPeriod = view.findViewById(R.id.keyPeriod)
-        panelVoice = view.findViewById(R.id.panelVoice)
-        panelRx = view.findViewById(R.id.panelRx)
-        panelNumpad = view.findViewById(R.id.panelNumpad)
-        panelHistory = view.findViewById(R.id.panelHistory)
-        rxListContainer = view.findViewById(R.id.rxListContainer)
-        historyListContainer = view.findViewById(R.id.historyListContainer)
-        etSnippetSearch = view.findViewById(R.id.etSnippetSearch)
 
         btnModeToggle?.setOnClickListener { toggleLanguage() }
-        view.findViewById<View>(R.id.btnDrawerRx).setOnClickListener {
-            switchDrawer(if (activeDrawer == DrawerMode.RX) DrawerMode.VOICE else DrawerMode.RX)
-        }
-        view.findViewById<View>(R.id.btnDrawerNum).setOnClickListener {
-            switchDrawer(if (activeDrawer == DrawerMode.NUMPAD) DrawerMode.VOICE else DrawerMode.NUMPAD)
-        }
-        view.findViewById<View>(R.id.btnDrawerHistory).setOnClickListener {
-            switchDrawer(if (activeDrawer == DrawerMode.HISTORY) DrawerMode.VOICE else DrawerMode.HISTORY)
-        }
         view.findViewById<View>(R.id.btnOpenSettings).setOnClickListener {
             buzz()
             val intent = Intent(this, MainActivity::class.java).apply {
@@ -169,16 +139,6 @@ class MedUktiImeService : InputMethodService() {
             if (!isListening.get()) startContinuousDictation() else stopContinuousDictation()
         }
 
-        etSnippetSearch?.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                populateRxList(s?.toString() ?: "")
-            }
-            override fun afterTextChanged(s: Editable?) {}
-        })
-
-        buildNumpad(view)
-
         view.findViewById<View>(R.id.keySwitchKb).setOnClickListener {
             buzz()
             if (isListening.get()) stopContinuousDictation()
@@ -190,12 +150,73 @@ class MedUktiImeService : InputMethodService() {
                 imm.showInputMethodPicker()
             }
         }
-        view.findViewById<View>(R.id.keyComma).setOnClickListener { commitQuickToken(", ") }
-        view.findViewById<View>(R.id.keySpace).setOnClickListener { commitQuickToken(" ") }
+
+        view.findViewById<View>(R.id.keyComma).setOnClickListener {
+            buzz(10L)
+            commitQuickToken(", ")
+        }
+
         keyPeriod?.setOnClickListener {
+            buzz(10L)
             val ch = if (Prefs.isOdiaEngine(Prefs.getEngine(this))) "। " else ". "
             commitQuickToken(ch)
         }
+
+        // Gboard-style Spacebar: tap inserts space, swipe left/right moves cursor (keeps mic live)
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop.toFloat()
+        val stepPx = 12f * resources.displayMetrics.density
+        var spaceDownX = 0f
+        var spaceLastStepX = 0f
+        var spaceSwiping = false
+        view.findViewById<View>(R.id.keySpace).setOnTouchListener { _, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    spaceDownX = ev.x
+                    spaceLastStepX = ev.x
+                    spaceSwiping = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dxTotal = ev.x - spaceDownX
+                    if (!spaceSwiping && abs(dxTotal) > touchSlop) {
+                        spaceSwiping = true
+                        spaceLastStepX = ev.x
+                    }
+                    if (spaceSwiping) {
+                        val delta = ev.x - spaceLastStepX
+                        if (abs(delta) >= stepPx) {
+                            val steps = (delta / stepPx).toInt()
+                            val keyCode = if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+                            val ic = currentInputConnection
+                            if (ic != null) {
+                                ic.finishComposingText()
+                                repeat(abs(steps)) {
+                                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                                }
+                            }
+                            buzz(8L)
+                            spaceLastStepX += steps * stepPx
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!spaceSwiping) {
+                        buzz(10L)
+                        commitQuickToken(" ")
+                    }
+                    spaceSwiping = false
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    spaceSwiping = false
+                    true
+                }
+                else -> false
+            }
+        }
+
         view.findViewById<View>(R.id.keyUndo).setOnClickListener {
             buzz(24L)
             undoLastCommitted()
@@ -235,7 +256,6 @@ class MedUktiImeService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         lastCommittedLen = 0
-        switchDrawer(DrawerMode.VOICE)
         refreshModeUi()
         resetIdleSleepTimer()
         serviceScope.launch { OfflineAsrEngines.preload(this@MedUktiImeService) }
@@ -256,172 +276,11 @@ class MedUktiImeService : InputMethodService() {
         super.onFinishInputView(finishingInput)
     }
 
-    private fun switchDrawer(mode: DrawerMode) {
-        activeDrawer = mode
-        panelVoice?.visibility = if (mode == DrawerMode.VOICE) View.VISIBLE else View.GONE
-        panelRx?.visibility = if (mode == DrawerMode.RX) View.VISIBLE else View.GONE
-        panelNumpad?.visibility = if (mode == DrawerMode.NUMPAD) View.VISIBLE else View.GONE
-        panelHistory?.visibility = if (mode == DrawerMode.HISTORY) View.VISIBLE else View.GONE
-        if (mode == DrawerMode.RX) populateRxList(etSnippetSearch?.text?.toString() ?: "")
-        if (mode == DrawerMode.HISTORY) populateHistoryList()
-    }
-
     private fun refreshModeUi() {
         val eng = Prefs.getEngine(this)
         val isOdia = Prefs.isOdiaEngine(eng)
         btnModeToggle?.text = if (isOdia) "OD" else "MED"
         keyPeriod?.text = if (isOdia) "।" else "."
-        populateShortcutChips(isOdia)
-    }
-
-    private fun populateShortcutChips(isOdia: Boolean) {
-        val row = chipRow ?: return
-        row.removeAllViews()
-        val chips = if (isOdia) {
-            listOf("।" to "। ", "?" to "? ", "," to ", ", "ହଁ" to "ହଁ ", "ନାଇଁ" to "ନାଇଁ ", "ଠିକ୍ ଅଛି" to "ଠିକ୍ ଅଛି ", "କ'ଣ" to "କ'ଣ ", "ଆଚ୍ଛା" to "ଆଚ୍ଛା ", "ଧନ୍ୟବାଦ" to "ଧନ୍ୟବାଦ ")
-        } else {
-            listOf(
-                "Tab." to "Tab. ", "Inj." to "Inj. ", "Cap." to "Cap. ", "Syp." to "Syp. ",
-                "OD" to "OD ", "BD" to "BD ", "TDS" to "TDS ", "SOS" to "SOS ", "IV" to "IV ",
-                "BP" to "BP ", "SpO2" to "SpO2 ", "c/o" to "c/o ", "h/o" to "h/o ",
-                "k/c/o" to "k/c/o ", "O/E:" to "O/E: ", "Dx:" to "Dx: ", "Rx:" to "Rx:\n", "Advice:" to "Advice:\n"
-            )
-        }
-        val dp = resources.displayMetrics.density
-        for ((label, insertText) in chips) {
-            val tv = TextView(this).apply {
-                text = label
-                setTextColor(Color.WHITE)
-                textSize = 12f
-                setBackgroundResource(R.drawable.bg_chip_pill)
-                setPadding((10 * dp).toInt(), (6 * dp).toInt(), (10 * dp).toInt(), (6 * dp).toInt())
-                val lp = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { marginEnd = (6 * dp).toInt() }
-                layoutParams = lp
-                setOnClickListener {
-                    buzz(10L)
-                    commitQuickToken(insertText)
-                }
-            }
-            row.addView(tv)
-        }
-    }
-
-    private fun populateRxList(query: String) {
-        val container = rxListContainer ?: return
-        container.removeAllViews()
-        val q = query.trim().lowercase()
-        val items = Prefs.getSnippets(this).filter {
-            q.isEmpty() || it.first.lowercase().contains(q) || it.second.lowercase().contains(q)
-        }
-        val dp = resources.displayMetrics.density
-        for ((label, expansion) in items) {
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundResource(R.drawable.bg_key_dark)
-                setPadding((10 * dp).toInt(), (7 * dp).toInt(), (10 * dp).toInt(), (7 * dp).toInt())
-                val lp = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = (5 * dp).toInt() }
-                layoutParams = lp
-                setOnClickListener {
-                    buzz(14L)
-                    commitQuickToken(if (expansion.endsWith("\n") || expansion.endsWith(" ")) expansion else "$expansion ")
-                    switchDrawer(DrawerMode.VOICE)
-                }
-            }
-            val title = TextView(this).apply {
-                text = label
-                setTextColor(Color.parseColor("#81D4FA"))
-                textSize = 12f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-            }
-            val preview = TextView(this).apply {
-                text = expansion.replace("\n", " • ")
-                setTextColor(Color.parseColor("#CFD8DC"))
-                textSize = 11f
-                maxLines = 2
-            }
-            card.addView(title)
-            card.addView(preview)
-            container.addView(card)
-        }
-    }
-
-    private fun buildNumpad(view: View) {
-        val r1 = view.findViewById<LinearLayout>(R.id.numRow1)
-        val r2 = view.findViewById<LinearLayout>(R.id.numRow2)
-        val r3 = view.findViewById<LinearLayout>(R.id.numRow3)
-        val dp = resources.displayMetrics.density
-
-        fun addRowKeys(row: LinearLayout, keys: List<Pair<String, String>>) {
-            row.removeAllViews()
-            for ((label, token) in keys) {
-                val tv = TextView(this).apply {
-                    text = label
-                    setTextColor(Color.WHITE)
-                    textSize = 14f
-                    gravity = android.view.Gravity.CENTER
-                    setBackgroundResource(R.drawable.bg_chip_pill)
-                    setBackgroundResource(R.drawable.bg_key_dark)
-                    val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
-                        marginStart = (2 * dp).toInt()
-                        marginEnd = (2 * dp).toInt()
-                    }
-                    layoutParams = lp
-                    setOnClickListener {
-                        buzz(10L)
-                        commitQuickToken(token)
-                    }
-                }
-                row.addView(tv)
-            }
-        }
-
-        addRowKeys(r1, (1..9).map { "$it" to "$it" } + ("0" to "0"))
-        addRowKeys(r2, listOf("/" to "/", "." to ".", "%" to "%", "-" to "-", ":" to ":", "(" to "(", ")" to ")"))
-        addRowKeys(r3, listOf("mg" to " mg ", "mcg" to " mcg ", "ml" to " ml ", "gm" to " gm ", "IU" to " IU "))
-    }
-
-    private fun populateHistoryList() {
-        val container = historyListContainer ?: return
-        container.removeAllViews()
-        val items = Prefs.getRecentDictations(this)
-        val dp = resources.displayMetrics.density
-        if (items.isEmpty()) {
-            val empty = TextView(this).apply {
-                text = "No recent dictations yet."
-                setTextColor(Color.parseColor("#90A4AE"))
-                textSize = 12f
-                setPadding((10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt())
-            }
-            container.addView(empty)
-            return
-        }
-        for (item in items) {
-            val tv = TextView(this).apply {
-                text = item
-                setTextColor(Color.WHITE)
-                textSize = 12f
-                maxLines = 2
-                setBackgroundResource(R.drawable.bg_key_dark)
-                setPadding((10 * dp).toInt(), (8 * dp).toInt(), (10 * dp).toInt(), (8 * dp).toInt())
-                val lp = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = (5 * dp).toInt() }
-                layoutParams = lp
-                setOnClickListener {
-                    buzz(14L)
-                    commitQuickToken("$item ")
-                    switchDrawer(DrawerMode.VOICE)
-                }
-            }
-            container.addView(tv)
-        }
     }
 
     private fun toggleLanguage() {
@@ -455,14 +314,17 @@ class MedUktiImeService : InputMethodService() {
         }
     }
 
+    // Apple-style live-mic editing: never stops mic when tapping punctuation/space/backspace/enter
     private fun commitQuickToken(token: String) {
         val ic = currentInputConnection ?: return
+        ic.finishComposingText()
         ic.commitText(token, 1)
         lastCommittedLen = token.length
     }
 
     private fun performBackspace() {
         val ic = currentInputConnection ?: return
+        ic.finishComposingText()
         val selected = ic.getSelectedText(0)
         if (!selected.isNullOrEmpty()) {
             ic.commitText("", 1)
@@ -474,6 +336,7 @@ class MedUktiImeService : InputMethodService() {
 
     private fun undoLastCommitted() {
         val ic = currentInputConnection ?: return
+        ic.finishComposingText()
         if (lastCommittedLen > 0) {
             ic.deleteSurroundingText(lastCommittedLen, 0)
             lastCommittedLen = 0
@@ -483,6 +346,7 @@ class MedUktiImeService : InputMethodService() {
 
     private fun performEnterOrAction() {
         val ic = currentInputConnection ?: return
+        ic.finishComposingText()
         val info = currentInputEditorInfo
         val action = (info?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
         val multiLine = info != null && (info.inputType and android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
@@ -496,8 +360,11 @@ class MedUktiImeService : InputMethodService() {
     }
 
     private fun commitSpokenText(phrase: String) {
-        val rawClean = phrase.trim()
+        if (phrase.isEmpty()) return
+        val isPureNewline = phrase.all { it == '\n' }
+        val rawClean = if (isPureNewline) phrase else phrase.trim()
         if (rawClean.isEmpty()) return
+
         mainHandler.post {
             resetIdleSleepTimer()
             val ic = currentInputConnection ?: return@post
@@ -508,7 +375,15 @@ class MedUktiImeService : InputMethodService() {
                 return@post
             }
 
+            if (isPureNewline) {
+                ic.finishComposingText()
+                ic.commitText(rawClean, 1)
+                lastCommittedLen = rawClean.length
+                return@post
+            }
+
             val before = ic.getTextBeforeCursor(50, 0)?.toString() ?: ""
+            val after = ic.getTextAfterCursor(1, 0)?.toString() ?: ""
             val trimmedBefore = before.trimEnd()
             val atSentenceStart = trimmedBefore.isEmpty() ||
                 trimmedBefore.endsWith(".") ||
@@ -529,10 +404,17 @@ class MedUktiImeService : InputMethodService() {
                 !before.endsWith(" ") &&
                 !before.endsWith("\n")
 
-            val outText = (if (needLeadingSpace) " " else "") + formatted
+            // Apple-style smart cursor spacing: add trailing space only when inserting before a word
+            val afterChar = after.firstOrNull()
+            val needTrailingSpace = afterChar != null &&
+                !afterChar.isWhitespace() &&
+                afterChar !in listOf('.', '।', ',', '?', '!', ')', ']', ':') &&
+                !formatted.endsWith(" ") &&
+                !formatted.endsWith("\n")
+
+            val outText = (if (needLeadingSpace) " " else "") + formatted + (if (needTrailingSpace) " " else "")
             ic.commitText(outText, 1)
             lastCommittedLen = outText.length
-            Prefs.addRecentDictation(this, formatted)
         }
     }
 
@@ -562,7 +444,7 @@ class MedUktiImeService : InputMethodService() {
         val useStreamingDraft = Prefs.isStreamingDraftEnabled(this) && !Prefs.isOdiaEngine(resolved) && ModelDownloader.isStreamingZipformerInstalled(this)
         var streamObj = if (useStreamingDraft) StreamingZipformerEngine.createStream(this) else null
         val streamLock = Any()
-        val pendingSegments = java.util.concurrent.atomic.AtomicInteger(0)
+        val pendingSegments = AtomicInteger(0)
 
         vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
             try {
@@ -570,16 +452,17 @@ class MedUktiImeService : InputMethodService() {
                     pendingSegments.incrementAndGet()
                     val res = OfflineAsrEngines.transcribeSamples(this@MedUktiImeService, resolved, seg)
                     try {
-                    res.onSuccess { raw ->
-                        val finalOut = raw.trim()
-                        if (finalOut.isNotBlank()) {
-                            commitSpokenText(finalOut)
-                        } else {
+                        res.onSuccess { raw ->
+                            val isNewlineCmd = raw.isNotEmpty() && raw.all { it == '\n' }
+                            val finalOut = if (isNewlineCmd) raw else raw.trim()
+                            if (finalOut.isNotEmpty()) {
+                                commitSpokenText(finalOut)
+                            } else {
+                                mainHandler.post { currentInputConnection?.finishComposingText() }
+                            }
+                        }.onFailure {
                             mainHandler.post { currentInputConnection?.finishComposingText() }
                         }
-                    }.onFailure {
-                        mainHandler.post { currentInputConnection?.finishComposingText() }
-                    }
                     } finally {
                         pendingSegments.decrementAndGet()
                     }

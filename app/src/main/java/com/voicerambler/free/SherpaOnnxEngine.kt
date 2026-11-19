@@ -134,8 +134,8 @@ object SherpaOnnxEngine {
 
         val fullStopChar = if (Prefs.isOdiaEngine(engine)) "।" else "."
         text = text
-            .replace(Regex("\\s*\\bnew paragraph\\b\\s*", RegexOption.IGNORE_CASE), "\n\n")
-            .replace(Regex("\\s*\\bnew line\\b\\s*", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("\\s*\\b(?:new|next) paragraph\\b\\s*", RegexOption.IGNORE_CASE), "\n\n")
+            .replace(Regex("\\s*\\b(?:new|next) line\\b\\s*", RegexOption.IGNORE_CASE), "\n")
             .replace(Regex("\\s*\\b(?:bullet point|next point)\\b\\s*", RegexOption.IGNORE_CASE), "\n• ")
             .replace(Regex("\\s*\\b(?:full stop|purna chheda)\\b[.!]*", RegexOption.IGNORE_CASE), fullStopChar)
             .replace(Regex("\\s*\\bquestion mark\\b[.?]*", RegexOption.IGNORE_CASE), "?")
@@ -166,7 +166,7 @@ object SherpaOnnxEngine {
         }
 
         var finalOut = Normalizer.normalize(
-            text.replace(Regex("[ \\t]{2,}"), " ").trim(),
+            text.replace(Regex("[ \\t]{2,}"), " ").let { if (it.all { ch -> ch == '\n' }) it else it.trim() },
             Normalizer.Form.NFC
         )
         if (Prefs.isOdiaEngine(engine) && finalOut.isNotEmpty()) {
@@ -209,7 +209,7 @@ object SherpaOnnxEngine {
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = vadFile.absolutePath,
                     threshold = 0.38f,
-                    minSilenceDuration = 0.32f,
+                    minSilenceDuration = 0.55f,
                     minSpeechDuration = 0.14f,
                     maxSpeechDuration = 6.0f,
                     windowSize = 512
