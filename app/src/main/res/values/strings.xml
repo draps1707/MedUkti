@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">କଥାType</string>
-    <string name="accessibility_service_label">କଥାType Voice Input</string>
-    <string name="accessibility_service_description">Inserts offline Hinglish and Odia voice dictation inline at your cursor.</string>
+    <string name="app_name">MedUkti</string>
+    <string name="ime_name">MedUkti Voice</string>
 </resources>

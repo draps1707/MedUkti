@@ -12,7 +12,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="କଥାType"
+            android:text="MedUkti"
             android:textSize="26sp"
             android:textStyle="bold" />
 
@@ -20,13 +20,43 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="100% Offline Medical &amp; Odia Inline Voice Typing"
+            android:text="100% Offline Medical &amp; Odia Voice Keyboard (Zero Banking Warnings)"
             android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnEnableKb"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:text="1. Enable Keyboard" />
+
+            <Button
+                android:id="@+id/btnPickKb"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:text="2. Switch Keyboard" />
+        </LinearLayout>
+
+        <Switch
+            android:id="@+id/switchAutoListen"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Auto-listen when MedUkti keyboard opens" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="14dp"
             android:text="Active Mode"
             android:textStyle="bold" />
 
@@ -39,7 +69,7 @@
             android:id="@+id/btnDlMedAsr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:text="Download Google MedASR CTC (Clinical Core)" />
 
         <Button
@@ -93,12 +123,42 @@
             android:inputType="textMultiLine"
             android:minLines="3" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Rx Snippets &amp; Templates (Label | Text)"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnImportSnippets"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Import .txt/.csv" />
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/etSnippets"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top|start"
+            android:hint="Format: Label | Full expansion text"
+            android:inputType="textMultiLine"
+            android:minLines="5" />
+
         <Button
             android:id="@+id/btnSaveStart"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Save &amp; Start Floating Mic" />
+            android:text="Save Settings &amp; Preload Mode" />
 
         <TextView
             android:id="@+id/tvStatus"

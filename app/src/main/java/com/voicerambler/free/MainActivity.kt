@@ -3,15 +3,14 @@ package com.voicerambler.free
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
 import android.provider.Settings
+import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,14 +23,32 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
-    private var askedThisSession = false
     private lateinit var tvStatus: TextView
+    private lateinit var etSnippets: EditText
     private val uiScope = CoroutineScope(Dispatchers.Main + Job())
 
     private val permLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
+        ActivityResultContracts.RequestPermission()
     ) {
-        updateStatusAndAutoStart()
+        updateStatus()
+    }
+
+    private val importSnippetsLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        try {
+            val imported = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
+            if (imported.isNotBlank()) {
+                val existing = etSnippets.text.toString().trim()
+                val merged = if (existing.isEmpty()) imported.trim() else "$existing\n${imported.trim()}"
+                etSnippets.setText(merged)
+                Prefs.setSnippetsRaw(this, merged)
+                Toast.makeText(this, "Imported snippets! Tap Save to confirm.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,12 +57,31 @@ class MainActivity : AppCompatActivity() {
 
         val spinnerEngine = findViewById<Spinner>(R.id.spinnerEngine)
         val etPersonalDict = findViewById<EditText>(R.id.etPersonalDict)
+        val switchAutoListen = findViewById<Switch>(R.id.switchAutoListen)
+        etSnippets = findViewById(R.id.etSnippets)
         tvStatus = findViewById(R.id.tvStatus)
 
         spinnerEngine.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
         spinnerEngine.setSelection(AsrEngineType.entries.indexOf(Prefs.getEngine(this)).coerceAtLeast(0))
 
+        switchAutoListen.isChecked = Prefs.isAutoListen(this)
+        switchAutoListen.setOnCheckedChangeListener { _, isChecked ->
+            Prefs.setAutoListen(this, isChecked)
+        }
+
         etPersonalDict.setText(Prefs.getPersonalDict(this))
+        etSnippets.setText(Prefs.getSnippetsRaw(this))
+
+        findViewById<Button>(R.id.btnEnableKb).setOnClickListener {
+            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+        }
+        findViewById<Button>(R.id.btnPickKb).setOnClickListener {
+            val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showInputMethodPicker()
+        }
+        findViewById<Button>(R.id.btnImportSnippets).setOnClickListener {
+            importSnippetsLauncher.launch(arrayOf("text/plain", "text/csv", "text/*"))
+        }
 
         findViewById<Button>(R.id.btnDlMedAsr).setOnClickListener {
             downloadBatch(
@@ -96,14 +132,26 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnSaveStart).setOnClickListener {
             Prefs.setEngine(this, AsrEngineType.entries[spinnerEngine.selectedItemPosition])
             Prefs.setPersonalDict(this, etPersonalDict.text.toString())
-            askedThisSession = false
-            checkAndRequestNextMissingPermission()
-            updateStatusAndAutoStart()
+            Prefs.setSnippetsRaw(this, etSnippets.text.toString())
+            Prefs.setAutoListen(this, switchAutoListen.isChecked)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                permLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+            updateStatus()
             uiScope.launch { OfflineAsrEngines.preload(this@MainActivity) }
+            Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
         }
 
         ModelDownloader.cleanupUnusedModels(this)
-        checkAndRequestNextMissingPermission()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+        updateStatus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateStatus()
     }
 
     private fun downloadBatch(artifacts: List<ModelDownloader.ModelArtifact>, label: String) {
@@ -122,56 +170,18 @@ class MainActivity : AppCompatActivity() {
             }
             Toast.makeText(this@MainActivity, "$label ready offline!", Toast.LENGTH_SHORT).show()
             OfflineAsrEngines.preload(this@MainActivity)
-            updateStatusAndAutoStart()
+            updateStatus()
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateStatusAndAutoStart()
+    private fun isImeEnabled(): Boolean {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        return imm.enabledInputMethodList.any { it.packageName == packageName }
     }
 
-    private fun hasMicAndNotif(): Boolean {
+    private fun updateStatus() {
         val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        val notifOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        } else true
-        return micOk && notifOk
-    }
-
-    private fun checkAndRequestNextMissingPermission() {
-        if (askedThisSession) return
-        askedThisSession = true
-
-        if (!hasMicAndNotif()) {
-            val perms = mutableListOf(Manifest.permission.RECORD_AUDIO)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                perms.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-            permLauncher.launch(perms.toTypedArray())
-            return
-        }
-
-        if (!Settings.canDrawOverlays(this)) {
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            return
-        }
-
-        if (DictationAccessibilityService.instance == null) {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            return
-        }
-
-        val pm = getSystemService(PowerManager::class.java)
-        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
-        }
-    }
-
-    private fun updateStatusAndAutoStart() {
-        val micOk = hasMicAndNotif()
-        val overlayOk = Settings.canDrawOverlays(this)
-        val accOk = DictationAccessibilityService.instance != null
+        val imeOk = isImeEnabled()
         val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
         val medOk = ModelDownloader.isMedAsrInstalled(this)
         val p110Ok = ModelDownloader.isParakeet110mInstalled(this)
@@ -181,17 +191,14 @@ class MainActivity : AppCompatActivity() {
 
         tvStatus.text = buildString {
             appendLine("Active Mode: ${Prefs.getEngine(this@MainActivity).label}")
+            appendLine("Keyboard Enabled: ${if (imeOk) "YES" else "Tap '1. Enable Keyboard'"} | Mic: ${if (micOk) "OK" else "Needed"}")
+            appendLine("Loaded Snippets: ${Prefs.getSnippets(this@MainActivity).size}")
             appendLine("Google MedASR CTC: ${if (medOk) "Installed" else "Not downloaded"}")
             appendLine("Parakeet TDT 110M: ${if (p110Ok) "Installed" else "Not downloaded"}")
             appendLine("Parakeet TDT 0.6B v2: ${if (p06bOk) "Installed" else "Not downloaded"}")
             appendLine("Odia (IndicConformer): ${if (odiaOk) "Installed" else "Not downloaded"}")
             appendLine("Odia Natural (SraVaani 1.0): ${if (sravaaniOk) "Installed" else "Not downloaded"}")
             appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
-            appendLine("Mic: ${if (micOk) "OK" else "Needed"} | Overlay: ${if (overlayOk) "OK" else "Needed"} | Accessibility: ${if (accOk) "OK" else "Needed"}")
-        }
-
-        if (micOk && overlayOk) {
-            startForegroundService(Intent(this, FloatingMicService::class.java))
         }
     }
 }
