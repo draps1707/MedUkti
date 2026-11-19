@@ -20,14 +20,21 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Offline sherpa-onnx (IndicConformer + Whisper Swift + Silero VAD)"
+            android:text="Live Offline Inline Dictation (English India + Hinglish + Hindi + Odia)"
             android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnDlIndianEn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Download English (India) Live Pack (~71 MB - Fastest)" />
 
         <Button
             android:id="@+id/btnDlAll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:text="Download All Offline Models (Recommended)" />
 
         <TextView

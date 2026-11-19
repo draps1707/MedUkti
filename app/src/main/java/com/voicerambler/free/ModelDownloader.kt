@@ -23,6 +23,30 @@ object ModelDownloader {
         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
     )
 
+    val INDIAN_EN_ENC = ModelArtifact(
+        "indian_en_enc",
+        "indian-en-encoder.int8.onnx",
+        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/encoder-epoch-10-avg-5-chunk-64-left-256.int8.onnx"
+    )
+
+    val INDIAN_EN_DEC = ModelArtifact(
+        "indian_en_dec",
+        "indian-en-decoder.int8.onnx",
+        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/decoder-epoch-10-avg-5-chunk-64-left-256.int8.onnx"
+    )
+
+    val INDIAN_EN_JOINER = ModelArtifact(
+        "indian_en_joiner",
+        "indian-en-joiner.int8.onnx",
+        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/joiner-epoch-10-avg-5-chunk-64-left-256.int8.onnx"
+    )
+
+    val INDIAN_EN_TOKENS = ModelArtifact(
+        "indian_en_tokens",
+        "indian-en-tokens.txt",
+        "https://huggingface.co/Akshatkasera007/STT-streaming-zipformer-indian-en/resolve/main/tokens.txt"
+    )
+
     val INDIC_TOKENS = ModelArtifact(
         "indic_tokens",
         "indicconformer-tokens.txt",
@@ -59,25 +83,6 @@ object ModelDownloader {
         "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-swift/tokens.txt"
     )
 
-    val NEEDLE_BIN = ModelArtifact(
-        "needle",
-        "needle",
-        "https://huggingface.co/Cactus-Compute/needle3/resolve/main/android-arm64/needle",
-        executable = true
-    )
-
-    val SHRUTI_HI_EN = ModelArtifact(
-        "shruti_hi",
-        "shruti.cact",
-        "https://huggingface.co/udgamlabs/Shruti/resolve/main/shruti.cact"
-    )
-
-    val SHRUTI_ODIA = ModelArtifact(
-        "shruti_or",
-        "shruti-odia.cact",
-        "https://huggingface.co/udgamlabs/shruti-odia/resolve/main/shruti-odia.cact"
-    )
-
     fun modelsDir(ctx: Context): File = File(ctx.filesDir, "models").apply { mkdirs() }
 
     fun getFile(ctx: Context, artifact: ModelArtifact): File = File(modelsDir(ctx), artifact.fileName)
@@ -86,6 +91,12 @@ object ModelDownloader {
         val f = getFile(ctx, artifact)
         return f.exists() && f.length() > 512L
     }
+
+    fun isIndianEnInstalled(ctx: Context): Boolean =
+        isInstalled(ctx, INDIAN_EN_ENC) &&
+            isInstalled(ctx, INDIAN_EN_DEC) &&
+            isInstalled(ctx, INDIAN_EN_JOINER) &&
+            isInstalled(ctx, INDIAN_EN_TOKENS)
 
     suspend fun download(
         ctx: Context,

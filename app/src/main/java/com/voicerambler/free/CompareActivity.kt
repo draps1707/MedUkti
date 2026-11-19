@@ -46,6 +46,14 @@ class CompareActivity : AppCompatActivity() {
                 uiScope.launch {
                     val out = StringBuilder()
 
+                    val indEn = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIAN_EN_STREAMING, wav)
+                    out.appendLine("=== English (India) Streaming Zipformer ===")
+                    indEn.onSuccess { raw ->
+                        out.appendLine("Raw: $raw")
+                        out.appendLine("Medical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
+                    }.onFailure { out.appendLine("Skipped: ${it.message}") }
+                    out.appendLine()
+
                     val swift = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_SWIFT, wav)
                     out.appendLine("=== Whisper Hinglish Swift (sherpa-onnx + VAD) ===")
                     swift.onSuccess { raw ->

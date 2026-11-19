@@ -1,12 +1,18 @@
 package com.voicerambler.free
 
 import android.content.Context
+import com.k2fsa.sherpa.onnx.EndpointConfig
+import com.k2fsa.sherpa.onnx.EndpointRule
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
+import com.k2fsa.sherpa.onnx.OnlineModelConfig
+import com.k2fsa.sherpa.onnx.OnlineRecognizer
+import com.k2fsa.sherpa.onnx.OnlineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
@@ -16,9 +22,10 @@ object SherpaOnnxEngine {
 
     private var cachedEngineType: AsrEngineType? = null
     private var recognizer: OfflineRecognizer? = null
+    private var onlineRecognizer: OnlineRecognizer? = null
     private var vad: Vad? = null
 
-    private fun readWavAsFloats(wavFile: File): FloatArray {
+    fun readWavAsFloats(wavFile: File): FloatArray {
         val bytes = wavFile.readBytes()
         if (bytes.size <= 44) return FloatArray(0)
         val numSamples = (bytes.size - 44) / 2
@@ -34,9 +41,10 @@ object SherpaOnnxEngine {
         return floats
     }
 
-    private fun extractSpeechWithVad(ctx: Context, samples: FloatArray): List<FloatArray> {
+    @Synchronized
+    fun getOrCreateVad(ctx: Context): Vad? {
         if (!ModelDownloader.isInstalled(ctx, ModelDownloader.SILERO_VAD)) {
-            return listOf(samples)
+            return null
         }
         if (vad == null) {
             val vadFile = ModelDownloader.getFile(ctx, ModelDownloader.SILERO_VAD)
@@ -44,7 +52,7 @@ object SherpaOnnxEngine {
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = vadFile.absolutePath,
                     threshold = 0.45f,
-                    minSilenceDuration = 0.25f,
+                    minSilenceDuration = 0.45f,
                     minSpeechDuration = 0.20f,
                     windowSize = 512
                 ),
@@ -54,8 +62,11 @@ object SherpaOnnxEngine {
             )
             vad = Vad(assetManager = null, config = vadConfig)
         }
+        return vad
+    }
 
-        val v = vad ?: return listOf(samples)
+    private fun extractSpeechWithVad(ctx: Context, samples: FloatArray): List<FloatArray> {
+        val v = getOrCreateVad(ctx) ?: return listOf(samples)
         v.reset()
         val windowSize = 512
         var offset = 0
@@ -74,6 +85,43 @@ object SherpaOnnxEngine {
             v.pop()
         }
         return if (segments.isEmpty()) emptyList() else segments
+    }
+
+    @Synchronized
+    fun getOrCreateOnlineRecognizer(ctx: Context): OnlineRecognizer {
+        if (onlineRecognizer != null) return onlineRecognizer!!
+        if (!ModelDownloader.isIndianEnInstalled(ctx)) {
+            throw IllegalStateException("Download English (India) Live Pack first")
+        }
+        val enc = ModelDownloader.getFile(ctx, ModelDownloader.INDIAN_EN_ENC)
+        val dec = ModelDownloader.getFile(ctx, ModelDownloader.INDIAN_EN_DEC)
+        val joiner = ModelDownloader.getFile(ctx, ModelDownloader.INDIAN_EN_JOINER)
+        val tok = ModelDownloader.getFile(ctx, ModelDownloader.INDIAN_EN_TOKENS)
+
+        val config = OnlineRecognizerConfig(
+            featConfig = FeatureConfig(sampleRate = 16000, featureDim = 80),
+            modelConfig = OnlineModelConfig(
+                transducer = OnlineTransducerModelConfig(
+                    encoder = enc.absolutePath,
+                    decoder = dec.absolutePath,
+                    joiner = joiner.absolutePath
+                ),
+                tokens = tok.absolutePath,
+                numThreads = 4,
+                debug = false,
+                modelType = "zipformer2"
+            ),
+            endpointConfig = EndpointConfig(
+                rule1 = EndpointRule(false, 2.4f, 0.0f),
+                rule2 = EndpointRule(true, 1.0f, 0.0f),
+                rule3 = EndpointRule(false, 0.0f, 20.0f)
+            ),
+            enableEndpoint = true,
+            decodingMethod = "greedy_search"
+        )
+        val rec = OnlineRecognizer(assetManager = null, config = config)
+        onlineRecognizer = rec
+        return rec
     }
 
     @Synchronized
@@ -143,10 +191,65 @@ object SherpaOnnxEngine {
         return rec
     }
 
+    fun preload(ctx: Context, engine: AsrEngineType) {
+        try {
+            getOrCreateVad(ctx)
+            when (engine) {
+                AsrEngineType.INDIAN_EN_STREAMING -> getOrCreateOnlineRecognizer(ctx)
+                AsrEngineType.WHISPER_HINGLISH_SWIFT,
+                AsrEngineType.INDIC_CONFORMER_HI,
+                AsrEngineType.INDIC_CONFORMER_OR -> getOrCreateRecognizer(ctx, engine)
+                else -> {}
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    fun transcribeOnlineSamples(ctx: Context, samples: FloatArray): Result<String> {
+        return try {
+            if (samples.isEmpty()) return Result.success("")
+            val rec = getOrCreateOnlineRecognizer(ctx)
+            val stream = rec.createStream()
+            stream.acceptWaveform(samples, 16000)
+            // Pad 0.4s trailing silence so the final word flushes cleanly
+            stream.acceptWaveform(FloatArray(6400), 16000)
+            while (rec.isReady(stream)) {
+                rec.decode(stream)
+            }
+            val text = rec.getResult(stream).text.trim()
+            stream.release()
+            Result.success(text)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun transcribeSamples(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
+        return try {
+            if (samples.isEmpty()) return Result.success("")
+            if (engine == AsrEngineType.INDIAN_EN_STREAMING) {
+                return transcribeOnlineSamples(ctx, samples)
+            }
+            val rec = getOrCreateRecognizer(ctx, engine)
+            val stream = rec.createStream()
+            stream.acceptWaveform(samples, 16000)
+            rec.decode(stream)
+            val text = rec.getResult(stream).text.trim()
+            stream.release()
+            Result.success(text)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun transcribe(ctx: Context, engine: AsrEngineType, wavFile: File): Result<String> {
         return try {
             val samples = readWavAsFloats(wavFile)
             if (samples.isEmpty()) return Result.success("")
+
+            if (engine == AsrEngineType.INDIAN_EN_STREAMING) {
+                return transcribeOnlineSamples(ctx, samples)
+            }
 
             val speechSegments = extractSpeechWithVad(ctx, samples)
             if (speechSegments.isEmpty()) {

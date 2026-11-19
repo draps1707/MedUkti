@@ -53,10 +53,27 @@ class MainActivity : AppCompatActivity() {
         spinnerModel.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Prefs.AVAILABLE_MODELS)
         spinnerModel.setSelection(Prefs.AVAILABLE_MODELS.indexOf(Prefs.getModel(this)).coerceAtLeast(0))
 
+        findViewById<Button>(R.id.btnDlIndianEn).setOnClickListener {
+            downloadBatch(
+                listOf(
+                    ModelDownloader.SILERO_VAD,
+                    ModelDownloader.INDIAN_EN_TOKENS,
+                    ModelDownloader.INDIAN_EN_ENC,
+                    ModelDownloader.INDIAN_EN_DEC,
+                    ModelDownloader.INDIAN_EN_JOINER
+                ),
+                "English (India) Live Pack"
+            )
+        }
+
         findViewById<Button>(R.id.btnDlAll).setOnClickListener {
             downloadBatch(
                 listOf(
                     ModelDownloader.SILERO_VAD,
+                    ModelDownloader.INDIAN_EN_TOKENS,
+                    ModelDownloader.INDIAN_EN_ENC,
+                    ModelDownloader.INDIAN_EN_DEC,
+                    ModelDownloader.INDIAN_EN_JOINER,
                     ModelDownloader.WHISPER_SWIFT_TOKENS,
                     ModelDownloader.WHISPER_SWIFT_ENC,
                     ModelDownloader.WHISPER_SWIFT_DEC,
@@ -88,6 +105,7 @@ class MainActivity : AppCompatActivity() {
             askedThisSession = false
             checkAndRequestNextMissingPermission()
             updateStatusAndAutoStart()
+            uiScope.launch { OfflineAsrEngines.preload(this@MainActivity) }
         }
 
         checkAndRequestNextMissingPermission()
@@ -108,6 +126,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             Toast.makeText(this@MainActivity, "$label ready offline!", Toast.LENGTH_SHORT).show()
+            OfflineAsrEngines.preload(this@MainActivity)
             updateStatusAndAutoStart()
         }
     }
@@ -159,12 +178,14 @@ class MainActivity : AppCompatActivity() {
         val overlayOk = Settings.canDrawOverlays(this)
         val accOk = DictationAccessibilityService.instance != null
         val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
+        val indianEnOk = ModelDownloader.isIndianEnInstalled(this)
         val indicOrOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_OR)
         val indicHiOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_HI)
         val swiftOk = ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_ENC) && ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_DEC)
 
         tvStatus.text = buildString {
             appendLine("Active Engine: ${Prefs.getEngine(this@MainActivity).label}")
+            appendLine("English (India) Live: ${if (indianEnOk) "Installed" else "Not downloaded"}")
             appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
             appendLine("Whisper Hinglish Swift: ${if (swiftOk) "Installed" else "Not downloaded"}")
             appendLine("IndicConformer Hindi: ${if (indicHiOk) "Installed" else "Not downloaded"}")

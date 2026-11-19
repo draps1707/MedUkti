@@ -4,6 +4,7 @@ import android.content.Context
 
 enum class AsrEngineType(val label: String) {
     AUTO_OFFLINE("Auto (Best Installed Offline Engine)"),
+    INDIAN_EN_STREAMING("English (India) Live Streaming (Offline ~71 MB)"),
     WHISPER_HINGLISH_SWIFT("Whisper Hinglish Swift + Silero VAD (Offline)"),
     INDIC_CONFORMER_OR("AI4Bharat IndicConformer Odia + Silero VAD (Offline)"),
     INDIC_CONFORMER_HI("AI4Bharat IndicConformer Hindi + Silero VAD (Offline)"),

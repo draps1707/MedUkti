@@ -1,11 +1,15 @@
 package com.voicerambler.free
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -22,9 +26,13 @@ import android.widget.ImageView
 import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 
 class FloatingMicService : Service() {
@@ -34,28 +42,41 @@ class FloatingMicService : Service() {
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
     private var ivMic: ImageView? = null
-    private lateinit var recorder: WavRecorderHelper
+    private lateinit var fallbackRecorder: WavRecorderHelper
     private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private var isListening = false
+    private val isListening = AtomicBoolean(false)
     private var isProcessing = false
-    private var beforeCursor = ""
-    private var afterCursor = ""
+    private var isFallbackMode = false
+
+    private var sessionBeforeCursor = ""
+    private var sessionAfterCursor = ""
+    private val committedText = StringBuilder()
+    private var lastRenderedInserted = ""
+
     private var lastUndoFullText: String? = null
     private var lastUndoCursor: Int = 0
+
+    private var liveLoopJob: Job? = null
+    private var vadConsumerJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        recorder = WavRecorderHelper(this)
+        fallbackRecorder = WavRecorderHelper(this)
         startForegroundNotification()
         showFloatingBubble()
 
+        // Preload active recognizer & VAD in background so first tap is instant
+        serviceScope.launch {
+            OfflineAsrEngines.preload(this@FloatingMicService)
+        }
+
         DictationAccessibilityService.onEditableFocusChanged = { focused ->
             mainHandler.post {
-                if (!isListening && !isProcessing) {
+                if (!isListening.get() && !isProcessing) {
                     floatingView?.visibility = if (focused) View.VISIBLE else View.GONE
                 }
             }
@@ -85,7 +106,7 @@ class FloatingMicService : Service() {
         }
         val notification = Notification.Builder(this, channelId)
             .setContentTitle("VoiceRambler Free is active")
-            .setContentText("Offline-first dictation. Tap to dictate, hold to undo, drag to move.")
+            .setContentText("Tap once for continuous live inline dictation. Tap again to stop.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
         startForeground(101, notification)
@@ -129,7 +150,7 @@ class FloatingMicService : Service() {
         var isDragging = false
         var longPressTriggered = false
         val longPressRunnable = Runnable {
-            if (!isDragging && !isListening && !isProcessing) {
+            if (!isDragging && !isListening.get() && !isProcessing) {
                 longPressTriggered = true
                 val undo = lastUndoFullText
                 if (undo != null) {
@@ -172,7 +193,7 @@ class FloatingMicService : Service() {
                         Prefs.setBubblePos(this@FloatingMicService, params.x, params.y)
                     } else if (!longPressTriggered && !isProcessing) {
                         buzz(20L)
-                        if (!isListening) startDictation() else stopAndTranscribe()
+                        if (!isListening.get()) startContinuousDictation() else stopContinuousDictation()
                     }
                     true
                 }
@@ -183,40 +204,276 @@ class FloatingMicService : Service() {
         windowManager.addView(view, params)
     }
 
-    private fun spliceAtCursor(inserted: String): Pair<String, Int> {
-        val needLeadingSpace = beforeCursor.isNotEmpty() && !beforeCursor.endsWith(" ") && !beforeCursor.endsWith("\n") && inserted.isNotEmpty()
-        val needTrailingSpace = afterCursor.isNotEmpty() && !afterCursor.startsWith(" ") && !afterCursor.startsWith("\n") && inserted.isNotEmpty()
+    private fun renderInlineText(partial: String) {
+        val combined = buildString {
+            append(committedText)
+            if (partial.isNotEmpty()) {
+                if (isNotEmpty()) append(" ")
+                append(partial)
+            }
+        }.trim()
+        if (combined == lastRenderedInserted || combined.isEmpty()) return
+        lastRenderedInserted = combined
+
+        val needLeadingSpace = sessionBeforeCursor.isNotEmpty() && !sessionBeforeCursor.endsWith(" ") && !sessionBeforeCursor.endsWith("\n")
+        val needTrailingSpace = sessionAfterCursor.isNotEmpty() && !sessionAfterCursor.startsWith(" ") && !sessionAfterCursor.startsWith("\n")
         val mid = buildString {
             if (needLeadingSpace) append(" ")
-            append(inserted)
+            append(combined)
             if (needTrailingSpace) append(" ")
         }
-        val full = beforeCursor + mid + afterCursor
-        val cursorEnd = beforeCursor.length + (if (needLeadingSpace) 1 else 0) + inserted.length
-        return Pair(full, cursorEnd)
+        val full = sessionBeforeCursor + mid + sessionAfterCursor
+        val cursorEnd = sessionBeforeCursor.length + (if (needLeadingSpace) 1 else 0) + combined.length
+        mainHandler.post {
+            DictationAccessibilityService.instance?.setFullTextWithCursor(full, cursorEnd)
+        }
     }
 
-    private fun startDictation() {
-        val ctx = DictationAccessibilityService.instance?.getCursorContext()
-        beforeCursor = ctx?.first ?: ""
-        afterCursor = ctx?.second ?: ""
-        lastUndoFullText = beforeCursor + afterCursor
-        lastUndoCursor = beforeCursor.length
+    private fun appendCommittedSegment(rawSegment: String, useOptionalGemini: Boolean, resolvedEngine: AsrEngineType) {
+        var finalOut = MedicalNormalizer.normalize(this, rawSegment.trim())
+        if (useOptionalGemini && resolvedEngine != AsrEngineType.GEMINI_CLOUD && finalOut.isNotBlank()) {
+            // Optional Gemini polish is skipped in live streaming loop unless explicitly enabled
+        }
+        if (finalOut.isNotBlank()) {
+            if (committedText.isNotEmpty()) committedText.append(" ")
+            committedText.append(finalOut)
+            renderInlineText("")
+        }
+    }
 
+    private fun startContinuousDictation() {
+        val ctx = DictationAccessibilityService.instance?.getCursorContext()
+        sessionBeforeCursor = ctx?.first ?: ""
+        sessionAfterCursor = ctx?.second ?: ""
+        lastUndoFullText = sessionBeforeCursor + sessionAfterCursor
+        lastUndoCursor = sessionBeforeCursor.length
+        committedText.clear()
+        lastRenderedInserted = ""
+
+        val selected = Prefs.getEngine(this)
+        val resolvedRes = OfflineAsrEngines.resolveEngine(this, selected)
+        if (resolvedRes.isFailure) {
+            Toast.makeText(this, resolvedRes.exceptionOrNull()?.message ?: "Download an offline model first", Toast.LENGTH_LONG).show()
+            return
+        }
+        val resolved = resolvedRes.getOrThrow()
+
+        if (resolved == AsrEngineType.INDIAN_EN_STREAMING) {
+            isFallbackMode = false
+            startStreamingIndianEnglish()
+        } else if (SherpaOnnxEngine.getOrCreateVad(this) != null) {
+            isFallbackMode = false
+            startContinuousVadLoop(resolved)
+        } else {
+            isFallbackMode = true
+            startFallbackTapToStop()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startStreamingIndianEnglish() {
+        isListening.set(true)
+        setMicUiState(MicUiState.LISTENING)
+
+        liveLoopJob = serviceScope.launch(Dispatchers.IO) {
+            var ar: AudioRecord? = null
+            try {
+                val rec = SherpaOnnxEngine.getOrCreateOnlineRecognizer(this@FloatingMicService)
+                val stream = rec.createStream()
+
+                val sampleRate = 16000
+                val minBuf = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                val bufSize = maxOf(minBuf, 4096)
+                ar = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
+                if (ar.state != AudioRecord.STATE_INITIALIZED) {
+                    throw IllegalStateException("Mic failed to initialize")
+                }
+                ar.startRecording()
+
+                val chunkSamples = 1600 // 100ms chunks
+                val shortBuf = ShortArray(chunkSamples)
+                val floatBuf = FloatArray(chunkSamples)
+                var lastPartial = ""
+                var lastUiPushMs = 0L
+
+                while (isListening.get()) {
+                    val read = ar.read(shortBuf, 0, chunkSamples)
+                    if (read > 0) {
+                        for (i in 0 until read) {
+                            floatBuf[i] = shortBuf[i] / 32768.0f
+                        }
+                        stream.acceptWaveform(if (read == chunkSamples) floatBuf else floatBuf.copyOf(read), sampleRate)
+                        while (rec.isReady(stream)) {
+                            rec.decode(stream)
+                        }
+                        val text = rec.getResult(stream).text.trim()
+                        val now = System.currentTimeMillis()
+                        if (text != lastPartial && (now - lastUiPushMs >= 180L)) {
+                            lastPartial = text
+                            lastUiPushMs = now
+                            renderInlineText(text)
+                        }
+                        if (rec.isEndpoint(stream)) {
+                            val finalPhrase = rec.getResult(stream).text.trim()
+                            if (finalPhrase.isNotEmpty()) {
+                                val normalized = MedicalNormalizer.normalize(this@FloatingMicService, finalPhrase)
+                                if (normalized.isNotEmpty()) {
+                                    if (committedText.isNotEmpty()) committedText.append(" ")
+                                    committedText.append(normalized)
+                                    renderInlineText("")
+                                }
+                            }
+                            lastPartial = ""
+                            rec.reset(stream)
+                        }
+                    }
+                }
+
+                // Flush remaining tail when user taps Stop
+                stream.acceptWaveform(FloatArray(6400), sampleRate)
+                while (rec.isReady(stream)) {
+                    rec.decode(stream)
+                }
+                val tail = rec.getResult(stream).text.trim()
+                if (tail.isNotEmpty()) {
+                    val normalized = MedicalNormalizer.normalize(this@FloatingMicService, tail)
+                    if (normalized.isNotEmpty()) {
+                        if (committedText.isNotEmpty()) committedText.append(" ")
+                        committedText.append(normalized)
+                        renderInlineText("")
+                    }
+                }
+                stream.release()
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@FloatingMicService, e.message ?: "Streaming error", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                try {
+                    ar?.stop()
+                    ar?.release()
+                } catch (_: Exception) {
+                }
+                withContext(Dispatchers.Main) {
+                    isListening.set(false)
+                    isProcessing = false
+                    setMicUiState(MicUiState.IDLE)
+                }
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startContinuousVadLoop(resolved: AsrEngineType) {
+        isListening.set(true)
+        setMicUiState(MicUiState.LISTENING)
+        val segmentChannel = Channel<FloatArray>(Channel.UNLIMITED)
+        val useOptionalGemini = Prefs.isGeminiPolishEnabled(this) && Prefs.getApiKey(this).isNotBlank()
+
+        vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
+            for (seg in segmentChannel) {
+                val res = OfflineAsrEngines.transcribeSamples(this@FloatingMicService, resolved, seg)
+                res.onSuccess { raw ->
+                    var finalOut = MedicalNormalizer.normalize(this@FloatingMicService, raw)
+                    if (useOptionalGemini && resolved != AsrEngineType.GEMINI_CLOUD && finalOut.isNotBlank()) {
+                        GeminiClient.polishOfflineTranscript(Prefs.getApiKey(this@FloatingMicService), Prefs.getModel(this@FloatingMicService), finalOut)
+                            .onSuccess { polished -> if (polished.isNotBlank()) finalOut = polished }
+                    }
+                    if (finalOut.isNotBlank()) {
+                        if (committedText.isNotEmpty()) committedText.append(" ")
+                        committedText.append(finalOut)
+                        renderInlineText("")
+                    }
+                }
+            }
+            withContext(Dispatchers.Main) {
+                isProcessing = false
+                setMicUiState(MicUiState.IDLE)
+            }
+        }
+
+        liveLoopJob = serviceScope.launch(Dispatchers.IO) {
+            var ar: AudioRecord? = null
+            try {
+                val vad = SherpaOnnxEngine.getOrCreateVad(this@FloatingMicService)
+                    ?: throw IllegalStateException("Silero VAD not installed")
+                vad.reset()
+
+                val sampleRate = 16000
+                val minBuf = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                val bufSize = maxOf(minBuf, 4096)
+                ar = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
+                if (ar.state != AudioRecord.STATE_INITIALIZED) {
+                    throw IllegalStateException("Mic failed to initialize")
+                }
+                ar.startRecording()
+
+                val windowSize = 512
+                val shortBuf = ShortArray(windowSize)
+                val floatBuf = FloatArray(windowSize)
+
+                while (isListening.get()) {
+                    val read = ar.read(shortBuf, 0, windowSize)
+                    if (read == windowSize) {
+                        for (i in 0 until windowSize) {
+                            floatBuf[i] = shortBuf[i] / 32768.0f
+                        }
+                        vad.acceptWaveform(floatBuf)
+                        while (!vad.empty()) {
+                            val seg = vad.front()
+                            if (seg.samples.isNotEmpty()) {
+                                segmentChannel.trySend(seg.samples)
+                            }
+                            vad.pop()
+                        }
+                    }
+                }
+
+                vad.flush()
+                while (!vad.empty()) {
+                    val seg = vad.front()
+                    if (seg.samples.isNotEmpty()) {
+                        segmentChannel.trySend(seg.samples)
+                    }
+                    vad.pop()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@FloatingMicService, e.message ?: "VAD error", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                try {
+                    ar?.stop()
+                    ar?.release()
+                } catch (_: Exception) {
+                }
+                segmentChannel.close()
+            }
+        }
+    }
+
+    private fun startFallbackTapToStop() {
         try {
-            recorder.startRecording()
-            isListening = true
+            fallbackRecorder.startRecording()
+            isListening.set(true)
             setMicUiState(MicUiState.LISTENING)
         } catch (e: Exception) {
-            isListening = false
+            isListening.set(false)
             setMicUiState(MicUiState.IDLE)
             Toast.makeText(this, "Mic error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun stopAndTranscribe() {
-        val wavFile = recorder.stopRecording()
-        isListening = false
+    private fun stopContinuousDictation() {
+        if (!isFallbackMode) {
+            isListening.set(false)
+            isProcessing = true
+            setMicUiState(MicUiState.POLISHING)
+            return
+        }
+
+        val wavFile = fallbackRecorder.stopRecording()
+        isListening.set(false)
         if (wavFile == null || !wavFile.exists()) {
             setMicUiState(MicUiState.IDLE)
             return
@@ -236,15 +493,14 @@ class FloatingMicService : Service() {
                 var finalOut = MedicalNormalizer.normalize(this@FloatingMicService, raw)
                 if (useOptionalGemini && engine != AsrEngineType.GEMINI_CLOUD && finalOut.isNotBlank()) {
                     GeminiClient.polishOfflineTranscript(Prefs.getApiKey(this@FloatingMicService), Prefs.getModel(this@FloatingMicService), finalOut)
-                        .onSuccess { polished ->
-                            if (polished.isNotBlank()) finalOut = polished
-                        }
+                        .onSuccess { polished -> if (polished.isNotBlank()) finalOut = polished }
                 }
                 isProcessing = false
                 setMicUiState(MicUiState.IDLE)
                 if (finalOut.isNotBlank()) {
-                    val (full, pos) = spliceAtCursor(finalOut)
-                    DictationAccessibilityService.instance?.setFullTextWithCursor(full, pos)
+                    committedText.clear()
+                    committedText.append(finalOut)
+                    renderInlineText("")
                 }
             }.onFailure { err ->
                 isProcessing = false
@@ -256,7 +512,10 @@ class FloatingMicService : Service() {
 
     override fun onDestroy() {
         DictationAccessibilityService.onEditableFocusChanged = null
-        recorder.stopRecording()
+        isListening.set(false)
+        liveLoopJob?.cancel()
+        vadConsumerJob?.cancel()
+        fallbackRecorder.stopRecording()
         floatingView?.let { windowManager.removeView(it) }
         serviceScope.cancel()
         super.onDestroy()
