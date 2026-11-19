@@ -120,7 +120,7 @@ class FloatingMicService : Service() {
             )
         }
         val notification = Notification.Builder(this, channelId)
-            .setContentTitle("VoiceRambler Free (Hinglish & Odia)")
+            .setContentTitle("କଥାType (Hinglish & Odia)")
             .setContentText("Tap mic to dictate, tap HI/OD to switch language.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()

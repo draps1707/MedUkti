@@ -65,22 +65,18 @@ object SherpaOnnxEngine {
         var text = Normalizer.normalize(raw.trim(), Normalizer.Form.NFC)
         if (text.isEmpty()) return ""
 
-        // Strip Whisper noise/hallucination artifacts & 3x+ repetitions
         text = text
             .replace(Regex("\\[(?:BLANK_AUDIO|unintelligible|unk|noise|silence|inaudible)\\]", RegexOption.IGNORE_CASE), "")
             .replace(Regex("(?i)\\b(?:thanks for watching|thank you for watching|subscribe to my channel)\\b[.!]*"), "")
             .replace(Regex("\\b(\\w+)(?:\\s+\\1){2,}\\b", RegexOption.IGNORE_CASE), "$1")
 
-        // Strip standalone hesitation fillers
         text = text.replace(Regex("(?i)\\b(?:umm+|uhh+|err+m*|ahh+)\\b[,\\s]*"), " ")
 
-        // Self-correction: "wait no <new>" or "sorry i mean <new>"
         val selfCorr = Regex("(?i).*?\\b(?:wait no|sorry i mean|i mean)\\b[,\\s]+(.+)$").find(text)
         if (selfCorr != null) {
             text = selfCorr.groupValues[1].trim()
         }
 
-        // Paragraph, bullet, and punctuation voice commands
         val fullStopChar = if (engine == AsrEngineType.INDIC_CONFORMER_OR) "।" else "."
         text = text
             .replace(Regex("\\s*\\bnew paragraph\\b\\s*", RegexOption.IGNORE_CASE), "\n\n")
@@ -90,10 +86,12 @@ object SherpaOnnxEngine {
             .replace(Regex("\\s*\\bquestion mark\\b[.?]*", RegexOption.IGNORE_CASE), "?")
             .replace(Regex("\\s*\\bcomma\\b,*", RegexOption.IGNORE_CASE), ",")
 
-        // Voice emoji shortcuts
         for ((phrase, emoji) in EMOJI_MAP) {
             text = text.replace(Regex("\\b${Regex.escape(phrase)}\\b", RegexOption.IGNORE_CASE), emoji)
         }
+
+        // Apply Odia-English bridge + safe medical dictionary
+        text = MedicalNormalizer.normalize(ctx, text, engine)
 
         // Personal dictionary replacements (wrong = right, one per line)
         val dictRaw = Prefs.getPersonalDict(ctx)
@@ -220,7 +218,6 @@ object SherpaOnnxEngine {
                     debug = false
                 )
             }
-            else -> throw IllegalArgumentException("Unsupported sherpa-onnx engine: $engine")
         }
 
         val config = OfflineRecognizerConfig(
@@ -235,6 +232,7 @@ object SherpaOnnxEngine {
 
     fun preload(ctx: Context, engine: AsrEngineType) {
         try {
+            MedicalNormalizer.init(ctx)
             getOrCreateVad(ctx)
             getOrCreateRecognizer(ctx, engine)
         } catch (_: Exception) {

@@ -1,14 +1,14 @@
 package com.voicerambler.free
 
 import android.content.Context
-import java.io.File
 import kotlin.math.abs
 
 object MedicalNormalizer {
 
     private val singleWordMap = HashMap<String, String>()
     private val multiWordRules = ArrayList<Pair<Regex, String>>()
-    private val fuzzyCandidates = ArrayList<Pair<String, String>>()
+    private val fuzzyBuckets = HashMap<Char, ArrayList<Pair<String, String>>>()
+    private val skeletonMap = HashMap<String, String>()
 
     @Volatile
     private var loaded = false
@@ -91,6 +91,130 @@ object MedicalNormalizer {
         "milliliters" to "mL"
     )
 
+    /** Curated Odia-script -> English bridge for everyday chat, hospital, disease, and medicine terms. */
+    private val ODIA_TO_ENGLISH_BRIDGE = linkedMapOf(
+        "ଓକେ" to "ok",
+        "ସରି" to "sorry",
+        "ଥ୍ୟାଙ୍କ ୟୁ" to "thank you",
+        "ଥ୍ୟାଙ୍କ୍ସ" to "thanks",
+        "ପ୍ଲିଜ" to "please",
+        "ହେଲୋ" to "hello",
+        "ହାଇ" to "hi",
+        "ଗୁଡ ମର୍ଣ୍ଣିଂ" to "good morning",
+        "ଗୁଡ ନାଇଟ" to "good night",
+        "ମର୍ଣ୍ଣିଂ" to "morning",
+        "ନାଇଟ" to "night",
+        "ଟାଇମ" to "time",
+        "ଫୋନ" to "phone",
+        "କଲ" to "call",
+        "ମେସେଜ" to "message",
+        "ହ୍ୱାଟ୍ସଆପ" to "WhatsApp",
+        "ହ୍ୱାଟ୍ସଆପ୍" to "WhatsApp",
+        "ଫଟୋ" to "photo",
+        "ଭିଡିଓ" to "video",
+        "ଡକ୍ଟର" to "doctor",
+        "ଡାକ୍ତର" to "doctor",
+        "ହସ୍ପିଟାଲ" to "hospital",
+        "ହସ୍ପିଟାଲ୍" to "hospital",
+        "କ୍ଲିନିକ" to "clinic",
+        "ଓପିଡି" to "OPD",
+        "ଆଇସିୟୁ" to "ICU",
+        "ଏମରଜେନ୍ସି" to "emergency",
+        "ପେସେଣ୍ଟ" to "patient",
+        "ରିପୋର୍ଟ" to "report",
+        "ଟେଷ୍ଟ" to "test",
+        "ବ୍ଲଡ ଟେଷ୍ଟ" to "blood test",
+        "ବ୍ଲଡ ପ୍ରେସର" to "blood pressure",
+        "ବିପି" to "BP",
+        "ସୁଗାର" to "sugar",
+        "ଡାଇବେଟିସ" to "Diabetes",
+        "ଡାଇବେଟିସ୍" to "Diabetes",
+        "ହାଇପରଟେନସନ" to "Hypertension",
+        "ଥାଇରଏଡ" to "Thyroid",
+        "ଆଜମା" to "Asthma",
+        "ନିମୋନିଆ" to "Pneumonia",
+        "ମ୍ୟାଲେରିଆ" to "Malaria",
+        "ଟାଇଫଏଡ" to "Typhoid",
+        "ଡେଙ୍ଗୁ" to "Dengue",
+        "ଜଣ୍ଡିସ" to "Jaundice",
+        "ଫିଭର" to "fever",
+        "ପେନ" to "pain",
+        "ଏକ୍ସରେ" to "X-ray",
+        "ସିଟି ସ୍କାନ" to "CT scan",
+        "ଏମଆରଆଇ" to "MRI",
+        "ଅଲଟ୍ରାସାଉଣ୍ଡ" to "ultrasound",
+        "ଇସିଜି" to "ECG",
+        "ମେଡିସିନ" to "medicine",
+        "ଟାବଲେଟ" to "tablet",
+        "ଟାବଲେଟ୍" to "tablet",
+        "କ୍ୟାପସୁଲ" to "capsule",
+        "ସିରପ" to "syrup",
+        "ଇଞ୍ଜେକ୍ସନ" to "injection",
+        "ଡ୍ରପ" to "drop",
+        "ଆଣ୍ଟିବାୟୋଟିକ" to "antibiotic",
+        "ପାରାସିଟାମୋଲ" to "Paracetamol",
+        "ମେଟଫର୍ମିନ" to "Metformin",
+        "ପ୍ୟାଣ୍ଟୋପ୍ରାଜୋଲ" to "Pantoprazole",
+        "ଆମୋକ୍ସିସିଲିନ" to "Amoxicillin",
+        "ଆଜିଥ୍ରୋମାଇସିନ" to "Azithromycin",
+        "ସେଫଟ୍ରାଇଆକ୍ସୋନ" to "Ceftriaxone",
+        "ପିପଟାଜ" to "Piptaz",
+        "ମୋନୋସେଫ" to "Monocef",
+        "ଡୋଲୋ" to "Dolo",
+        "ସର୍ଜରୀ" to "surgery",
+        "ଅପରେସନ" to "operation",
+        "ଆଡମିଟ" to "admit",
+        "ଡିସଚାର୍ଜ" to "discharge"
+    )
+
+    private fun englishSkeleton(word: String): String {
+        val sb = StringBuilder()
+        var prev = '\u0000'
+        for (ch in word.lowercase()) {
+            val mapped = when (ch) {
+                'a', 'e', 'i', 'o', 'u', 'y', 'h', 'w' -> continue
+                'c', 'k', 'q' -> 'k'
+                'p', 'f' -> 'p'
+                'b', 'v' -> 'b'
+                't', 'd' -> 't'
+                's', 'z' -> 's'
+                'g', 'j' -> 'j'
+                else -> ch
+            }
+            if (mapped != prev) {
+                sb.append(mapped)
+                prev = mapped
+            }
+        }
+        return sb.toString()
+    }
+
+    private fun odiaSkeleton(word: String): String {
+        val sb = StringBuilder()
+        var prev = '\u0000'
+        for (ch in word) {
+            val mapped = when (ch) {
+                'କ', 'ଖ' -> 'k'
+                'ଗ', 'ଘ', 'ଜ', 'ଝ' -> 'j'
+                'ଚ', 'ଛ' -> 'k'
+                'ଟ', 'ଠ', 'ଡ', 'ଢ', 'ଡ଼', 'ଢ଼', 'ତ', 'ଥ', 'ଦ', 'ଧ' -> 't'
+                'ଣ', 'ନ' -> 'n'
+                'ପ', 'ଫ' -> 'p'
+                'ବ', 'ଭ' -> 'b'
+                'ମ' -> 'm'
+                'ର' -> 'r'
+                'ଲ', 'ଳ' -> 'l'
+                'ଶ', 'ଷ', 'ସ' -> 's'
+                else -> continue
+            }
+            if (mapped != prev) {
+                sb.append(mapped)
+                prev = mapped
+            }
+        }
+        return sb.toString()
+    }
+
     fun init(ctx: Context) {
         if (loaded) return
         synchronized(this) {
@@ -102,6 +226,8 @@ object MedicalNormalizer {
                     singleWordMap[k] = v
                 }
             }
+            val skelCounts = HashMap<String, Int>()
+            val skelTerm = HashMap<String, String>()
             try {
                 ctx.assets.open("medical_dictionary.txt").bufferedReader().useLines { lines ->
                     lines.forEach { raw ->
@@ -112,38 +238,29 @@ object MedicalNormalizer {
                                 multiWordRules.add(Regex("\\b${Regex.escape(lower)}\\b", RegexOption.IGNORE_CASE) to Regex.escapeReplacement(term))
                             } else {
                                 singleWordMap.putIfAbsent(lower, term)
-                                if (lower.length >= 6 && lower !in PROTECTED_WORDS) {
-                                    fuzzyCandidates.add(lower to term)
+                                if (lower.length >= 8 && lower !in PROTECTED_WORDS) {
+                                    fuzzyBuckets.getOrPut(lower[0]) { ArrayList() }.add(lower to term)
+                                }
+                                if (lower.length >= 7) {
+                                    val sk = englishSkeleton(lower)
+                                    if (sk.length >= 5) {
+                                        skelCounts[sk] = (skelCounts[sk] ?: 0) + 1
+                                        skelTerm[sk] = term
+                                    }
                                 }
                             }
                         }
+                    }
+                }
+                for ((sk, cnt) in skelCounts) {
+                    if (cnt == 1) {
+                        skeletonMap[sk] = skelTerm[sk]!!
                     }
                 }
             } catch (_: Exception) {
             }
             loaded = true
         }
-    }
-
-    /** Generates a hotwords.txt file in app filesDir for sherpa-onnx beam-search biasing. */
-    fun ensureHotwordsFile(ctx: Context): File {
-        init(ctx)
-        val out = File(ModelDownloader.modelsDir(ctx), "medical_hotwords.txt")
-        if (out.exists() && out.length() > 100L) return out
-        val terms = LinkedHashSet<String>()
-        try {
-            ctx.assets.open("medical_dictionary.txt").bufferedReader().useLines { lines ->
-                lines.forEach { raw ->
-                    val t = raw.trim()
-                    if (t.length >= 4 && t.all { it.code < 128 }) {
-                        terms.add(t.lowercase())
-                    }
-                }
-            }
-        } catch (_: Exception) {
-        }
-        out.writeText(terms.joinToString("\n"))
-        return out
     }
 
     private fun levenshtein(a: String, b: String, maxDist: Int): Int {
@@ -165,58 +282,61 @@ object MedicalNormalizer {
     }
 
     private fun fuzzyLookup(lowerWord: String): String? {
-        if (lowerWord.length < 6 || lowerWord in PROTECTED_WORDS) return null
-        val maxDist = if (lowerWord.length >= 9) 2 else 1
+        if (lowerWord.length < 8 || lowerWord in PROTECTED_WORDS) return null
         val firstChar = lowerWord[0]
         var bestTerm: String? = null
-        var bestDist = maxDist + 1
+        var bestDist = 2
         var tie = false
 
-        for ((candLower, candCanonical) in fuzzyCandidates) {
-            if (candLower[0] != firstChar) continue
-            if (abs(candLower.length - lowerWord.length) > maxDist) continue
-            val d = levenshtein(lowerWord, candLower, maxDist)
+        val bucket = fuzzyBuckets[firstChar] ?: return null
+        for ((candLower, candCanonical) in bucket) {
+            if (abs(candLower.length - lowerWord.length) > 1) continue
+            val d = levenshtein(lowerWord, candLower, 1)
             if (d < bestDist) {
                 bestDist = d
                 bestTerm = candCanonical
                 tie = false
-            } else if (d == bestDist && d <= maxDist && bestTerm != candCanonical) {
+            } else if (d == bestDist && d <= 1 && bestTerm != candCanonical) {
                 tie = true
             }
         }
-        return if (!tie && bestDist <= maxDist) bestTerm else null
+        return if (!tie && bestDist <= 1) bestTerm else null
     }
 
-    /**
-     * Conservative offline medical normalizer:
-     * 1. Applies fast pre-compiled phonetic & UK/US medical bridges.
-     * 2. Collapses split syllables ("pan to prazole" -> "Pantoprazole") when safe.
-     * 3. Applies O(1) dictionary casing + conservative fuzzy matching (edit distance <= 1-2).
-     * 4. NEVER alters digits, decimals, doses, units, or negations.
-     */
-        fun countMedicalHits(ctx: Context, text: String): Int {
-        init(ctx)
-        if (text.isBlank()) return 0
-        var hits = 0
-        for (w in text.lowercase().split(Regex("\\s+"))) {
-            val c = w.trimEnd('.', ',', ';', ':', '?', '!')
-            if (c.length >= 4 && singleWordMap.containsKey(c)) hits++
-        }
-        return hits
-    }
-
-    fun normalize(ctx: Context, raw: String): String {
+    fun normalize(ctx: Context, raw: String, engine: AsrEngineType): String {
         init(ctx)
         var text = raw.trim()
         if (text.isEmpty()) return ""
 
+        if (engine == AsrEngineType.INDIC_CONFORMER_OR) {
+            for ((odia, eng) in ODIA_TO_ENGLISH_BRIDGE) {
+                if (odia in text) {
+                    text = text.replace(odia, eng)
+                }
+            }
+            // Phonetic Odia-script -> English medical term matcher for longer drug/disease words
+            val words = text.split(Regex("\\s+"))
+            val out = ArrayList<String>(words.size)
+            for (w in words) {
+                if (w.length >= 7 && w.any { it in '\u0B00'..'\u0B7F' }) {
+                    val sk = odiaSkeleton(w)
+                    val hit = if (sk.length >= 5) skeletonMap[sk] else null
+                    out.add(hit ?: w)
+                } else {
+                    out.add(w)
+                }
+            }
+            return out.joinToString(" ").replace(Regex("\\s{2,}"), " ").trim()
+        }
+
+        // Hinglish safe medical normalization (never alters numbers, units, negations, or short Hinglish words)
         for ((regex, replacement) in multiWordRules) {
             if (regex.containsMatchIn(text)) {
                 text = regex.replace(text, replacement)
             }
         }
 
-        val tokens = text.split(Regex("\\s+")).toMutableList()
+        val tokens = text.split(Regex("\\s+"))
         val out = ArrayList<String>(tokens.size)
         var i = 0
         while (i < tokens.size) {
@@ -225,15 +345,13 @@ object MedicalNormalizer {
             val punct1 = w1.substring(clean1.length)
             val low1 = clean1.lowercase()
 
-            // Try joining 2 adjacent pure-alpha tokens (e.g. "panto prazole" -> "Pantoprazole")
             if (i + 1 < tokens.size && clean1.all { it in 'a'..'z' || it in 'A'..'Z' } && low1 !in PROTECTED_WORDS) {
                 val w2 = tokens[i + 1]
                 val clean2 = w2.trimEnd('.', ',', ';', ':', '?', '!')
                 val punct2 = w2.substring(clean2.length)
                 val low2 = clean2.lowercase()
                 if (clean2.all { it in 'a'..'z' || it in 'A'..'Z' } && low2 !in PROTECTED_WORDS) {
-                    val joined = low1 + low2
-                    val hit = singleWordMap[joined]
+                    val hit = singleWordMap[low1 + low2]
                     if (hit != null) {
                         out.add(hit + punct2)
                         i += 2
@@ -256,10 +374,6 @@ object MedicalNormalizer {
             i++
         }
 
-        text = out.joinToString(" ")
-        if (text.isNotEmpty() && text[0] in 'a'..'z') {
-            text = text[0].uppercaseChar() + text.substring(1)
-        }
-        return text.replace(Regex("\\s{2,}"), " ").trim()
+        return out.joinToString(" ").replace(Regex("\\s{2,}"), " ").trim()
     }
 }

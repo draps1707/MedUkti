@@ -24,6 +24,15 @@ jobs:
           echo "Downloading $AAR_URL"
           curl -L -o app/libs/sherpa-onnx.aar "$AAR_URL"
 
+      - name: Merge 98,000+ open medical terms into dictionary
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/glutanimate/wordlist-medicalterms-en/master/wordlist.txt -o /tmp/med_extra.txt || true
+          if [ -s /tmp/med_extra.txt ]; then
+            cat app/src/main/assets/medical_dictionary.txt /tmp/med_extra.txt | awk 'NF' | awk '!seen[tolower($0)]++' > /tmp/med_merged.txt
+            mv /tmp/med_merged.txt app/src/main/assets/medical_dictionary.txt
+          fi
+          wc -l app/src/main/assets/medical_dictionary.txt
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -35,5 +44,5 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VoiceRamblerFree-debug-apk
+          name: KathaType-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
