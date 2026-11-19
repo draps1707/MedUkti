@@ -17,23 +17,10 @@ object ModelDownloader {
         val executable: Boolean = false
     )
 
-    val NEEDLE_BIN = ModelArtifact(
-        "needle",
-        "needle",
-        "https://huggingface.co/Cactus-Compute/needle3/resolve/main/android-arm64/needle",
-        executable = true
-    )
-
-    val SHRUTI_HI_EN = ModelArtifact(
-        "shruti_hi",
-        "shruti.cact",
-        "https://huggingface.co/udgamlabs/Shruti/resolve/main/shruti.cact"
-    )
-
-    val SHRUTI_ODIA = ModelArtifact(
-        "shruti_or",
-        "shruti-odia.cact",
-        "https://huggingface.co/udgamlabs/shruti-odia/resolve/main/shruti-odia.cact"
+    val SILERO_VAD = ModelArtifact(
+        "silero_vad",
+        "silero_vad.onnx",
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
     )
 
     val INDIC_TOKENS = ModelArtifact(
@@ -54,13 +41,50 @@ object ModelDownloader {
         "https://huggingface.co/Docglasses-AI/indic-conformer-600m-sherpa-onnx-int8/resolve/main/indicconformer-or.int8.onnx"
     )
 
+    val WHISPER_SWIFT_ENC = ModelArtifact(
+        "whisper_swift_enc",
+        "hinglish-swift-encoder.int8.onnx",
+        "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-swift/encoder.int8.onnx"
+    )
+
+    val WHISPER_SWIFT_DEC = ModelArtifact(
+        "whisper_swift_dec",
+        "hinglish-swift-decoder.int8.onnx",
+        "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-swift/decoder.int8.onnx"
+    )
+
+    val WHISPER_SWIFT_TOKENS = ModelArtifact(
+        "whisper_swift_tok",
+        "hinglish-swift-tokens.txt",
+        "https://huggingface.co/NiranjanYadavIN/indicconformer-sherpa-onnx/resolve/main/hi-hinglish-swift/tokens.txt"
+    )
+
+    val NEEDLE_BIN = ModelArtifact(
+        "needle",
+        "needle",
+        "https://huggingface.co/Cactus-Compute/needle3/resolve/main/android-arm64/needle",
+        executable = true
+    )
+
+    val SHRUTI_HI_EN = ModelArtifact(
+        "shruti_hi",
+        "shruti.cact",
+        "https://huggingface.co/udgamlabs/Shruti/resolve/main/shruti.cact"
+    )
+
+    val SHRUTI_ODIA = ModelArtifact(
+        "shruti_or",
+        "shruti-odia.cact",
+        "https://huggingface.co/udgamlabs/shruti-odia/resolve/main/shruti-odia.cact"
+    )
+
     fun modelsDir(ctx: Context): File = File(ctx.filesDir, "models").apply { mkdirs() }
 
     fun getFile(ctx: Context, artifact: ModelArtifact): File = File(modelsDir(ctx), artifact.fileName)
 
     fun isInstalled(ctx: Context, artifact: ModelArtifact): Boolean {
         val f = getFile(ctx, artifact)
-        return f.exists() && f.length() > 1024L
+        return f.exists() && f.length() > 512L
     }
 
     suspend fun download(

@@ -13,22 +13,11 @@ object OfflineAsrEngines {
         wavFile: File
     ): Result<String> = withContext(Dispatchers.IO) {
         when (engine) {
+            AsrEngineType.INDIC_CONFORMER_OR,
+            AsrEngineType.INDIC_CONFORMER_HI,
+            AsrEngineType.WHISPER_HINGLISH_SWIFT -> SherpaOnnxEngine.transcribe(ctx, engine, wavFile)
             AsrEngineType.SHRUTI_HI_EN -> runShrutiNeedle(ctx, ModelDownloader.SHRUTI_HI_EN, wavFile)
             AsrEngineType.SHRUTI_ODIA -> runShrutiNeedle(ctx, ModelDownloader.SHRUTI_ODIA, wavFile)
-            AsrEngineType.INDIC_CONFORMER_HI -> {
-                if (!ModelDownloader.isInstalled(ctx, ModelDownloader.INDIC_HI)) {
-                    Result.failure(Exception("Download IndicConformer Hindi ONNX in App Manager first"))
-                } else {
-                    Result.failure(Exception("IndicConformer ONNX runtime integration ready in Phase 2; use Shruti or Gemini for now"))
-                }
-            }
-            AsrEngineType.INDIC_CONFORMER_OR -> {
-                if (!ModelDownloader.isInstalled(ctx, ModelDownloader.INDIC_OR)) {
-                    Result.failure(Exception("Download IndicConformer Odia ONNX in App Manager first"))
-                } else {
-                    Result.failure(Exception("IndicConformer ONNX runtime integration ready in Phase 2; use Shruti or Gemini for now"))
-                }
-            }
             AsrEngineType.GEMINI_CLOUD -> {
                 val key = Prefs.getApiKey(ctx)
                 if (key.isBlank()) {
@@ -65,7 +54,6 @@ object OfflineAsrEngines {
             if (exit != 0) {
                 Result.failure(Exception("Shruti exit $exit: $output"))
             } else {
-                // Take final clean transcript line
                 val cleaned = output.lines().lastOrNull { it.isNotBlank() }?.trim() ?: ""
                 Result.success(cleaned)
             }

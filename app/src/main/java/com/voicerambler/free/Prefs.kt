@@ -3,10 +3,11 @@ package com.voicerambler.free
 import android.content.Context
 
 enum class AsrEngineType(val label: String) {
+    INDIC_CONFORMER_OR("AI4Bharat IndicConformer Odia (Offline sherpa-onnx)"),
+    INDIC_CONFORMER_HI("AI4Bharat IndicConformer Hindi (Offline sherpa-onnx)"),
+    WHISPER_HINGLISH_SWIFT("Whisper Hinglish Swift + Silero VAD (Offline sherpa-onnx)"),
     SHRUTI_HI_EN("Shruti Offline (Hindi / Hinglish / Eng - 29.5 MB)"),
     SHRUTI_ODIA("Shruti Offline (Odia / Eng - ~30 MB)"),
-    INDIC_CONFORMER_HI("AI4Bharat IndicConformer Hindi (Offline ONNX)"),
-    INDIC_CONFORMER_OR("AI4Bharat IndicConformer Odia (Offline ONNX)"),
     GEMINI_CLOUD("Gemini Cloud Audio (Optional)")
 }
 
@@ -26,8 +27,8 @@ object Prefs {
     )
 
     fun getEngine(ctx: Context): AsrEngineType {
-        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_ENGINE, AsrEngineType.SHRUTI_HI_EN.name)
-        return AsrEngineType.entries.firstOrNull { it.name == raw } ?: AsrEngineType.SHRUTI_HI_EN
+        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_ENGINE, AsrEngineType.INDIC_CONFORMER_OR.name)
+        return AsrEngineType.entries.firstOrNull { it.name == raw } ?: AsrEngineType.INDIC_CONFORMER_OR
     }
 
     fun setEngine(ctx: Context, engine: AsrEngineType) {

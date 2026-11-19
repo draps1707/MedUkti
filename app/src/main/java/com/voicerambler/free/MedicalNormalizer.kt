@@ -1,9 +1,33 @@
 package com.voicerambler.free
 
+import android.content.Context
+
 object MedicalNormalizer {
 
+    private val canonicalTerms = LinkedHashMap<String, String>()
+    @Volatile
+    private var loaded = false
+
+    fun init(ctx: Context) {
+        if (loaded) return
+        synchronized(this) {
+            if (loaded) return
+            try {
+                ctx.assets.open("medical_dictionary.txt").bufferedReader().useLines { lines ->
+                    lines.forEach { raw ->
+                        val term = raw.trim()
+                        if (term.isNotEmpty()) {
+                            canonicalTerms[term.lowercase()] = term
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+            loaded = true
+        }
+    }
+
     private val PHONETIC_CORRECTIONS = linkedMapOf(
-        // Labs & Vitals
         "s p o 2" to "SpO2",
         "spo 2" to "SpO2",
         "spo2" to "SpO2",
@@ -25,29 +49,17 @@ object MedicalNormalizer {
         "u t i" to "UTI",
         "s t e m i" to "STEMI",
         "n s t e m i" to "NSTEMI",
-        // Common Drugs & Misrecognitions
         "pep taz" to "Piptaz",
         "pip taz" to "Piptaz",
-        "piperacillin tazobactam" to "piperacillin-tazobactam",
-        "sef triaxone" to "ceftriaxone",
-        "cef triaxone" to "ceftriaxone",
-        "azithro mycin" to "azithromycin",
-        "amoxycillin" to "amoxicillin",
-        "panto prazole" to "pantoprazole",
-        "para cetamol" to "paracetamol",
-        "furo semide" to "furosemide",
-        "met formin" to "metformin",
-        "amlo dipine" to "amlodipine",
-        "telmi sartan" to "telmisartan",
-        "atorva statin" to "atorvastatin",
-        "clopido grel" to "clopidogrel",
-        "ondan setron" to "ondansetron",
-        "dexametha sone" to "dexamethasone",
-        "hydro cortisone" to "hydrocortisone",
-        "levo cetirizine" to "levocetirizine",
-        "salbu tamol" to "salbutamol",
-        "enoxa parin" to "enoxaparin",
-        // Dosing abbreviations
+        "sef triaxone" to "Ceftriaxone",
+        "cef triaxone" to "Ceftriaxone",
+        "mono sef" to "Monocef",
+        "taxim o" to "Taxim O",
+        "moxikind cv" to "Moxikind CV",
+        "glycomet gp" to "Glycomet GP",
+        "telma am" to "Telma AM",
+        "metolar xl" to "Metolar XL",
+        "pan d" to "Pan D",
         "once daily" to "OD",
         "twice daily" to "BD",
         "thrice daily" to "TDS",
@@ -60,33 +72,33 @@ object MedicalNormalizer {
         "milliliters" to "mL"
     )
 
-    private val NUMBER_WORDS = mapOf(
-        "zero" to "0", "one" to "1", "two" to "2", "three" to "3", "four" to "4",
-        "five" to "5", "six" to "6", "seven" to "7", "eight" to "8", "nine" to "9",
-        "ten" to "10", "twenty" to "20", "thirty" to "30", "forty" to "40",
-        "fifty" to "50", "hundred" to "100", "five hundred" to "500"
-    )
-
     /**
-     * Runs 100% offline in <2ms on output from ANY ASR engine (Shruti, IndicConformer, or Gemini).
-     * Never alters existing digits, decimals, or negations (no, not, nil, absent, nahi).
+     * Conservative offline normalizer:
+     * 1. Fixes known phonetic splits/abbreviations.
+     * 2. Restores canonical casing/spelling for any matched term from medical_dictionary.txt.
+     * 3. NEVER alters existing digits, decimals, doses, or negations.
      */
-    fun normalize(raw: String): String {
+    fun normalize(ctx: Context, raw: String): String {
+        init(ctx)
         var text = raw.trim()
         if (text.isEmpty()) return ""
-
-        // Convert spoken number words only when followed by a clinical unit
-        for ((word, digit) in NUMBER_WORDS) {
-            val regex = Regex("\\b$word\\s+(mg|mcg|mL|ml|gm|g|IU|%)\\b", RegexOption.IGNORE_CASE)
-            text = regex.replace(text) { m -> "$digit ${m.groupValues[1]}" }
-        }
 
         for ((bad, good) in PHONETIC_CORRECTIONS) {
             val regex = Regex("\\b${Regex.escape(bad)}\\b", RegexOption.IGNORE_CASE)
             text = regex.replace(text, good)
         }
 
-        // Capitalize first character if Latin lowercase
+        // Apply single-word and multi-word canonical casing from Dr. Shukla's dictionary
+        for ((lowerKey, canonical) in canonicalTerms) {
+            if (lowerKey.length < 2) continue
+            if (lowerKey.all { it.code < 128 }) {
+                val regex = Regex("\\b${Regex.escape(lowerKey)}\\b", RegexOption.IGNORE_CASE)
+                if (regex.containsMatchIn(text)) {
+                    text = regex.replace(text, Regex.escapeReplacement(canonical))
+                }
+            }
+        }
+
         if (text.isNotEmpty() && text[0] in 'a'..'z') {
             text = text[0].uppercaseChar() + text.substring(1)
         }

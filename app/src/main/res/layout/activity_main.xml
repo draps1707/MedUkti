@@ -20,13 +20,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Offline-First Indic + Medical ASR (Shruti &amp; IndicConformer)"
-            android:textSize="14sp" />
+            android:text="Offline sherpa-onnx (IndicConformer + Whisper Swift + Silero VAD) &amp; Shruti"
+            android:textSize="13sp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="16dp"
             android:text="Active ASR Engine"
             android:textStyle="bold" />
 
@@ -38,9 +38,30 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Offline Model Downloads"
+            android:layout_marginTop="14dp"
+            android:text="Offline Model Manager"
             android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnDlIndicOr"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download IndicConformer Odia + Silero VAD (~661 MB)" />
+
+        <Button
+            android:id="@+id/btnDlIndicHi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download IndicConformer Hindi + Silero VAD (~661 MB)" />
+
+        <Button
+            android:id="@+id/btnDlWhisperSwift"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Download Whisper Hinglish Swift + Silero VAD (~152 MB)" />
 
         <Button
             android:id="@+id/btnDlShrutiHi"
@@ -50,38 +71,24 @@
             android:text="Download Shruti Hindi/Hinglish + Engine (~32 MB)" />
 
         <Button
-            android:id="@+id/btnDlShrutiOr"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Download Shruti Odia (~30 MB)" />
-
-        <Button
-            android:id="@+id/btnDlIndicOr"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Download IndicConformer Odia ONNX (~659 MB)" />
-
-        <Button
             android:id="@+id/btnCompare"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="Open Side-by-Side Engine Compare" />
+            android:layout_marginTop="12dp"
+            android:text="Open Recognition Lab (Compare Engines)" />
 
         <CheckBox
             android:id="@+id/cbGeminiOptional"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="14dp"
             android:text="Optional: Polish offline transcript with Gemini Cloud" />
 
         <EditText
             android:id="@+id/etApiKey"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Optional Gemini API key (not required for offline)"
+            android:hint="Optional Gemini API key (not required)"
             android:inputType="textPassword" />
 
         <Spinner
@@ -93,14 +100,14 @@
             android:id="@+id/btnSaveStart"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:text="Save &amp; Start Floating Mic" />
 
         <TextView
             android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:textSize="13sp" />
     </LinearLayout>
 </ScrollView>

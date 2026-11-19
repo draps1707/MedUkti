@@ -233,7 +233,7 @@ class FloatingMicService : Service() {
             wavFile.delete()
 
             rawResult.onSuccess { raw ->
-                var finalOut = MedicalNormalizer.normalize(raw)
+                var finalOut = MedicalNormalizer.normalize(this@FloatingMicService, raw)
                 if (useOptionalGemini && engine != AsrEngineType.GEMINI_CLOUD && finalOut.isNotBlank()) {
                     GeminiClient.polishOfflineTranscript(Prefs.getApiKey(this@FloatingMicService), Prefs.getModel(this@FloatingMicService), finalOut)
                         .onSuccess { polished ->

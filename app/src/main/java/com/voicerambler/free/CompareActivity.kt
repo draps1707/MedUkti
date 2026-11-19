@@ -50,15 +50,25 @@ class CompareActivity : AppCompatActivity() {
                     out.appendLine("=== Shruti (Hindi/Hinglish/Eng) ===")
                     shrutiHi.onSuccess { raw ->
                         out.appendLine("Raw: $raw")
-                        out.appendLine("Medical Layer: ${MedicalNormalizer.normalize(raw)}")
+                        out.appendLine("Medical Layer: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
                     }.onFailure { out.appendLine("Error: ${it.message}") }
+                    out.appendLine()
+
+                    val indicOr = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.INDIC_CONFORMER_OR, wav)
+                    out.appendLine("=== IndicConformer Odia (sherpa-onnx) ===")
+                    indicOr.onSuccess { raw -> out.appendLine("Raw: $raw\nMedical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}") }.onFailure { out.appendLine("Skipped/Err: ${it.message}") }
+                    out.appendLine()
+
+                    val swift = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.WHISPER_HINGLISH_SWIFT, wav)
+                    out.appendLine("=== Whisper Hinglish Swift (sherpa-onnx + VAD) ===")
+                    swift.onSuccess { raw -> out.appendLine("Raw: $raw\nMedical: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}") }.onFailure { out.appendLine("Skipped/Err: ${it.message}") }
                     out.appendLine()
 
                     val shrutiOr = OfflineAsrEngines.transcribe(this@CompareActivity, AsrEngineType.SHRUTI_ODIA, wav)
                     out.appendLine("=== Shruti (Odia) ===")
                     shrutiOr.onSuccess { raw ->
                         out.appendLine("Raw: $raw")
-                        out.appendLine("Medical Layer: ${MedicalNormalizer.normalize(raw)}")
+                        out.appendLine("Medical Layer: ${MedicalNormalizer.normalize(this@CompareActivity, raw)}")
                     }.onFailure { out.appendLine("Error: ${it.message}") }
                     out.appendLine()
 

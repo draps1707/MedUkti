@@ -17,6 +17,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Download official sherpa-onnx Android AAR
+        run: |
+          mkdir -p app/libs
+          AAR_URL=$(curl -s https://api.github.com/repos/k2-fsa/sherpa-onnx/releases/tags/v2.0.1 | grep -o 'https://[^"]*\.aar' | head -n 1)
+          echo "Downloading $AAR_URL"
+          curl -L -o app/libs/sherpa-onnx.aar "$AAR_URL"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:

@@ -1,0 +1,989 @@
+﻿Dyspnoea
+Orthopnoea
+Paroxysmal nocturnal dyspnoea
+Tachypnoea
+Bradypnoea
+Apnoea
+Haemoptysis
+Haematemesis
+Melena
+Haematochezia
+Dysphagia
+Odynophagia
+Dyspepsia
+Tenesmus
+Steatorrhoea
+Ascites
+Hepatomegaly
+Splenomegaly
+Lymphadenopathy
+Clubbing
+Koilonychia
+Cyanosis
+Jaundice
+Anasarca
+Pitting oedema
+Hypovolaemia
+Hypervolaemia
+Syncope
+Presyncope
+Vertigo
+Paraesthesia
+Dysaesthesia
+Ataxia
+Aphasia
+Dysarthria
+Diplopia
+Nystagmus
+Ptosis
+Proptosis
+Papilloedema
+Tinnitus Hypertension
+Hypotension
+Hypertensive urgency
+Hypertensive emergency
+Cardiomyopathy
+Myocarditis
+Pericarditis
+Endocarditis
+Aortic stenosis
+Aortic regurgitation
+Mitral stenosis
+Mitral regurgitation
+Tricuspid regurgitation
+Atrial fibrillation
+Atrial flutter
+Supraventricular tachycardia
+Ventricular tachycardia
+Ventricular fibrillation
+Bradyarrhythmia
+Tachyarrhythmia
+Heart failure
+HFpEF
+HFrEF
+HFmrEF
+Acute coronary syndrome
+Myocardial infarction
+STEMI
+NSTEMI
+Unstable angina
+Stable angina
+Coronary artery disease
+Ischaemic heart disease
+Cardiogenic shock
+Cardiac tamponade
+Pulmonary hypertension
+Cor pulmonale
+Peripheral arterial disease
+Deep vein thrombosis
+Pulmonary embolism
+Left ventricular hypertrophy
+Right ventricular hypertrophy
+Ejection fraction Electrocardiogram
+Electrocardiography
+Echocardiogram
+Echocardiography
+Transthoracic echocardiography
+Transoesophageal echocardiography
+Holter monitoring
+PR interval
+QRS complex
+QT interval
+QTc
+ST segment
+ST elevation
+ST depression
+T wave inversion
+U wave
+Delta wave
+Epsilon wave
+Left axis deviation
+Right axis deviation
+Bundle branch block
+Left bundle branch block
+Right bundle branch block
+AV block
+First degree AV block
+Second degree AV block
+Third degree AV block
+Sinus rhythm
+Sinus bradycardia
+Sinus tachycardia
+RBBB
+LBBB
+LVH
+RVH
+LVEF
+TAPSE
+Regional wall motion abnormality
+Diastolic dysfunction
+Systolic dysfunction Asthma
+COPD
+Chronic bronchitis
+Emphysema
+Bronchiectasis
+Pneumonia
+Pneumonitis
+Interstitial lung disease
+Pulmonary fibrosis
+Pleural effusion
+Empyema
+Pneumothorax
+Haemothorax
+ARDS
+Acute respiratory failure
+Type 1 respiratory failure
+Type 2 respiratory failure
+Obstructive sleep apnoea
+Obesity hypoventilation syndrome
+Tuberculosis
+Pulmonary tuberculosis
+Extrapulmonary tuberculosis
+Community acquired pneumonia
+Hospital acquired pneumonia
+Ventilator associated pneumonia
+Aspiration pneumonia
+Lung abscess
+Pulmonary oedema
+Acute exacerbation of COPD
+Status asthmaticus
+Noninvasive ventilation
+Mechanical ventilation
+Endotracheal intubation
+Tracheostomy
+Pulse oximetry
+Arterial blood gas
+ABG
+PaO2
+PaCO2
+PEEP
+FiO2
+CPAP
+BiPAP Acute kidney injury
+AKI
+Chronic kidney disease
+CKD
+End stage kidney disease
+ESKD
+Glomerulonephritis
+Nephrotic syndrome
+Nephritic syndrome
+Diabetic nephropathy
+Hypertensive nephrosclerosis
+Tubulointerstitial nephritis
+Acute tubular necrosis
+Renal tubular acidosis
+RTA
+Urinary tract infection
+Pyelonephritis
+Cystitis
+Nephrolithiasis
+Renal calculus
+Hydronephrosis
+Haematuria
+Proteinuria
+Albuminuria
+Microalbuminuria
+Macroalbuminuria
+Urine albumin creatinine ratio
+UACR
+Protein creatinine ratio
+eGFR
+Estimated glomerular filtration rate
+Creatinine clearance
+Hyperkalaemia
+Hypokalaemia
+Hyponatraemia
+Hypernatraemia
+Metabolic acidosis
+Metabolic alkalosis
+Haemodialysis
+Peritoneal dialysis
+Arteriovenous fistula
+Renal replacement therapy Gastroesophageal reflux disease
+GERD
+Peptic ulcer disease
+PUD
+Gastritis
+Duodenitis
+Oesophagitis
+Barrett oesophagus
+Achalasia
+Oesophageal varices
+Portal hypertension
+Cirrhosis
+Hepatic encephalopathy
+Acute liver failure
+Chronic liver disease
+Hepatitis A
+Hepatitis B
+Hepatitis C
+Hepatitis E
+NAFLD
+MASLD
+NASH
+Spontaneous bacterial peritonitis
+Hepatorenal syndrome
+Cholelithiasis
+Cholecystitis
+Cholangitis
+Choledocholithiasis
+Pancreatitis
+Chronic pancreatitis
+Inflammatory bowel disease
+Ulcerative colitis
+Crohn disease
+Irritable bowel syndrome
+Coeliac disease
+Malabsorption syndrome
+Colorectal carcinoma
+Hepatocellular carcinoma
+Upper gastrointestinal bleeding
+Lower gastrointestinal bleeding Diabetes mellitus
+Type 1 diabetes
+Type 2 diabetes
+Gestational diabetes
+Diabetic ketoacidosis
+DKA
+Hyperosmolar hyperglycaemic state
+HHS
+Hypoglycaemia
+Hyperglycaemia
+Insulin resistance
+Metabolic syndrome
+Diabetic retinopathy
+Diabetic neuropathy
+Diabetic foot
+HbA1c
+Glycated haemoglobin
+Fasting plasma glucose
+Postprandial glucose
+Oral glucose tolerance test
+OGTT
+Continuous glucose monitoring
+CGM
+Thyroiditis
+Hypothyroidism
+Hyperthyroidism
+Thyrotoxicosis
+Graves disease
+Hashimoto thyroiditis
+Thyroid storm
+Myxoedema coma
+Goitre
+Thyroid nodule
+TSH
+Free T4
+Free T3
+Adrenal insufficiency
+Cushing syndrome
+Primary hyperaldosteronism
+Pheochromocytoma
+Acromegaly
+Hypopituitarism
+Hyperprolactinaemia Ischaemic stroke
+Haemorrhagic stroke
+Transient ischaemic attack
+TIA
+Intracerebral haemorrhage
+Subarachnoid haemorrhage
+Cerebral venous thrombosis
+Meningitis
+Encephalitis
+Epilepsy
+Status epilepticus
+Migraine
+Tension type headache
+Cluster headache
+Trigeminal neuralgia
+Bell palsy
+Guillain Barre syndrome
+CIDP
+Myasthenia gravis
+Multiple sclerosis
+Parkinson disease
+Essential tremor
+Dementia
+Delirium
+Alzheimer disease
+Vascular dementia
+Normal pressure hydrocephalus
+Intracranial pressure
+Hemiparesis
+Hemiplegia
+Paraplegia
+Quadriplegia
+Radiculopathy
+Peripheral neuropathy
+Motor neuron disease Depression
+Major depressive disorder
+Generalized anxiety disorder
+Panic disorder
+Obsessive compulsive disorder
+OCD
+Post traumatic stress disorder
+PTSD
+Bipolar disorder
+Mania
+Hypomania
+Schizophrenia
+Psychosis
+Substance use disorder
+Alcohol withdrawal
+Opioid withdrawal
+Nicotine dependence
+Insomnia
+Somatic symptom disorder
+Conversion disorder
+Suicidal ideation Neonate
+Newborn
+Infant
+Toddler
+Growth faltering
+Failure to thrive
+Developmental delay
+Developmental milestone
+Immunisation
+Vaccination
+Febrile seizure
+Neonatal jaundice
+Neonatal sepsis
+Birth asphyxia
+Respiratory distress syndrome
+Hyaline membrane disease
+Meconium aspiration syndrome
+Transient tachypnoea of newborn
+Necrotising enterocolitis
+Neonatal hypoglycaemia
+Congenital heart disease
+Cyanotic heart disease
+Acyanotic heart disease
+Acute gastroenteritis
+Severe acute malnutrition
+SAM
+Moderate acute malnutrition
+MAM
+Kwashiorkor
+Marasmus
+Bronchiolitis
+Croup
+Epiglottitis
+Pertussis
+Rheumatic fever Antenatal care
+Postnatal care
+Postpartum haemorrhage
+PPH
+Preeclampsia
+Eclampsia
+Gestational hypertension
+Gestational diabetes mellitus
+GDM
+Placenta previa
+Placental abruption
+Preterm labour
+Premature rupture of membranes
+PROM
+PPROM
+Ectopic pregnancy
+Molar pregnancy
+Hyperemesis gravidarum
+Intrauterine growth restriction
+IUGR
+Foetal growth restriction
+FGR
+Oligohydramnios
+Polyhydramnios
+Shoulder dystocia
+Obstructed labour
+Uterine rupture
+Postpartum depression
+Menorrhagia
+Dysmenorrhoea
+Amenorrhoea
+Polycystic ovary syndrome
+PCOS
+Endometriosis
+Adenomyosis
+Leiomyoma
+Fibroid
+Pelvic inflammatory disease
+PID Urticaria
+Angioedema
+Atopic dermatitis
+Eczema
+Contact dermatitis
+Psoriasis
+Lichen planus
+Vitiligo
+Melasma
+Acne vulgaris
+Rosacea
+Impetigo
+Cellulitis
+Erysipelas
+Folliculitis
+Furuncle
+Carbuncle
+Scabies
+Pediculosis
+Dermatophytosis
+Tinea corporis
+Tinea cruris
+Tinea capitis
+Onychomycosis
+Candidiasis
+Herpes zoster
+Herpes simplex
+Pemphigus vulgaris
+Bullous pemphigoid
+Stevens Johnson syndrome
+Toxic epidermal necrolysis
+Drug eruption
+Erythema nodosum Osteoarthritis
+Rheumatoid arthritis
+Gout
+Pseudogout
+Septic arthritis
+Ankylosing spondylitis
+Systemic lupus erythematosus
+SLE
+Systemic sclerosis
+Sjogren syndrome
+Vasculitis
+Polymyalgia rheumatica
+Osteoporosis
+Osteomalacia
+Osteomyelitis
+Avascular necrosis
+Intervertebral disc prolapse
+Lumbar spondylosis
+Cervical spondylosis
+Sciatica
+Rotator cuff tear
+Frozen shoulder
+Carpal tunnel syndrome
+Fracture
+Dislocation
+Sprain
+Strain
+Compartment syndrome Appendicitis
+Cholecystectomy
+Appendicectomy
+Hernia repair
+Laparotomy
+Laparoscopy
+Thoracocentesis
+Thoracentesis
+Paracentesis
+Lumbar puncture
+Pleural aspiration
+Ascitic tap
+Central venous catheterisation
+Arterial line insertion
+Nasogastric tube
+Urinary catheterisation
+Wound debridement
+Incision and drainage
+Biopsy
+Excision
+Suturing
+Dressing Complete blood count
+CBC
+Haemoglobin
+Haematocrit
+Total leukocyte count
+Differential leukocyte count
+Platelet count
+ESR
+C reactive protein
+CRP
+Procalcitonin
+Liver function test
+LFT
+Renal function test
+RFT
+Serum electrolytes
+Lipid profile
+Coagulation profile
+Prothrombin time
+PT
+INR
+aPTT
+Troponin I
+Troponin T
+BNP
+NT proBNP
+D dimer
+Ferritin
+Vitamin B12
+Folate
+Urinalysis
+Urine microscopy
+Urine culture
+Blood culture
+Sputum culture
+Chest X ray
+Chest radiograph
+Computed tomography
+CT
+Magnetic resonance imaging
+MRI
+Ultrasonography
+Doppler ultrasound
+CT angiography
+MRI angiography Paracetamol
+Ibuprofen
+Diclofenac
+Naproxen
+Aceclofenac
+Etoricoxib
+Amoxicillin
+Clavulanate
+Azithromycin
+Clarithromycin
+Doxycycline
+Cefixime
+Ceftriaxone
+Cefotaxime
+Ceftazidime
+Cefoperazone
+Sulbactam
+Piperacillin
+Tazobactam
+Meropenem
+Imipenem
+Vancomycin
+Linezolid
+Metronidazole
+Nitrofurantoin
+Fosfomycin
+Ciprofloxacin
+Levofloxacin
+Moxifloxacin
+Pantoprazole
+Rabeprazole
+Omeprazole
+Esomeprazole
+Famotidine
+Domperidone
+Ondansetron
+Metformin
+Glimepiride
+Gliclazide
+Sitagliptin
+Vildagliptin
+Linagliptin
+Empagliflozin
+Dapagliflozin
+Canagliflozin
+Liraglutide
+Semaglutide
+Dulaglutide
+Insulin glargine
+Insulin aspart
+Regular insulin
+Telmisartan
+Losartan
+Olmesartan
+Ramipril
+Enalapril
+Amlodipine
+Cilnidipine
+Nifedipine
+Metoprolol
+Carvedilol
+Bisoprolol
+Nebivolol
+Atenolol
+Furosemide
+Torsemide
+Spironolactone
+Atorvastatin
+Rosuvastatin
+Fenofibrate
+Clopidogrel
+Aspirin
+Apixaban
+Rivaroxaban
+Dabigatran
+Warfarin
+Levothyroxine
+Carbimazole
+Prednisolone
+Hydrocortisone
+Dexamethasone
+Salbutamol
+Formoterol
+Budesonide
+Tiotropium
+Ipratropium
+Montelukast
+Theophylline Augmentin
+Clavam
+Moxikind CV
+Taxim O
+Monocef
+Mahacef
+Zifi
+Azee
+Azithral
+Pan D
+Pantocid
+Sompraz
+Razo
+Rabekind
+Omez
+Glycomet
+Glycomet GP
+Amaryl
+Diamicron
+Istavel
+Galvus
+Trajenta
+Jardiance
+Forxiga
+Telma
+Telma AM
+Olmezest
+Amlong
+Stamlo
+Cilacar
+Concor
+Metolar XL
+Nebicard
+Lasix
+Dytor
+Aldactone
+Ecosprin
+Clopilet
+Atorva
+Rosuvas
+Thyronorm
+Eltroxin
+Asthalin
+Budecort
+Foracort
+Duolin
+Tiova OPD
+IPD
+ICU
+HDU
+Casualty
+Emergency department
+Follow up
+Chief complaint
+History of present illness
+HPI
+Past history
+Family history
+Personal history
+Drug history
+Clinical examination
+General examination
+Systemic examination
+Cardiovascular examination
+Respiratory system examination
+Abdominal examination
+Central nervous system examination
+Provisional diagnosis
+Differential diagnosis
+Final diagnosis
+Treatment plan
+Discharge summary
+Referral note
+Once daily
+Twice daily
+Thrice daily
+Four times daily
+Before food
+After food
+At bedtime
+SOS
+STAT
+OD
+BD
+TDS
+QID
+HS
+PRN
+PO
+IV
+IM
+SC
+SL
+Nebulisation
+रक्तचाप
+उच्च रक्तचाप
+निम्न रक्तचाप
+मधुमेह
+शुगर
+हृदय
+दिल
+हृदयाघात
+दिल का दौरा
+सांस
+सांस फूलना
+सांस लेने में तकलीफ
+खांसी
+बलगम
+खून की खांसी
+बुखार
+तेज बुखार
+ठंड लगना
+कंपकंपी
+सीने में दर्द
+पेट दर्द
+सिरदर्द
+चक्कर
+बेहोशी
+दौरा
+दौरे
+कमजोरी
+थकान
+सूजन
+पैरों में सूजन
+पीलिया
+उल्टी
+मतली
+दस्त
+कब्ज
+खून की उल्टी
+काला मल
+पेशाब
+पेशाब में जलन
+पेशाब में खून
+गुर्दा
+किडनी
+गुर्दे की बीमारी
+किडनी फेल्योर
+मूत्र संक्रमण
+पथरी
+डायलिसिस
+जिगर
+लीवर
+फैटी लिवर
+लिवर सिरोसिस
+पित्ताशय
+अग्न्याशय
+थायरॉइड
+थायराइड
+थायरॉइड की कमी
+थायरॉइड की अधिकता
+खून की कमी
+एनीमिया
+संक्रमण
+एलर्जी
+दमा
+अस्थमा
+निमोनिया
+टीबी
+तपेदिक
+स्ट्रोक
+लकवा
+पक्षाघात
+मिर्गी
+माइग्रेन
+गठिया
+जोड़ों का दर्द
+कमर दर्द
+घुटने का दर्द
+गर्भावस्था
+प्रसव
+प्रसवोत्तर रक्तस्राव
+गर्भकालीन मधुमेह
+रक्त शर्करा
+खाली पेट शुगर
+खाने के बाद शुगर
+हीमोग्लोबिन
+प्लेटलेट
+क्रिएटिनिन
+यूरिया
+कोलेस्ट्रॉल
+ट्राइग्लिसराइड
+इलेक्ट्रोकार्डियोग्राम
+ईसीजी
+इकोकार्डियोग्राफी
+एक्स रे
+अल्ट्रासाउंड
+सीटी स्कैन
+एमआरआई
+रक्त जांच
+मूत्र जांच
+दवा
+गोली
+कैप्सूल
+इंजेक्शन
+दिन में एक बार
+दिन में दो बार
+दिन में तीन बार
+खाने से पहले
+खाने के बाद
+रात को
+ରକ୍ତଚାପ
+ଉଚ୍ଚ ରକ୍ତଚାପ
+ନିମ୍ନ ରକ୍ତଚାପ
+ମଧୁମେହ
+ସୁଗାର
+ହୃଦୟ
+ହୃଦ୍‌ରୋଗ
+ହୃଦଘାତ
+ଛାତି ଯନ୍ତ୍ରଣା
+ଶ୍ୱାସ
+ଶ୍ୱାସକଷ୍ଟ
+ନିଶ୍ୱାସ ନେବାରେ କଷ୍ଟ
+କାଶ
+କଫ
+ରକ୍ତ କାଶ
+ଜ୍ୱର
+ଅଧିକ ଜ୍ୱର
+ଥଣ୍ଡା
+କମ୍ପ
+ପେଟ ଯନ୍ତ୍ରଣା
+ମୁଣ୍ଡବିନ୍ଧା
+ମୁଣ୍ଡ ଘୂରାଇବା
+ବେହୋସ
+ଖିଞ୍ଚୁଣି
+ଦୁର୍ବଳତା
+ଥକାପଣ
+ଫୁଲା
+ଗୋଡ଼ ଫୁଲିବା
+କାମଳ
+ବାନ୍ତି
+ବାନ୍ତି ଲାଗିବା
+ଝାଡ଼ା
+କୋଷ୍ଠକାଠିନ୍ୟ
+ରକ୍ତ ବାନ୍ତି
+କଳା ଝାଡ଼ା
+ପରିସ୍ରା
+ପରିସ୍ରାରେ ଜ୍ୱଳନ
+ପରିସ୍ରାରେ ରକ୍ତ
+ବୃକ୍କ
+କିଡନୀ
+ବୃକ୍କ ରୋଗ
+କିଡନୀ ଫେଲ୍ୟୁର
+ମୂତ୍ରନଳୀ ସଂକ୍ରମଣ
+ପଥର
+ଡାୟାଲିସିସ
+ଯକୃତ
+ଲିଭର
+ଫ୍ୟାଟି ଲିଭର
+ଲିଭର ସିରୋସିସ
+ଥାଇରଏଡ
+ରକ୍ତହୀନତା
+ଆନିମିଆ
+ସଂକ୍ରମଣ
+ଆଲର୍ଜି
+ଆଜମା
+ନିମୋନିଆ
+ଯକ୍ଷ୍ମା
+ଷ୍ଟ୍ରୋକ
+ପକ୍ଷାଘାତ
+ମୃଗୀ
+ମାଇଗ୍ରେନ
+ଗଣ୍ଠିବାତ
+ଗଣ୍ଠି ଯନ୍ତ୍ରଣା
+କମର ଯନ୍ତ୍ରଣା
+ଆଣ୍ଠୁ ଯନ୍ତ୍ରଣା
+ଗର୍ଭାବସ୍ଥା
+ପ୍ରସବ
+ପ୍ରସବ ପରବର୍ତ୍ତୀ ରକ୍ତସ୍ରାବ
+ଗର୍ଭାବସ୍ଥାର ମଧୁମେହ
+ରକ୍ତ ଶର୍କରା
+ଖାଲି ପେଟର ସୁଗାର
+ଖାଇବା ପରେ ସୁଗାର
+ହିମୋଗ୍ଲୋବିନ
+ପ୍ଲେଟଲେଟ
+କ୍ରିଏଟିନିନ
+ୟୁରିଆ
+କୋଲେଷ୍ଟେରଲ
+ଟ୍ରାଇଗ୍ଲିସରାଇଡ
+ଇସିଜି
+ଇକୋକାର୍ଡିଓଗ୍ରାଫି
+ଏକ୍ସ ରେ
+ଅଲଟ୍ରାସାଉଣ୍ଡ
+ସିଟି ସ୍କାନ
+ଏମଆରଆଇ
+ରକ୍ତ ପରୀକ୍ଷା
+ପରିସ୍ରା ପରୀକ୍ଷା
+ଔଷଧ
+ବଟିକା
+କ୍ୟାପସୁଲ
+ଇଞ୍ଜେକ୍ସନ
+ଦିନକୁ ଥରେ
+ଦିନକୁ ଦୁଇଥର
+ଦିନକୁ ତିନିଥର
+ଖାଇବା ପୂର୍ବରୁ
+ଖାଇବା ପରେ
+ରାତିରେ
+saans ki takleef
+saans phoolna
+seene mein dard
+pet mein dard
+sir dard
+chakkar aana
+behoshi
+kamzori
+thakaan
+bukhar
+tez bukhar
+thand lagna
+khansi
+balgam
+khoon wali khansi
+ulti
+matli
+dast
+kabz
+khoon ki ulti
+kala stool
+peshab
+peshab mein jalan
+peshab mein khoon
+sujan
+pairon mein sujan
+peeliya
+gurda
+kidney
+gurde ki bimari
+kidney failure
+pathri
+dialysis
+dil ki bimari
+dil ka daura
+high BP
+low BP
+sugar
+diabetes
+thyroid
+thyroid ki kami
+thyroid badhna
+khoon ki kami
+anemia
+infection
+allergy
+asthma
+dama
+TB
+lakwa
+mirgi
+daura
+jodon ka dard
+kamar dard
+ghutne ka dard
+garbhavastha
+prasav
+delivery
+pregnancy
+sugar fasting
+khane ke baad sugar
+khali pet
+dawai
+goli
+capsule
+injection
+din mein ek baar
+din mein do baar
+din mein teen baar
+khane se pehle
+khane ke baad
+raat ko

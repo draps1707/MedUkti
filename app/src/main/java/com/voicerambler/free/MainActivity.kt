@@ -53,14 +53,17 @@ class MainActivity : AppCompatActivity() {
         spinnerModel.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Prefs.AVAILABLE_MODELS)
         spinnerModel.setSelection(Prefs.AVAILABLE_MODELS.indexOf(Prefs.getModel(this)).coerceAtLeast(0))
 
-        findViewById<Button>(R.id.btnDlShrutiHi).setOnClickListener {
-            downloadPair(ModelDownloader.NEEDLE_BIN, ModelDownloader.SHRUTI_HI_EN, "Shruti Hindi/Hinglish")
-        }
-        findViewById<Button>(R.id.btnDlShrutiOr).setOnClickListener {
-            downloadPair(ModelDownloader.NEEDLE_BIN, ModelDownloader.SHRUTI_ODIA, "Shruti Odia")
-        }
         findViewById<Button>(R.id.btnDlIndicOr).setOnClickListener {
-            downloadPair(ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_OR, "IndicConformer Odia")
+            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_OR), "IndicConformer Odia")
+        }
+        findViewById<Button>(R.id.btnDlIndicHi).setOnClickListener {
+            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_HI), "IndicConformer Hindi")
+        }
+        findViewById<Button>(R.id.btnDlWhisperSwift).setOnClickListener {
+            downloadBatch(listOf(ModelDownloader.SILERO_VAD, ModelDownloader.WHISPER_SWIFT_TOKENS, ModelDownloader.WHISPER_SWIFT_ENC, ModelDownloader.WHISPER_SWIFT_DEC), "Whisper Hinglish Swift")
+        }
+        findViewById<Button>(R.id.btnDlShrutiHi).setOnClickListener {
+            downloadBatch(listOf(ModelDownloader.NEEDLE_BIN, ModelDownloader.SHRUTI_HI_EN), "Shruti Hindi/Hinglish")
         }
         findViewById<Button>(R.id.btnCompare).setOnClickListener {
             startActivity(Intent(this, CompareActivity::class.java))
@@ -79,32 +82,21 @@ class MainActivity : AppCompatActivity() {
         checkAndRequestNextMissingPermission()
     }
 
-    private fun downloadPair(
-        first: ModelDownloader.ModelArtifact,
-        second: ModelDownloader.ModelArtifact,
-        label: String
-    ) {
+    private fun downloadBatch(artifacts: List<ModelDownloader.ModelArtifact>, label: String) {
         uiScope.launch {
-            tvStatus.text = "Downloading $label (part 1/2)..."
-            val r1 = if (ModelDownloader.isInstalled(this@MainActivity, first)) {
-                Result.success(ModelDownloader.getFile(this@MainActivity, first))
-            } else {
-                ModelDownloader.download(this@MainActivity, first) { p ->
-                    tvStatus.text = "Downloading ${first.fileName}: $p%"
+            for ((idx, art) in artifacts.withIndex()) {
+                if (ModelDownloader.isInstalled(this@MainActivity, art)) continue
+                tvStatus.text = "Downloading $label (${idx + 1}/${artifacts.size}: ${art.fileName})..."
+                val res = ModelDownloader.download(this@MainActivity, art) { p ->
+                    tvStatus.text = "Downloading ${art.fileName}: $p%"
+                }
+                if (res.isFailure) {
+                    tvStatus.text = "Error: ${res.exceptionOrNull()?.message}"
+                    Toast.makeText(this@MainActivity, "Failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    return@launch
                 }
             }
-            if (r1.isFailure) {
-                tvStatus.text = "Error: ${r1.exceptionOrNull()?.message}"
-                return@launch
-            }
-            val r2 = ModelDownloader.download(this@MainActivity, second) { p ->
-                tvStatus.text = "Downloading ${second.fileName}: $p%"
-            }
-            if (r2.isSuccess) {
-                Toast.makeText(this@MainActivity, "$label ready offline!", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this@MainActivity, "Failed: ${r2.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
-            }
+            Toast.makeText(this@MainActivity, "$label ready offline!", Toast.LENGTH_SHORT).show()
             updateStatusAndAutoStart()
         }
     }
@@ -155,17 +147,19 @@ class MainActivity : AppCompatActivity() {
         val micOk = hasMicAndNotif()
         val overlayOk = Settings.canDrawOverlays(this)
         val accOk = DictationAccessibilityService.instance != null
-        val needleOk = ModelDownloader.isInstalled(this, ModelDownloader.NEEDLE_BIN)
-        val shrutiHiOk = ModelDownloader.isInstalled(this, ModelDownloader.SHRUTI_HI_EN)
-        val shrutiOrOk = ModelDownloader.isInstalled(this, ModelDownloader.SHRUTI_ODIA)
+        val vadOk = ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)
         val indicOrOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_OR)
+        val indicHiOk = ModelDownloader.isInstalled(this, ModelDownloader.INDIC_HI)
+        val swiftOk = ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_ENC) && ModelDownloader.isInstalled(this, ModelDownloader.WHISPER_SWIFT_DEC)
+        val shrutiOk = ModelDownloader.isInstalled(this, ModelDownloader.SHRUTI_HI_EN)
 
         tvStatus.text = buildString {
             appendLine("Active Engine: ${Prefs.getEngine(this@MainActivity).label}")
-            appendLine("Shruti Engine (needle): ${if (needleOk) "Installed" else "Not downloaded"}")
-            appendLine("Shruti Hindi/Hinglish: ${if (shrutiHiOk) "Installed" else "Not downloaded"}")
-            appendLine("Shruti Odia: ${if (shrutiOrOk) "Installed" else "Not downloaded"}")
-            appendLine("IndicConformer Odia ONNX: ${if (indicOrOk) "Installed" else "Not downloaded"}")
+            appendLine("Silero VAD: ${if (vadOk) "Installed" else "Not downloaded"}")
+            appendLine("IndicConformer Odia: ${if (indicOrOk) "Installed" else "Not downloaded"}")
+            appendLine("IndicConformer Hindi: ${if (indicHiOk) "Installed" else "Not downloaded"}")
+            appendLine("Whisper Hinglish Swift: ${if (swiftOk) "Installed" else "Not downloaded"}")
+            appendLine("Shruti Hindi/Hinglish: ${if (shrutiOk) "Installed" else "Not downloaded"}")
             appendLine("Mic: ${if (micOk) "OK" else "Needed"} | Overlay: ${if (overlayOk) "OK" else "Needed"} | Accessibility: ${if (accOk) "OK" else "Needed"}")
         }
 
