@@ -202,7 +202,7 @@ object SraVaaniEngine {
         }
         val ortEnv = env ?: OrtEnvironment.getEnvironment().also { env = it }
         val opts = OrtSession.SessionOptions().apply {
-            setIntraOpNumThreads(4)
+            setIntraOpNumThreads(2)
         }
         if (encoderSession == null) {
             encoderSession = ortEnv.createSession(encFile.absolutePath, opts)

@@ -35,6 +35,7 @@ class DictationAccessibilityService : AccessibilityService() {
     }
 
     private val handler = Handler(Looper.getMainLooper())
+    private var lastEventCheckMs = 0L
     private val hideRunnable = Runnable {
         if (getFreshEditableNode() == null) {
             onEditableFocusChanged?.invoke(false)
@@ -55,6 +56,11 @@ class DictationAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (event?.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED && now - lastEventCheckMs < 120L) {
+            return
+        }
+        lastEventCheckMs = now
         val pkg = event?.packageName?.toString()?.lowercase() ?: ""
         if (pkg.isNotEmpty() && BANKING_PKG_PREFIXES.any { pkg.startsWith(it) }) {
             pauseForBanking()

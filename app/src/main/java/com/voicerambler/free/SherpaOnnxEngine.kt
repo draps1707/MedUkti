@@ -36,6 +36,27 @@ object SherpaOnnxEngine {
         SraVaaniEngine.release()
     }
 
+    @Synchronized
+    fun releaseInactiveModels(active: AsrEngineType) {
+        val keepKeys = when (active) {
+            AsrEngineType.INDIC_CONFORMER_OR -> setOf("odia")
+            AsrEngineType.SRAVAANI_OR -> emptySet()
+            AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI -> setOf("odia")
+            AsrEngineType.MEDASR_CTC -> setOf("medasr")
+            AsrEngineType.PARAKEET_110M -> setOf("parakeet_110m")
+            AsrEngineType.PARAKEET_06B_V2 -> setOf("parakeet_06b")
+            AsrEngineType.DUAL_PARAKEET_110M_MEDASR -> setOf("parakeet_110m", "medasr")
+            AsrEngineType.DUAL_PARAKEET_06B_MEDASR -> setOf("parakeet_06b", "medasr")
+        }
+        val toRemove = recognizers.keys.filter { it !in keepKeys }
+        for (k in toRemove) {
+            try { recognizers.remove(k)?.release() } catch (_: Exception) {}
+        }
+        if (active != AsrEngineType.SRAVAANI_OR && active != AsrEngineType.DUAL_ODIA_INDIC_SRAVAANI) {
+            SraVaaniEngine.release()
+        }
+    }
+
     private fun computeRms(samples: FloatArray): Float {
         if (samples.isEmpty()) return 0f
         var sumSq = 0.0
@@ -144,10 +165,21 @@ object SherpaOnnxEngine {
             }
         }
 
-        return Normalizer.normalize(
+        var finalOut = Normalizer.normalize(
             text.replace(Regex("[ \\t]{2,}"), " ").trim(),
             Normalizer.Form.NFC
         )
+        if (Prefs.isOdiaEngine(engine) && finalOut.isNotEmpty()) {
+            val words = finalOut.split(Regex("\\s+"))
+            val lastCh = finalOut.last()
+            if (words.size >= 4 && lastCh !in setOf('।', '.', '?', '!', ',')) {
+                val isQuestion = words.any {
+                    it in setOf("କିଏ", "କଣ", "କ'ଣ", "କେମିତି", "କେବେ", "କାହିଁକି", "କୁଆଡ଼େ", "କେତେ")
+                }
+                finalOut += if (isQuestion) "?" else "।"
+            }
+        }
+        return finalOut
     }
 
     fun readWavAsFloats(wavFile: File): FloatArray {
@@ -227,7 +259,7 @@ object SherpaOnnxEngine {
                 OfflineModelConfig(
                     nemo = OfflineNemoEncDecCtcModelConfig(model = model.absolutePath),
                     tokens = tokens.absolutePath,
-                    numThreads = 4,
+                    numThreads = 2,
                     debug = false
                 )
             }
@@ -240,7 +272,7 @@ object SherpaOnnxEngine {
                 OfflineModelConfig(
                     medasr = OfflineMedAsrCtcModelConfig(model = model.absolutePath),
                     tokens = tokens.absolutePath,
-                    numThreads = 4,
+                    numThreads = 2,
                     debug = false
                 )
             }
@@ -260,7 +292,7 @@ object SherpaOnnxEngine {
                     ),
                     tokens = tok.absolutePath,
                     modelType = "nemo_transducer",
-                    numThreads = 4,
+                    numThreads = 2,
                     debug = false
                 )
             }
@@ -280,7 +312,7 @@ object SherpaOnnxEngine {
                     ),
                     tokens = tok.absolutePath,
                     modelType = "nemo_transducer",
-                    numThreads = 4,
+                    numThreads = 2,
                     debug = false
                 )
             }

@@ -6,7 +6,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -58,6 +61,15 @@ class FloatingMicService : Service() {
     private var liveLoopJob: Job? = null
     private var vadConsumerJob: Job? = null
 
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                if (isListening.get()) stopContinuousDictation()
+                SherpaOnnxEngine.releaseRecognizer()
+            }
+        }
+    }
+
     private val idleSleepRunnable = Runnable {
         if (!isListening.get() && !isProcessing) {
             SherpaOnnxEngine.releaseRecognizer()
@@ -66,7 +78,7 @@ class FloatingMicService : Service() {
 
     private fun resetIdleSleepTimer() {
         mainHandler.removeCallbacks(idleSleepRunnable)
-        mainHandler.postDelayed(idleSleepRunnable, 10 * 60 * 1000L) // 10 min RAM auto-sleep
+        mainHandler.postDelayed(idleSleepRunnable, 3 * 60 * 1000L) // 10 min RAM auto-sleep
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -87,10 +99,8 @@ class FloatingMicService : Service() {
         startForegroundNotification()
         showFloatingBubble()
         resetIdleSleepTimer()
+        registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
 
-        serviceScope.launch {
-            OfflineAsrEngines.preload(this@FloatingMicService)
-        }
 
         DictationAccessibilityService.onEditableFocusChanged = { focused ->
             mainHandler.post {
@@ -98,7 +108,6 @@ class FloatingMicService : Service() {
                     refreshLangBadge()
                     floatingView?.visibility = View.VISIBLE
                     resetIdleSleepTimer()
-                    serviceScope.launch { OfflineAsrEngines.preload(this@FloatingMicService) }
                 } else {
                     if (isListening.get()) {
                         stopContinuousDictation()
@@ -179,7 +188,7 @@ class FloatingMicService : Service() {
         Prefs.setEngine(this, next)
         refreshLangBadge()
         buzz(25L)
-        serviceScope.launch { OfflineAsrEngines.preload(this@FloatingMicService) }
+        SherpaOnnxEngine.releaseInactiveModels(next)
         Toast.makeText(
             this,
             if (Prefs.isOdiaEngine(next)) "Switched to Odia" else "Switched to Medical (${next.name.substringBefore('_')})",
@@ -496,6 +505,7 @@ class FloatingMicService : Service() {
     }
 
     override fun onDestroy() {
+        try { unregisterReceiver(screenOffReceiver) } catch (_: Exception) {}
         mainHandler.removeCallbacks(idleSleepRunnable)
         DictationAccessibilityService.onEditableFocusChanged = null
         isListening.set(false)
