@@ -1,4 +1,4 @@
-package com.voicerambler.free
+package com.medukti.keyboard
 
 import android.content.Context
 
@@ -9,7 +9,7 @@ enum class AsrEngineType(val label: String) {
 }
 
 object Prefs {
-    private const val FILE = "voice_rambler_prefs"
+    private const val FILE = "medukti_prefs"
     private const val KEY_ENGINE = "asr_engine"
     private const val KEY_MED_ENGINE = "med_asr_engine"
     private const val KEY_ODIA_ENGINE = "odia_asr_engine"

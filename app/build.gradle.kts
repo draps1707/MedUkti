@@ -4,15 +4,15 @@ plugins {
 }
 
 android {
-    namespace = "com.voicerambler.free"
+    namespace = "com.medukti.keyboard"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.voicerambler.free"
+        applicationId = "com.medukti.keyboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 27
-        versionName = "4.1.9"
+        versionCode = 28
+        versionName = "4.2.0"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }

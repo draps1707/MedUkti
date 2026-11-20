@@ -1,4 +1,4 @@
-package com.voicerambler.free
+package com.medukti.keyboard
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -57,7 +57,6 @@ class MedUktiImeService : InputMethodService() {
     private val activeResolvedEngine = AtomicReference<AsrEngineType>(AsrEngineType.WHISPER_TURBO)
 
     private var btnModeToggle: TextView? = null
-    private var tvImeStatus: TextView? = null
     private var micRingContainer: LinearLayout? = null
     private var tvMicPillLabel: TextView? = null
     private var keyPeriod: TextView? = null
@@ -128,7 +127,6 @@ class MedUktiImeService : InputMethodService() {
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.keyboard_medukti, null)
         btnModeToggle = view.findViewById(R.id.btnModeToggle)
-        tvImeStatus = view.findViewById(R.id.tvImeStatus)
         micRingContainer = view.findViewById(R.id.micRingContainer)
         tvMicPillLabel = view.findViewById(R.id.tvMicPillLabel)
         keyPeriod = view.findViewById(R.id.keyPeriod)
@@ -285,7 +283,7 @@ class MedUktiImeService : InputMethodService() {
                     startContinuousDictation()
                 }
             } else {
-                tvImeStatus?.text = "Grant Mic permission in MedUkti app"
+                tvMicPillLabel?.text = "Grant Mic in App"
             }
         }
     }
@@ -328,9 +326,9 @@ class MedUktiImeService : InputMethodService() {
         buzz(25L)
         if (isListening.get()) {
             currentInputConnection?.finishComposingText()
-            tvImeStatus?.text = if (Prefs.isOdiaEngine(resolvedNext)) "Listening (Odia)..." else "Listening (MED)..."
+            tvMicPillLabel?.text = if (Prefs.isOdiaEngine(resolvedNext)) "Listening (Odia)..." else "Listening..."
         } else {
-            tvImeStatus?.text = if (Prefs.isOdiaEngine(resolvedNext)) "Odia Ready" else "Medical Ready"
+            tvMicPillLabel?.text = "Tap to Speak"
         }
         // Debounced off-main-thread preload: never blocks UI or thrashes native memory on rapid taps
         scheduleDebouncedPreload(300L)
@@ -345,14 +343,8 @@ class MedUktiImeService : InputMethodService() {
         micRingContainer?.setBackgroundResource(res)
         tvMicPillLabel?.text = when (state) {
             MicUiState.IDLE -> "Tap to Speak"
-            MicUiState.LISTENING -> "Listening... (Tap to Stop)"
+            MicUiState.LISTENING -> if (Prefs.isOdiaEngine(activeResolvedEngine.get())) "Listening (Odia)..." else "Listening..."
             MicUiState.POLISHING -> "Finishing..."
-        }
-        val isOd = Prefs.isOdiaEngine(activeResolvedEngine.get())
-        tvImeStatus?.text = when (state) {
-            MicUiState.IDLE -> if (isOd) "Odia Ready" else "Ready"
-            MicUiState.LISTENING -> if (isOd) "Listening (Odia)..." else "Listening..."
-            MicUiState.POLISHING -> "Finalizing..."
         }
     }
 
@@ -381,7 +373,7 @@ class MedUktiImeService : InputMethodService() {
         if (lastCommittedLen > 0) {
             ic.deleteSurroundingText(lastCommittedLen, 0)
             lastCommittedLen = 0
-            tvImeStatus?.text = "Undid last phrase"
+            Toast.makeText(this, "Undid last phrase", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -479,7 +471,7 @@ class MedUktiImeService : InputMethodService() {
         }
 
         isListening.set(true)
-        tvImeStatus?.text = "Starting mic..." 
+        tvMicPillLabel?.text = "Starting..." 
         val segmentChannel = Channel<Pair<FloatArray, AsrEngineType>>(Channel.UNLIMITED)
 
         val streamingAvailable = Prefs.isStreamingDraftEnabled(this) && ModelDownloader.isStreamingZipformerInstalled(this)

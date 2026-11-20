@@ -1,4 +1,4 @@
-package com.voicerambler.free
+package com.medukti.keyboard
 
 import android.content.Context
 import ai.onnxruntime.OnnxTensor
