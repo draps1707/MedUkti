@@ -33,6 +33,18 @@ object SraVaaniEngine {
     private var encoderSession: OrtSession? = null
     private var decoderSession: OrtSession? = null
     private var tokens: List<String> = emptyList()
+    private var allowedTokens: BooleanArray = BooleanArray(0)
+
+    private fun isOdiaOrAsciiToken(tok: String): Boolean {
+        if (tok.isEmpty() || tok == "<unk>" || tok == "<s>" || tok == "</s>") return false
+        for (ch in tok) {
+            if (ch == '\u2581' || ch.isWhitespace() || ch == '।' || ch == '॥') continue
+            if (ch in '\u0B00'..'\u0B7F') continue
+            if (ch.code in 32..126) continue
+            return false
+        }
+        return true
+    }
 
     private val hannWindow: FloatArray by lazy {
         FloatArray(WIN_LEN) { i ->
@@ -199,6 +211,12 @@ object SraVaaniEngine {
         }
         if (tokens.isEmpty()) {
             tokens = ctx.assets.open("sravaani_tokens.txt").bufferedReader().readLines()
+            val mask = BooleanArray(VOCAB_SIZE + 1) { false }
+            mask[BLANK_ID] = true
+            for (i in 0 until min(VOCAB_SIZE, tokens.size)) {
+                mask[i] = isOdiaOrAsciiToken(tokens[i])
+            }
+            allowedTokens = mask
         }
         val ortEnv = env ?: OrtEnvironment.getEnvironment().also { env = it }
         val opts = OrtSession.SessionOptions().apply {
@@ -311,6 +329,7 @@ object SraVaaniEngine {
                     var bestTok = 0
                     var bestTokVal = Float.NEGATIVE_INFINITY
                     for (i in 0..VOCAB_SIZE) {
+                        if (i < allowedTokens.size && !allowedTokens[i]) continue
                         if (logits[i] > bestTokVal) {
                             bestTokVal = logits[i]
                             bestTok = i
