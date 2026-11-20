@@ -210,6 +210,7 @@ object ModelDownloader {
 
             val total = conn.contentLengthLong
             var downloaded = 0L
+            var lastPct = -1
             conn.inputStream.use { input ->
                 FileOutputStream(tmp).use { output ->
                     val buf = ByteArray(16384)
@@ -219,14 +220,18 @@ object ModelDownloader {
                         output.write(buf, 0, n)
                         downloaded += n
                         if (total > 0) {
-                            onProgress(((downloaded * 100) / total).toInt().coerceIn(0, 100))
+                            val pct = ((downloaded * 100) / total).toInt().coerceIn(0, 100)
+                            if (pct != lastPct) {
+                                lastPct = pct
+                                withContext(Dispatchers.Main) { onProgress(pct) }
+                            }
                         }
                     }
                 }
             }
             if (dest.exists()) dest.delete()
             tmp.renameTo(dest)
-            onProgress(100)
+            withContext(Dispatchers.Main) { onProgress(100) }
             Result.success(dest)
         } catch (e: Exception) {
             Result.failure(e)

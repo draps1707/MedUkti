@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnDlSraVaani: TextView
     private lateinit var etHfToken: EditText
     private val uiScope = CoroutineScope(Dispatchers.Main + Job())
+    private var isDownloading = false
 
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -156,27 +157,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun downloadBatch(badgeView: TextView, artifacts: List<ModelDownloader.ModelArtifact>, label: String) {
+        if (isDownloading) {
+            Toast.makeText(this, "A download is already in progress", Toast.LENGTH_SHORT).show()
+            return
+        }
+        isDownloading = true
         uiScope.launch {
-            tvStatus.visibility = View.VISIBLE
-            for ((idx, art) in artifacts.withIndex()) {
-                if (ModelDownloader.isInstalled(this@MainActivity, art)) continue
-                tvStatus.text = "Downloading $label (${idx + 1}/${artifacts.size}: ${art.fileName})..."
-                val res = ModelDownloader.download(this@MainActivity, art) { p ->
-                    badgeView.text = "$p%"
-                    tvStatus.text = "Downloading ${art.fileName}: $p%"
+            try {
+                tvStatus.visibility = View.VISIBLE
+                for ((idx, art) in artifacts.withIndex()) {
+                    if (ModelDownloader.isInstalled(this@MainActivity, art)) continue
+                    tvStatus.text = "Downloading $label (${idx + 1}/${artifacts.size}: ${art.fileName})..."
+                    val res = ModelDownloader.download(this@MainActivity, art) { p ->
+                        runOnUiThread {
+                            badgeView.text = "$p%"
+                            tvStatus.text = "Downloading ${art.fileName}: $p%"
+                        }
+                    }
+                    if (res.isFailure) {
+                        val msg = res.exceptionOrNull()?.message ?: "Download failed"
+                        tvStatus.text = "Error: $msg"
+                        badgeView.text = "Retry"
+                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                        return@launch
+                    }
                 }
-                if (res.isFailure) {
-                    val msg = res.exceptionOrNull()?.message ?: "Download failed"
-                    tvStatus.text = "Error: $msg"
-                    badgeView.text = "Retry"
-                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
-                    return@launch
-                }
+                tvStatus.visibility = View.GONE
+                Toast.makeText(this@MainActivity, "$label ready offline!", Toast.LENGTH_SHORT).show()
+                OfflineAsrEngines.preload(this@MainActivity)
+                updateStatus()
+            } finally {
+                isDownloading = false
             }
-            tvStatus.visibility = View.GONE
-            Toast.makeText(this@MainActivity, "$label ready offline!", Toast.LENGTH_SHORT).show()
-            OfflineAsrEngines.preload(this@MainActivity)
-            updateStatus()
         }
     }
 
