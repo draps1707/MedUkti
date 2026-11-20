@@ -20,13 +20,16 @@ jobs:
       - name: Download official sherpa-onnx Android AAR
         run: |
           mkdir -p app/libs
-          AARS=$(curl -s https://api.github.com/repos/k2-fsa/sherpa-onnx/releases/tags/v2.0.1 | grep -o 'https://[^"]*\.aar')
-          AAR_URL=$(echo "$AARS" | grep 'static-link-onnxruntime' | head -n 1)
+          AARS=$(curl -sSL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/k2-fsa/sherpa-onnx/releases/latest | grep -o 'https://[^"]*\.aar' | grep -v 'rknn' || true)
+          AAR_URL=$(echo "$AARS" | grep 'static-link-onnxruntime' | head -n 1 || true)
           if [ -z "$AAR_URL" ]; then
-            AAR_URL=$(echo "$AARS" | head -n 1)
+            AAR_URL=$(echo "$AARS" | head -n 1 || true)
+          fi
+          if [ -z "$AAR_URL" ]; then
+            AAR_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.2/sherpa-onnx-2.0.2.aar"
           fi
           echo "Downloading $AAR_URL"
-          curl -L -o app/libs/sherpa-onnx.aar "$AAR_URL"
+          curl -fsSL -o app/libs/sherpa-onnx.aar "$AAR_URL"
 
       - name: Compile 3-layer medical dictionary (Indian core + 2026 molecules + 98k open list)
         run: |
