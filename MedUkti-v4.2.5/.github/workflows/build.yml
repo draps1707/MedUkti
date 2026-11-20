@@ -48,12 +48,20 @@ jobs:
           }
           seen = set()
           out = []
-          with open(core_path, encoding="utf-8") as f:
-              for line in f:
-                  t = line.strip()
-                  if t and t.lower() not in seen:
-                      seen.add(t.lower())
-                      out.append(t)
+          import glob
+          os.makedirs(os.path.dirname(core_path), exist_ok=True)
+          if not os.path.exists(core_path):
+              hits = glob.glob("**/medical_dictionary.txt", recursive=True)
+              if hits:
+                  core_path = hits[0]
+          if os.path.exists(core_path):
+              with open(core_path, encoding="utf-8") as f:
+                  for line in f:
+                      t = line.strip()
+                      if t and t.lower() not in seen:
+                          seen.add(t.lower())
+                          out.append(t)
+          core_path = "app/src/main/assets/medical_dictionary.txt"
           if os.path.exists(extra_path) and os.path.getsize(extra_path) > 0:
               with open(extra_path, encoding="utf-8", errors="ignore") as f:
                   for line in f:
