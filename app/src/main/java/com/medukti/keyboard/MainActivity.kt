@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
@@ -20,6 +21,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -32,10 +34,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnDlSraVaani: TextView
     private lateinit var etHfToken: EditText
     private val uiScope = CoroutineScope(Dispatchers.Main + Job())
-    private var isDownloading = false
 
     private val permLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
+        ActivityResultContracts.RequestMultiplePermissions()
     ) {
         updateStatus()
     }
@@ -82,53 +83,20 @@ class MainActivity : AppCompatActivity() {
 
         btnDlWhisperTurbo.setOnClickListener {
             if (ModelDownloader.isWhisperTurboInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
-            downloadBatch(
-                btnDlWhisperTurbo,
-                listOf(
-                    ModelDownloader.SILERO_VAD,
-                    ModelDownloader.WHISPER_TURBO_TOKENS,
-                    ModelDownloader.WHISPER_TURBO_DEC,
-                    ModelDownloader.WHISPER_TURBO_ENC
-                ),
-                "Whisper Large-v3-Turbo"
-            )
+            startDownloadPack("whisper_turbo")
         }
         btnDlStreamingDraft.setOnClickListener {
             if (ModelDownloader.isStreamingZipformerInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
-            downloadBatch(
-                btnDlStreamingDraft,
-                listOf(
-                    ModelDownloader.SILERO_VAD,
-                    ModelDownloader.STREAMING_ZIP_TOKENS,
-                    ModelDownloader.STREAMING_ZIP_ENC,
-                    ModelDownloader.STREAMING_ZIP_DEC,
-                    ModelDownloader.STREAMING_ZIP_JOINER
-                ),
-                "Indian-EN Streaming Draft"
-            )
+            startDownloadPack("streaming_draft")
         }
         btnDlParakeetIndic.setOnClickListener {
             if (ModelDownloader.isParakeetIndicInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
             Prefs.setHfToken(this, etHfToken.text.toString())
-            downloadBatch(
-                btnDlParakeetIndic,
-                listOf(
-                    ModelDownloader.SILERO_VAD,
-                    ModelDownloader.PARAKEET_INDIC_TOKENS,
-                    ModelDownloader.PARAKEET_INDIC_DEC,
-                    ModelDownloader.PARAKEET_INDIC_JOINER,
-                    ModelDownloader.PARAKEET_INDIC_ENC
-                ),
-                "Parakeet-Indic v1"
-            )
+            startDownloadPack("parakeet_indic")
         }
         btnDlSraVaani.setOnClickListener {
             if (ModelDownloader.isSraVaaniInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
-            downloadBatch(
-                btnDlSraVaani,
-                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.SRAVAANI_DEC, ModelDownloader.SRAVAANI_ENC),
-                "SraVaani 1.0"
-            )
+            startDownloadPack("sravaani")
         }
 
         findViewById<View>(R.id.btnSaveStart).setOnClickListener {
@@ -136,18 +104,39 @@ class MainActivity : AppCompatActivity() {
             Prefs.setHfToken(this, etHfToken.text.toString())
             Prefs.setPersonalDict(this, etPersonalDict.text.toString())
             Prefs.setAutoListen(this, switchAutoListen.isChecked)
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                permLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            }
+            requestNeededPermissions()
             updateStatus()
             uiScope.launch { OfflineAsrEngines.preload(this@MainActivity) }
             Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
         }
 
-        ModelDownloader.cleanupUnusedModels(this)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            permLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        uiScope.launch {
+            ModelDownloadService.state.collectLatest { st ->
+                if (st.isRunning) {
+                    tvStatus.visibility = View.VISIBLE
+                    tvStatus.text = st.statusText
+                    val target = when (st.packId) {
+                        "whisper_turbo" -> btnDlWhisperTurbo
+                        "streaming_draft" -> btnDlStreamingDraft
+                        "parakeet_indic" -> btnDlParakeetIndic
+                        "sravaani" -> btnDlSraVaani
+                        else -> null
+                    }
+                    target?.text = "${st.percent}%"
+                } else {
+                    if (st.error != null) {
+                        tvStatus.visibility = View.VISIBLE
+                        tvStatus.text = st.statusText
+                    } else {
+                        tvStatus.visibility = View.GONE
+                    }
+                    updateStatus()
+                }
+            }
         }
+
+        ModelDownloader.cleanupUnusedModels(this)
+        requestNeededPermissions()
         updateStatus()
     }
 
@@ -156,40 +145,27 @@ class MainActivity : AppCompatActivity() {
         updateStatus()
     }
 
-    private fun downloadBatch(badgeView: TextView, artifacts: List<ModelDownloader.ModelArtifact>, label: String) {
-        if (isDownloading) {
+    private fun requestNeededPermissions() {
+        val needed = ArrayList<String>()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            needed.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (needed.isNotEmpty()) {
+            permLauncher.launch(needed.toTypedArray())
+        }
+    }
+
+    private fun startDownloadPack(packId: String) {
+        if (ModelDownloadService.state.value.isRunning) {
             Toast.makeText(this, "A download is already in progress", Toast.LENGTH_SHORT).show()
             return
         }
-        isDownloading = true
-        uiScope.launch {
-            try {
-                tvStatus.visibility = View.VISIBLE
-                for ((idx, art) in artifacts.withIndex()) {
-                    if (ModelDownloader.isInstalled(this@MainActivity, art)) continue
-                    tvStatus.text = "Downloading $label (${idx + 1}/${artifacts.size}: ${art.fileName})..."
-                    val res = ModelDownloader.download(this@MainActivity, art) { p ->
-                        runOnUiThread {
-                            badgeView.text = "$p%"
-                            tvStatus.text = "Downloading ${art.fileName}: $p%"
-                        }
-                    }
-                    if (res.isFailure) {
-                        val msg = res.exceptionOrNull()?.message ?: "Download failed"
-                        tvStatus.text = "Error: $msg"
-                        badgeView.text = "Retry"
-                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
-                        return@launch
-                    }
-                }
-                tvStatus.visibility = View.GONE
-                Toast.makeText(this@MainActivity, "$label ready offline!", Toast.LENGTH_SHORT).show()
-                OfflineAsrEngines.preload(this@MainActivity)
-                updateStatus()
-            } finally {
-                isDownloading = false
-            }
-        }
+        ModelDownloadService.startPack(this, packId)
     }
 
     private fun isImeEnabled(): Boolean {

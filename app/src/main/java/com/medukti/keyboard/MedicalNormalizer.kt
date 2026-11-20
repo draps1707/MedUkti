@@ -83,6 +83,21 @@ object MedicalNormalizer {
         "cef triaxone" to "Ceftriaxone",
         "safe triaxone" to "Ceftriaxone",
         "ceftryaxone" to "Ceftriaxone",
+        "septriaxone" to "Ceftriaxone",
+        "tajovactam" to "Tazobactam",
+        "cetaglifatin" to "Sitagliptin",
+        "augmentine" to "Augmentin",
+        "niphedipine" to "Nifedipine",
+        "nemodipine" to "Nimodipine",
+        "selectoxib" to "Celecoxib",
+        "etericoxib" to "Etoricoxib",
+        "pentoprazole" to "Pantoprazole",
+        "pentoprazol" to "Pantoprazole",
+        "raveprazol" to "Rabeprazole",
+        "raveprazole" to "Rabeprazole",
+        "rectus seeth" to "rectus sheath",
+        "ace inhibitors" to "ACE inhibitors",
+        "ace inhibitor" to "ACE inhibitor",
         "parasetamol" to "Paracetamol",
         "para setamol" to "Paracetamol",
         "para sitamol" to "Paracetamol",
@@ -474,7 +489,12 @@ object MedicalNormalizer {
                 out.add(w1)
             } else {
                 val exact = singleWordMap[low1]
-                out.add((exact ?: clean1) + punct1)
+                if (exact != null) {
+                    out.add(exact + punct1)
+                } else {
+                    val rescued = rescueDrugToken(low1)
+                    out.add((rescued ?: clean1) + punct1)
+                }
             }
         }
 
@@ -532,6 +552,23 @@ object MedicalNormalizer {
             t = t.replace(Regex("(?i)\\s*\\b${Regex.escape(phrase)}\\b[:.,]*\\s*"), "\n$heading ")
         }
         return t.trim()
+    }
+
+    private val DRUG_SUFFIXES = listOf(
+        "xone", "bactam", "gliptin", "gliflozin", "dipine", "coxib",
+        "prazole", "prazol", "sartan", "statin", "mycin", "cillin",
+        "zolam", "pril", "olol", "gliptin", "fibrate", "glitazone"
+    )
+
+    private fun rescueDrugToken(low: String): String? {
+        if (low.length < 7 || low in PROTECTED_WORDS) return null
+        val sk = englishSkeleton(low)
+        if (sk.length < 5) return null
+        coreSkeletonMap[sk]?.let { return it }
+        if (DRUG_SUFFIXES.any { low.endsWith(it) }) {
+            return fuzzyCoreSkeleton(sk, 1)
+        }
+        return null
     }
 
     private fun fuzzyCoreSkeleton(skel: String, maxDist: Int): String? {
