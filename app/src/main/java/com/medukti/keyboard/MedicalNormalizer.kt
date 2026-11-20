@@ -19,6 +19,10 @@ object MedicalNormalizer {
         "normal", "absent", "present", "mild", "moderate", "severe",
         "mg", "mcg", "ml", "gm", "kg", "iu", "od", "bd", "tds", "qid", "hs", "sos", "stat",
         "iv", "im", "sc", "po", "pr", "sl",
+        "excellent", "present", "presents", "presented", "precede", "preceded", "patient", "patients",
+        "disease", "increase", "decrease", "release", "please", "purpose", "diagnose", "prognosis",
+        "message", "passage", "average", "package", "bandage", "dosage", "damage", "storage",
+        "function", "treatment", "infection", "recurrent", "structural", "infectious", "clinical",
         // Everyday Hinglish words that must never be overwritten by medical acronyms
         "aap", "hai", "hain", "main", "mere", "meri", "mera", "sahi", "nahi", "nahin", "haan",
         "kya", "kyu", "kyon", "bhai", "yaar", "kar", "karo", "kiya", "bana", "banaaya",
@@ -96,6 +100,25 @@ object MedicalNormalizer {
         "raveprazol" to "Rabeprazole",
         "raveprazole" to "Rabeprazole",
         "rectus seeth" to "rectus sheath",
+        "erectus seed" to "rectus sheath",
+        "titanos" to "Tetanus",
+        "scroftipus" to "Scrub typhus",
+        "dengu" to "Dengue",
+        "lumbar lorosis" to "lumbar lordosis",
+        "lorosis" to "lordosis",
+        "thoracic gaipo sis" to "thoracic kyphosis",
+        "gaipo sis" to "kyphosis",
+        "phronchogenic" to "Bronchogenic",
+        "victa lactamage" to "beta-lactamase",
+        "lactamage" to "lactamase",
+        "procloreperagin" to "Prochlorperazine",
+        "feeds patrick" to "Fitzpatrick",
+        "augmenting injection" to "Augmentin injection",
+        "augmenting 625" to "Augmentin 625",
+        "tab augmenting" to "Tab. Augmentin",
+        "tablet augmenting" to "Tab. Augmentin",
+        "inj augmenting" to "Inj. Augmentin",
+        "injection augmenting" to "Inj. Augmentin",
         "ace inhibitors" to "ACE inhibitors",
         "ace inhibitor" to "ACE inhibitor",
         "parasetamol" to "Paracetamol",
@@ -557,7 +580,9 @@ object MedicalNormalizer {
     private val DRUG_SUFFIXES = listOf(
         "xone", "bactam", "gliptin", "gliflozin", "dipine", "coxib",
         "prazole", "prazol", "sartan", "statin", "mycin", "cillin",
-        "zolam", "pril", "olol", "gliptin", "fibrate", "glitazone"
+        "zolam", "pril", "olol", "fibrate", "glitazone",
+        "azine", "agin", "osis", "itis", "oma", "genic",
+        "pathy", "scopy", "ectomy", "plasty", "ase"
     )
 
     private fun rescueDrugToken(low: String): String? {
