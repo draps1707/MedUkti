@@ -148,6 +148,10 @@ object SherpaOnnxEngine {
 
         text = MedicalNormalizer.normalize(ctx, text, engine)
 
+        if (!Prefs.isOdiaEngine(engine)) {
+            text = capitalizeSentences(text)
+        }
+
 
         val dictRaw = Prefs.getPersonalDict(ctx)
         if (dictRaw.isNotBlank()) {
@@ -167,14 +171,22 @@ object SherpaOnnxEngine {
             text.replace(Regex("\\s+([.,?!।])"), "$1").replace(Regex("[ \\t]{2,}"), " ").let { if (it.all { ch -> ch == '\n' }) it else it.trim() },
             Normalizer.Form.NFC
         )
-        if (Prefs.isOdiaEngine(engine) && finalOut.isNotEmpty()) {
+        if (finalOut.isNotEmpty()) {
             val words = finalOut.split(Regex("\\s+"))
             val lastCh = finalOut.last()
-            if (words.size >= 4 && lastCh !in setOf('।', '.', '?', '!', ',')) {
-                val isQuestion = words.any {
-                    it in setOf("କିଏ", "କଣ", "କ'ଣ", "କେମିତି", "କେବେ", "କାହିଁକି", "କୁଆଡ଼େ", "କେତେ")
+            if (Prefs.isOdiaEngine(engine)) {
+                if (words.size >= 4 && lastCh !in setOf('।', '.', '?', '!', ',')) {
+                    val isQuestion = words.any {
+                        it in setOf("କିଏ", "କଣ", "କ'ଣ", "କେମିତି", "କେବେ", "କାହିଁକି", "କୁଆଡ଼େ", "କେତେ")
+                    }
+                    finalOut += if (isQuestion) "?" else "।"
                 }
-                finalOut += if (isQuestion) "?" else "।"
+            } else {
+                if (words.size >= 5 && lastCh !in setOf('.', '?', '!', ',', ':')) {
+                    val firstLow = words.firstOrNull()?.lowercase() ?: ""
+                    val isQuestion = firstLow in setOf("what", "why", "how", "when", "where", "who", "which")
+                    finalOut += if (isQuestion) "?" else "."
+                }
             }
         }
         return finalOut
@@ -207,9 +219,9 @@ object SherpaOnnxEngine {
             val vadConfig = VadModelConfig(
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = vadFile.absolutePath,
-                    threshold = if (isWhisper) 0.35f else 0.38f,
-                    minSilenceDuration = if (isWhisper) 0.90f else 0.50f,
-                    minSpeechDuration = if (isWhisper) 0.25f else 0.14f,
+                    threshold = if (isWhisper) 0.28f else 0.38f,
+                    minSilenceDuration = if (isWhisper) 0.65f else 0.50f,
+                    minSpeechDuration = if (isWhisper) 0.12f else 0.14f,
                     maxSpeechDuration = if (isWhisper) 15.0f else 6.0f,
                     windowSize = 512
                 ),

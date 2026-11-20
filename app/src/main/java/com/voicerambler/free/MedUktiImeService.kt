@@ -90,7 +90,7 @@ class MedUktiImeService : InputMethodService() {
 
     private fun resetIdleSleepTimer() {
         mainHandler.removeCallbacks(idleSleepRunnable)
-        mainHandler.postDelayed(idleSleepRunnable, 3 * 60 * 1000L)
+        mainHandler.postDelayed(idleSleepRunnable, 10 * 60 * 1000L)
     }
 
     private fun buzz(ms: Long = 16L) {
@@ -268,9 +268,22 @@ class MedUktiImeService : InputMethodService() {
         resetIdleSleepTimer()
         activeResolvedEngine.set(Prefs.getEngine(this))
         scheduleDebouncedPreload(0L)
-        if (Prefs.isAutoListen(this) && !isListening.get() && !isProcessing) {
+        if (vadConsumerJob?.isActive != true) {
+            isProcessing = false
+            setMicUiState(MicUiState.IDLE)
+        }
+        if (Prefs.isAutoListen(this) && !isListening.get()) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                startContinuousDictation()
+                if (isProcessing && vadConsumerJob?.isActive == true) {
+                    serviceScope.launch {
+                        vadConsumerJob?.join()
+                        if (!isListening.get() && isInputViewShown) {
+                            startContinuousDictation()
+                        }
+                    }
+                } else {
+                    startContinuousDictation()
+                }
             } else {
                 tvImeStatus?.text = "Grant Mic permission in MedUkti app"
             }
@@ -466,7 +479,7 @@ class MedUktiImeService : InputMethodService() {
         }
 
         isListening.set(true)
-        setMicUiState(MicUiState.LISTENING)
+        tvImeStatus?.text = "Starting mic..." 
         val segmentChannel = Channel<Pair<FloatArray, AsrEngineType>>(Channel.UNLIMITED)
 
         val streamingAvailable = Prefs.isStreamingDraftEnabled(this) && ModelDownloader.isStreamingZipformerInstalled(this)
@@ -525,6 +538,9 @@ class MedUktiImeService : InputMethodService() {
                     throw IllegalStateException("Mic failed to initialize")
                 }
                 ar.startRecording()
+                mainHandler.post {
+                    if (isListening.get()) setMicUiState(MicUiState.LISTENING)
+                }
 
                 val windowSize = 512
                 val shortBuf = ShortArray(windowSize)

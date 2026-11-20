@@ -312,7 +312,9 @@ object MedicalNormalizer {
                             if (' ' in lower) {
                                 multiWordRules.add(Regex("\\b${Regex.escape(lower)}\\b", RegexOption.IGNORE_CASE) to Regex.escapeReplacement(term))
                             } else {
-                                singleWordMap.putIfAbsent(lower, term)
+                                if (lineNo <= 1500 || !(term.length >= 6 && term.all { it.isUpperCase() })) {
+                                    singleWordMap.putIfAbsent(lower, term)
+                                }
                                 if (lower.length >= 8) {
                                     fuzzyBuckets.getOrPut(lower[0]) { ArrayList() }.add(lower to term)
                                 }
