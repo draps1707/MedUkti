@@ -11,8 +11,8 @@ android {
         applicationId = "com.voicerambler.free"
         minSdk = 29
         targetSdk = 35
-        versionCode = 23
-        versionName = "4.1.5"
+        versionCode = 24
+        versionName = "4.1.6"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }

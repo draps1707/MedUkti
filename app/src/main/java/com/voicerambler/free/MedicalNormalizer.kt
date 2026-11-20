@@ -439,69 +439,16 @@ object MedicalNormalizer {
 
         val tokens = text.split(Regex("\\s+"))
         val out = ArrayList<String>(tokens.size)
-        var i = 0
-        while (i < tokens.size) {
-            val w1 = tokens[i]
+        for (w1 in tokens) {
             val clean1 = w1.trimEnd('.', ',', ';', ':', '?', '!')
             val punct1 = w1.substring(clean1.length)
             val low1 = clean1.lowercase()
-
-            if (i + 2 < tokens.size && clean1.all { it in 'a'..'z' || it in 'A'..'Z' } && low1 !in PROTECTED_WORDS) {
-                val w2 = tokens[i + 1]
-                val w3 = tokens[i + 2]
-                val clean2 = w2.trimEnd('.', ',', ';', ':', '?', '!')
-                val clean3 = w3.trimEnd('.', ',', ';', ':', '?', '!')
-                val punct3 = w3.substring(clean3.length)
-                val low2 = clean2.lowercase()
-                val low3 = clean3.lowercase()
-                if (clean2.all { it in 'a'..'z' || it in 'A'..'Z' } &&
-                    clean3.all { it in 'a'..'z' || it in 'A'..'Z' } &&
-                    low2 !in PROTECTED_WORDS && low3 !in PROTECTED_WORDS
-                ) {
-                    val joined3 = low1 + low2 + low3
-                    val hit3 = singleWordMap[joined3]
-                        ?: (if (joined3.length >= 8) fuzzyLookup(joined3) else null)
-                        ?: (if (joined3.length >= 9) skeletonMap[englishSkeleton(joined3)] else null)
-                    if (hit3 != null) {
-                        out.add(hit3 + punct3)
-                        i += 3
-                        continue
-                    }
-                }
-            }
-
-            if (i + 1 < tokens.size && clean1.all { it in 'a'..'z' || it in 'A'..'Z' } && low1 !in PROTECTED_WORDS) {
-                val w2 = tokens[i + 1]
-                val clean2 = w2.trimEnd('.', ',', ';', ':', '?', '!')
-                val punct2 = w2.substring(clean2.length)
-                val low2 = clean2.lowercase()
-                if (clean2.all { it in 'a'..'z' || it in 'A'..'Z' } && low2 !in PROTECTED_WORDS) {
-                    val joined = low1 + low2
-                    val hit = singleWordMap[joined]
-                        ?: (if (joined.length >= 8) fuzzyLookup(joined) else null)
-                        ?: (if (joined.length >= 9) skeletonMap[englishSkeleton(joined)] else null)
-                        ?: (if (joined.length >= 10) fuzzyCoreSkeleton(englishSkeleton(joined), 2) else null)
-                    if (hit != null) {
-                        out.add(hit + punct2)
-                        i += 2
-                        continue
-                    }
-                }
-            }
-
             if (clean1.any { it.isDigit() } || low1 in PROTECTED_WORDS) {
                 out.add(w1)
             } else {
                 val exact = singleWordMap[low1]
-                if (exact != null) {
-                    out.add(exact + punct1)
-                } else {
-                    val fuzzy = fuzzyLookup(low1)
-                        ?: (if (low1.length >= 9) skeletonMap[englishSkeleton(low1)] else null)
-                    out.add((fuzzy ?: clean1) + punct1)
-                }
+                out.add((exact ?: clean1) + punct1)
             }
-            i++
         }
 
         var res = out.joinToString(" ").replace(Regex("[ \\t]{2,}"), " ").trim()
