@@ -23,6 +23,9 @@ object MedicalNormalizer {
         "disease", "increase", "decrease", "release", "please", "purpose", "diagnose", "prognosis",
         "message", "passage", "average", "package", "bandage", "dosage", "damage", "storage",
         "function", "treatment", "infection", "recurrent", "structural", "infectious", "clinical",
+        "adequate", "aerosol", "alkaline", "urea", "iron", "calcium", "zinc", "glucose", "oxygen",
+        "routine", "baseline", "medicine", "hormone", "tissue", "engine", "combine", "examine",
+        "define", "outline", "decline", "vaccine", "feeds", "patrick", "seed", "seeth",
         // Everyday Hinglish words that must never be overwritten by medical acronyms
         "aap", "hai", "hain", "main", "mere", "meri", "mera", "sahi", "nahi", "nahin", "haan",
         "kya", "kyu", "kyon", "bhai", "yaar", "kar", "karo", "kiya", "bana", "banaaya",
@@ -113,6 +116,39 @@ object MedicalNormalizer {
         "lactamage" to "lactamase",
         "procloreperagin" to "Prochlorperazine",
         "feeds patrick" to "Fitzpatrick",
+        "phronchogenic carcinoma" to "Bronchogenic carcinoma",
+        "scrub tipus" to "Scrub typhus",
+        "bupibhaken" to "Bupivacaine",
+        "oseltamibhir" to "Oseltamivir",
+        "carbimajol" to "Carbimazole",
+        "lamotrizin" to "Lamotrigine",
+        "diltia gem" to "Diltiazem",
+        "ondan cetron" to "Ondansetron",
+        "granny cetron" to "Granisetron",
+        "raja tripton" to "Rizatriptan",
+        "livocetti regin" to "Levocetirizine",
+        "pandy" to "Pan-D",
+        "pan dee" to "Pan-D",
+        "tell ma" to "Telma",
+        "mono safe" to "Monocef",
+        "do low" to "Dolo",
+        "glyco met" to "Glycomet",
+        "for ziga" to "Forxiga",
+        "jar diance" to "Jardiance",
+        "bhin blastin" to "Vinblastine",
+        "prajocin" to "Prazosin",
+        "omeprajol" to "Omeprazole",
+        "jolendronate" to "Zoledronate",
+        "seti regin" to "Cetirizine",
+        "jafir lucas" to "Zafirlukast",
+        "vanilla paksin" to "Venlafaxine",
+        "lamy-woodin" to "Lamivudine",
+        "lamy woodin" to "Lamivudine",
+        "carpil jomib" to "Carfilzomib",
+        "obinitu jumab" to "Obinutuzumab",
+        "naltrex zone" to "Naltrexone",
+        "faevukso-start" to "Febuxostat",
+        "faevukso start" to "Febuxostat",
         "augmenting injection" to "Augmentin injection",
         "augmenting 625" to "Augmentin 625",
         "tab augmenting" to "Tab. Augmentin",
@@ -375,7 +411,7 @@ object MedicalNormalizer {
                             if (' ' in lower) {
                                 multiWordRules.add(Regex("\\b${Regex.escape(lower)}\\b", RegexOption.IGNORE_CASE) to Regex.escapeReplacement(term))
                             } else {
-                                if (lineNo <= 1500 || !(term.length >= 6 && term.all { it.isUpperCase() })) {
+                                if (lineNo <= 3000 || !(term.length >= 6 && term.all { it.isUpperCase() })) {
                                     singleWordMap.putIfAbsent(lower, term)
                                 }
                                 if (lower.length >= 8) {
@@ -384,7 +420,7 @@ object MedicalNormalizer {
                                 if (lower.length >= 7) {
                                     val sk = englishSkeleton(lower)
                                     if (sk.length >= 5) {
-                                        if (lineNo <= 1500) {
+                                        if (lineNo <= 3000) {
                                             coreSkeletons.putIfAbsent(sk, term)
                                         } else {
                                             extraSkelCounts[sk] = (extraSkelCounts[sk] ?: 0) + 1
@@ -504,14 +540,40 @@ object MedicalNormalizer {
 
         val tokens = text.split(Regex("\\s+"))
         val out = ArrayList<String>(tokens.size)
-        for (w1 in tokens) {
+        var ti = 0
+        while (ti < tokens.size) {
+            val w1 = tokens[ti]
             val clean1 = w1.trimEnd('.', ',', ';', ':', '?', '!')
             val punct1 = w1.substring(clean1.length)
             val low1 = clean1.lowercase()
+            val dehyphen1 = if ('-' in low1) low1.replace("-", "") else ""
+
+            // 2-word skeleton sliding window for split medical/drug terms (e.g. "ondan cetron", "gaipo sis")
+            if (ti + 1 < tokens.size && punct1.isEmpty() && clean1.length >= 3 && clean1.all { it.isLetter() } && low1 !in PROTECTED_WORDS) {
+                val w2 = tokens[ti + 1]
+                val clean2 = w2.trimEnd('.', ',', ';', ':', '?', '!')
+                val punct2 = w2.substring(clean2.length)
+                val low2 = clean2.lowercase()
+                if (clean2.length >= 3 && clean2.all { it.isLetter() } && low2 !in PROTECTED_WORDS) {
+                    val joined = low1 + low2
+                    if (joined.length >= 8) {
+                        val hit2 = singleWordMap[joined] ?: run {
+                            val sk2 = englishSkeleton(joined)
+                            if (sk2.length >= 6) coreSkeletonMap[sk2] else null
+                        }
+                        if (hit2 != null) {
+                            out.add(hit2 + punct2)
+                            ti += 2
+                            continue
+                        }
+                    }
+                }
+            }
+
             if (clean1.any { it.isDigit() } || low1 in PROTECTED_WORDS) {
                 out.add(w1)
             } else {
-                val exact = singleWordMap[low1]
+                val exact = singleWordMap[low1] ?: (if (dehyphen1.length >= 8) singleWordMap[dehyphen1] else null)
                 if (exact != null) {
                     out.add(exact + punct1)
                 } else {
@@ -519,6 +581,7 @@ object MedicalNormalizer {
                     out.add((rescued ?: clean1) + punct1)
                 }
             }
+            ti++
         }
 
         var res = out.joinToString(" ").replace(Regex("[ \\t]{2,}"), " ").trim()
@@ -581,8 +644,16 @@ object MedicalNormalizer {
         "xone", "bactam", "gliptin", "gliflozin", "dipine", "coxib",
         "prazole", "prazol", "sartan", "statin", "mycin", "cillin",
         "zolam", "pril", "olol", "fibrate", "glitazone",
-        "azine", "agin", "osis", "itis", "oma", "genic",
-        "pathy", "scopy", "ectomy", "plasty", "ase"
+        "azine", "agin", "majol", "trizin", "triptan", "setron",
+        "cetron", "cycline", "conazole", "floxacin", "caine",
+        "sone", "solone", "lukast", "tidine", "dopa", "ase"
+    )
+
+    private val CLINICAL_SUFFIXES = listOf(
+        "osis", "itis", "oma", "genic", "pathy", "scopy", "ectomy",
+        "otomy", "ostomy", "plasty", "megaly", "sclerosis", "stenosis",
+        "algia", "emia", "aemia", "uria", "plasia", "blastoma",
+        "sarcoma", "carcinoma", "pnoea", "pnea", "rrhoea", "rrhea"
     )
 
     private fun rescueDrugToken(low: String): String? {
@@ -590,7 +661,7 @@ object MedicalNormalizer {
         val sk = englishSkeleton(low)
         if (sk.length < 5) return null
         coreSkeletonMap[sk]?.let { return it }
-        if (DRUG_SUFFIXES.any { low.endsWith(it) }) {
+        if (DRUG_SUFFIXES.any { low.endsWith(it) } || CLINICAL_SUFFIXES.any { low.endsWith(it) }) {
             return fuzzyCoreSkeleton(sk, 1)
         }
         return null

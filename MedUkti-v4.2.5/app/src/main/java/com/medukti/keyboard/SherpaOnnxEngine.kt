@@ -19,8 +19,8 @@ import kotlin.math.sqrt
 object SherpaOnnxEngine {
 
     private val recognizers = ConcurrentHashMap<String, OfflineRecognizer>()
-    private var vad: Vad? = null
-    private var vadIsWhisperProfile: Boolean? = null
+    private var vadWhisper: Vad? = null
+    private var vadFast: Vad? = null
 
     @Synchronized
     fun releaseRecognizer() {
@@ -203,48 +203,54 @@ object SherpaOnnxEngine {
         if (!ModelDownloader.isInstalled(ctx, ModelDownloader.SILERO_VAD)) {
             return null
         }
-        if (vad == null || vadIsWhisperProfile != isWhisper) {
-            try { vad?.release() } catch (_: Exception) {}
-            val vadFile = ModelDownloader.getFile(ctx, ModelDownloader.SILERO_VAD)
-            val vadConfig = VadModelConfig(
-                sileroVadModelConfig = SileroVadModelConfig(
-                    model = vadFile.absolutePath,
-                    threshold = if (isWhisper) 0.28f else 0.38f,
-                    minSilenceDuration = if (isWhisper) 0.65f else 0.50f,
-                    minSpeechDuration = if (isWhisper) 0.12f else 0.14f,
-                    maxSpeechDuration = if (isWhisper) 15.0f else 6.0f,
-                    windowSize = 512
-                ),
-                sampleRate = 16000,
-                numThreads = 1,
-                debug = false
-            )
-            vad = Vad(assetManager = null, config = vadConfig)
-            vadIsWhisperProfile = isWhisper
+        val existing = if (isWhisper) vadWhisper else vadFast
+        if (existing != null) return existing
+
+        val vadFile = ModelDownloader.getFile(ctx, ModelDownloader.SILERO_VAD)
+        val vadConfig = VadModelConfig(
+            sileroVadModelConfig = SileroVadModelConfig(
+                model = vadFile.absolutePath,
+                threshold = if (isWhisper) 0.28f else 0.38f,
+                minSilenceDuration = if (isWhisper) 0.65f else 0.50f,
+                minSpeechDuration = if (isWhisper) 0.12f else 0.14f,
+                maxSpeechDuration = if (isWhisper) 15.0f else 6.0f,
+                windowSize = 512
+            ),
+            sampleRate = 16000,
+            numThreads = 1,
+            debug = false
+        )
+        val created = Vad(assetManager = null, config = vadConfig)
+        if (isWhisper) {
+            vadWhisper = created
+        } else {
+            vadFast = created
         }
-        return vad
+        return created
     }
 
     private fun extractSpeechWithVad(ctx: Context, samples: FloatArray): List<FloatArray> {
         val v = getOrCreateVad(ctx, false) ?: return listOf(samples)
-        v.reset()
-        val windowSize = 512
-        var offset = 0
-        while (offset + windowSize <= samples.size) {
-            v.acceptWaveform(samples.copyOfRange(offset, offset + windowSize))
-            offset += windowSize
-        }
-        v.flush()
-
-        val segments = mutableListOf<FloatArray>()
-        while (!v.empty()) {
-            val seg = v.front()
-            if (seg.samples.isNotEmpty()) {
-                segments.add(seg.samples)
+        synchronized(v) {
+            v.reset()
+            val windowSize = 512
+            var offset = 0
+            while (offset + windowSize <= samples.size) {
+                v.acceptWaveform(samples.copyOfRange(offset, offset + windowSize))
+                offset += windowSize
             }
-            v.pop()
+            v.flush()
+
+            val segments = mutableListOf<FloatArray>()
+            while (!v.empty()) {
+                val seg = v.front()
+                if (seg.samples.isNotEmpty()) {
+                    segments.add(seg.samples)
+                }
+                v.pop()
+            }
+            return if (segments.isEmpty()) emptyList() else segments
         }
-        return if (segments.isEmpty()) emptyList() else segments
     }
 
     @Synchronized
