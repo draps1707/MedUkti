@@ -460,7 +460,7 @@ class MedUktiImeService : InputMethodService() {
         }
         val resolved = resolvedRes.getOrThrow()
         activeResolvedEngine.set(resolved)
-        if (SherpaOnnxEngine.getOrCreateVad(this) == null) {
+        if (SherpaOnnxEngine.getOrCreateVad(this, resolved == AsrEngineType.WHISPER_TURBO) == null) {
             Toast.makeText(this, "Download a model pack first (includes Silero VAD)", Toast.LENGTH_LONG).show()
             return
         }
@@ -513,7 +513,7 @@ class MedUktiImeService : InputMethodService() {
         liveLoopJob = serviceScope.launch(Dispatchers.IO) {
             var ar: AudioRecord? = null
             try {
-                val vad = SherpaOnnxEngine.getOrCreateVad(this@MedUktiImeService)
+                val vad = SherpaOnnxEngine.getOrCreateVad(this@MedUktiImeService, resolved == AsrEngineType.WHISPER_TURBO)
                     ?: throw IllegalStateException("Silero VAD not installed")
                 vad.reset()
 

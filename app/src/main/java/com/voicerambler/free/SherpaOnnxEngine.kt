@@ -21,6 +21,7 @@ object SherpaOnnxEngine {
 
     private val recognizers = ConcurrentHashMap<String, OfflineRecognizer>()
     private var vad: Vad? = null
+    private var vadIsWhisperProfile: Boolean? = null
 
     @Synchronized
     fun releaseRecognizer() {
@@ -59,13 +60,17 @@ object SherpaOnnxEngine {
         return sqrt(sumSq / samples.size).toFloat()
     }
 
-    private fun normalizeGainAndPad(samples: FloatArray): FloatArray {
+    private fun normalizeGainAndPad(samples: FloatArray, isWhisper: Boolean = false): FloatArray {
         if (samples.isEmpty()) return samples
         val rms = computeRms(samples)
-        val gain = if (rms in 0.0012f..0.08f) (0.08f / rms).coerceAtMost(6.0f) else 1.0f
+        val gain = if (isWhisper) {
+            if (rms in 0.002f..0.04f) (0.05f / rms).coerceAtMost(3.0f) else 1.0f
+        } else {
+            if (rms in 0.0012f..0.08f) (0.08f / rms).coerceAtMost(6.0f) else 1.0f
+        }
 
         val leadPad = 2560  // 0.16s leading silence so soft plosives ("Pa-") aren't clipped
-        val tailPad = 4800  // 0.30s trailing silence
+        val tailPad = if (isWhisper) 1600 else 4800  // Shorter tail for Whisper to avoid silence hallucinations
         val out = FloatArray(leadPad + samples.size + tailPad)
         for (i in samples.indices) {
             out[leadPad + i] = (samples[i] * gain).coerceIn(-0.95f, 0.95f)
@@ -159,7 +164,7 @@ object SherpaOnnxEngine {
         }
 
         var finalOut = Normalizer.normalize(
-            text.replace(Regex("[ \\t]{2,}"), " ").let { if (it.all { ch -> ch == '\n' }) it else it.trim() },
+            text.replace(Regex("\\s+([.,?!।])"), "$1").replace(Regex("[ \\t]{2,}"), " ").let { if (it.all { ch -> ch == '\n' }) it else it.trim() },
             Normalizer.Form.NFC
         )
         if (Prefs.isOdiaEngine(engine) && finalOut.isNotEmpty()) {
@@ -192,19 +197,20 @@ object SherpaOnnxEngine {
     }
 
     @Synchronized
-    fun getOrCreateVad(ctx: Context): Vad? {
+    fun getOrCreateVad(ctx: Context, isWhisper: Boolean = false): Vad? {
         if (!ModelDownloader.isInstalled(ctx, ModelDownloader.SILERO_VAD)) {
             return null
         }
-        if (vad == null) {
+        if (vad == null || vadIsWhisperProfile != isWhisper) {
+            try { vad?.release() } catch (_: Exception) {}
             val vadFile = ModelDownloader.getFile(ctx, ModelDownloader.SILERO_VAD)
             val vadConfig = VadModelConfig(
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = vadFile.absolutePath,
-                    threshold = 0.38f,
-                    minSilenceDuration = 0.55f,
-                    minSpeechDuration = 0.14f,
-                    maxSpeechDuration = 6.0f,
+                    threshold = if (isWhisper) 0.35f else 0.38f,
+                    minSilenceDuration = if (isWhisper) 0.90f else 0.50f,
+                    minSpeechDuration = if (isWhisper) 0.25f else 0.14f,
+                    maxSpeechDuration = if (isWhisper) 15.0f else 6.0f,
                     windowSize = 512
                 ),
                 sampleRate = 16000,
@@ -212,12 +218,13 @@ object SherpaOnnxEngine {
                 debug = false
             )
             vad = Vad(assetManager = null, config = vadConfig)
+            vadIsWhisperProfile = isWhisper
         }
         return vad
     }
 
     private fun extractSpeechWithVad(ctx: Context, samples: FloatArray): List<FloatArray> {
-        val v = getOrCreateVad(ctx) ?: return listOf(samples)
+        val v = getOrCreateVad(ctx, false) ?: return listOf(samples)
         v.reset()
         val windowSize = 512
         var offset = 0
@@ -343,10 +350,13 @@ object SherpaOnnxEngine {
 
     fun transcribeSamples(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            if (samples.size < 2400 || computeRms(samples) < 0.001f) {
+            val isWhisper = engine == AsrEngineType.WHISPER_TURBO
+            val minSamples = if (isWhisper) 4800 else 2400
+            val minRms = if (isWhisper) 0.002f else 0.001f
+            if (samples.size < minSamples || computeRms(samples) < minRms) {
                 return Result.success("")
             }
-            val boosted = normalizeGainAndPad(samples)
+            val boosted = normalizeGainAndPad(samples, isWhisper)
             val raw = decodeRaw(ctx, engine, boosted)
             Result.success(postProcessTranscript(ctx, raw, engine))
         } catch (e: Exception) {
@@ -367,7 +377,7 @@ object SherpaOnnxEngine {
             val sb = StringBuilder()
             for (seg in speechSegments) {
                 if (seg.size < 4800 || computeRms(seg) < 0.003f) continue
-                val boosted = normalizeGainAndPad(seg)
+                val boosted = normalizeGainAndPad(seg, engine == AsrEngineType.WHISPER_TURBO)
                 val raw = decodeRaw(ctx, engine, boosted)
                 val text = postProcessTranscript(ctx, raw, engine)
                 if (text.isNotEmpty()) {
