@@ -355,49 +355,7 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Model 5: IndicConformer 600M -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="IndicConformer 600M (Odia)"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="661 MB • Lighter Odia backup"
-                        android:textColor="#9AA0A6"
-                        android:textSize="11sp" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/btnDlIndicOr"
-                    android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:background="@drawable/bg_btn_compact"
-                    android:gravity="center"
-                    android:minWidth="86dp"
-                    android:paddingHorizontal="12dp"
-                    android:text="Download"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
 
             <TextView
                 android:id="@+id/tvStatus"
@@ -441,38 +399,17 @@
                 android:textColorHint="#6E7681"
                 android:textSize="13sp" />
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/btnSaveStart"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:layout_marginTop="12dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/btnCompare"
-                    android:layout_width="0dp"
-                    android:layout_height="42dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_key_action"
-                    android:gravity="center"
-                    android:text="Compare Lab"
-                    android:textColor="#E8EAED"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/btnSaveStart"
-                    android:layout_width="0dp"
-                    android:layout_height="42dp"
-                    android:layout_marginStart="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_btn_compact"
-                    android:gravity="center"
-                    android:text="Save Settings"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
+                android:background="@drawable/bg_btn_compact"
+                android:gravity="center"
+                android:text="Save Settings"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
     </LinearLayout>

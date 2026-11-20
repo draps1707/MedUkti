@@ -23,18 +23,6 @@ object ModelDownloader {
         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
     )
 
-    val INDIC_TOKENS = ModelArtifact(
-        "indic_tokens",
-        "indicconformer-tokens.txt",
-        "https://huggingface.co/Docglasses-AI/indic-conformer-600m-sherpa-onnx-int8/resolve/main/indicconformer-tokens.txt"
-    )
-
-    val INDIC_OR = ModelArtifact(
-        "indic_or",
-        "indicconformer-or.int8.onnx",
-        "https://huggingface.co/Docglasses-AI/indic-conformer-600m-sherpa-onnx-int8/resolve/main/indicconformer-or.int8.onnx"
-    )
-
     val SRAVAANI_ENC = ModelArtifact(
         "sravaani_enc",
         "sravaani-encoder.onnx",
@@ -128,10 +116,6 @@ object ModelDownloader {
         val f = getFile(ctx, artifact)
         return f.exists() && f.length() > 512L
     }
-
-    fun isOdiaInstalled(ctx: Context): Boolean =
-        isInstalled(ctx, INDIC_OR) && isInstalled(ctx, INDIC_TOKENS)
-
     fun isSraVaaniInstalled(ctx: Context): Boolean =
         isInstalled(ctx, SRAVAANI_ENC) && isInstalled(ctx, SRAVAANI_DEC)
 
@@ -155,8 +139,6 @@ object ModelDownloader {
     fun cleanupUnusedModels(ctx: Context) {
         val keep = setOf(
             SILERO_VAD.fileName,
-            INDIC_TOKENS.fileName,
-            INDIC_OR.fileName,
             SRAVAANI_ENC.fileName,
             SRAVAANI_DEC.fileName,
             STREAMING_ZIP_ENC.fileName,

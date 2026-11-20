@@ -4,7 +4,6 @@ import android.content.Context
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineMedAsrCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
-import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
@@ -39,7 +38,6 @@ object SherpaOnnxEngine {
     @Synchronized
     fun releaseInactiveModels(active: AsrEngineType) {
         val keepKeys = when (active) {
-            AsrEngineType.INDIC_CONFORMER_OR -> setOf("odia")
             AsrEngineType.SRAVAANI_OR -> emptySet()
             AsrEngineType.WHISPER_TURBO -> setOf("whisper_turbo")
             AsrEngineType.PARAKEET_INDIC -> setOf("parakeet_indic")
@@ -171,22 +169,14 @@ object SherpaOnnxEngine {
             text.replace(Regex("\\s+([.,?!।])"), "$1").replace(Regex("[ \\t]{2,}"), " ").let { if (it.all { ch -> ch == '\n' }) it else it.trim() },
             Normalizer.Form.NFC
         )
-        if (finalOut.isNotEmpty()) {
+        if (Prefs.isOdiaEngine(engine) && finalOut.isNotEmpty()) {
             val words = finalOut.split(Regex("\\s+"))
             val lastCh = finalOut.last()
-            if (Prefs.isOdiaEngine(engine)) {
-                if (words.size >= 4 && lastCh !in setOf('।', '.', '?', '!', ',')) {
-                    val isQuestion = words.any {
-                        it in setOf("କିଏ", "କଣ", "କ'ଣ", "କେମିତି", "କେବେ", "କାହିଁକି", "କୁଆଡ଼େ", "କେତେ")
-                    }
-                    finalOut += if (isQuestion) "?" else "।"
+            if (words.size >= 4 && lastCh !in setOf('।', '.', '?', '!', ',')) {
+                val isQuestion = words.any {
+                    it in setOf("କିଏ", "କଣ", "କ'ଣ", "କେମିତି", "କେବେ", "କାହିଁକି", "କୁଆଡ଼େ", "କେତେ")
                 }
-            } else {
-                if (words.size >= 5 && lastCh !in setOf('.', '?', '!', ',', ':')) {
-                    val firstLow = words.firstOrNull()?.lowercase() ?: ""
-                    val isQuestion = firstLow in setOf("what", "why", "how", "when", "where", "who", "which")
-                    finalOut += if (isQuestion) "?" else "."
-                }
+                finalOut += if (isQuestion) "?" else "।"
             }
         }
         return finalOut
@@ -262,19 +252,6 @@ object SherpaOnnxEngine {
         recognizers[key]?.let { return it }
 
         val modelConfig = when (key) {
-            "odia" -> {
-                val model = ModelDownloader.getFile(ctx, ModelDownloader.INDIC_OR)
-                val tokens = ModelDownloader.getFile(ctx, ModelDownloader.INDIC_TOKENS)
-                if (!model.exists() || !tokens.exists()) {
-                    throw IllegalStateException("Download Odia Offline Pack first")
-                }
-                OfflineModelConfig(
-                    nemo = OfflineNemoEncDecCtcModelConfig(model = model.absolutePath),
-                    tokens = tokens.absolutePath,
-                    numThreads = 4,
-                    debug = false
-                )
-            }
             "whisper_turbo" -> {
                 val enc = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_TURBO_ENC)
                 val dec = ModelDownloader.getFile(ctx, ModelDownloader.WHISPER_TURBO_DEC)
@@ -339,7 +316,6 @@ object SherpaOnnxEngine {
 
     private fun decodeRaw(ctx: Context, engine: AsrEngineType, boosted: FloatArray): String {
         return when (engine) {
-            AsrEngineType.INDIC_CONFORMER_OR -> decodeSingle(getOrCreateModel(ctx, "odia"), boosted)
             AsrEngineType.SRAVAANI_OR -> SraVaaniEngine.transcribeSamples(ctx, boosted)
             AsrEngineType.WHISPER_TURBO -> decodeSingle(getOrCreateModel(ctx, "whisper_turbo"), boosted)
             AsrEngineType.PARAKEET_INDIC -> decodeSingle(getOrCreateModel(ctx, "parakeet_indic"), boosted)
@@ -351,7 +327,6 @@ object SherpaOnnxEngine {
             MedicalNormalizer.init(ctx)
             getOrCreateVad(ctx)
             when (engine) {
-                AsrEngineType.INDIC_CONFORMER_OR -> getOrCreateModel(ctx, "odia")
                 AsrEngineType.SRAVAANI_OR -> SraVaaniEngine.preload(ctx)
                 AsrEngineType.WHISPER_TURBO -> getOrCreateModel(ctx, "whisper_turbo")
                 AsrEngineType.PARAKEET_INDIC -> getOrCreateModel(ctx, "parakeet_indic")

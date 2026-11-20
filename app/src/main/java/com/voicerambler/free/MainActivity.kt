@@ -30,7 +30,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnDlStreamingDraft: TextView
     private lateinit var btnDlParakeetIndic: TextView
     private lateinit var btnDlSraVaani: TextView
-    private lateinit var btnDlIndicOr: TextView
     private lateinit var etHfToken: EditText
     private val uiScope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -55,7 +54,6 @@ class MainActivity : AppCompatActivity() {
         btnDlStreamingDraft = findViewById(R.id.btnDlStreamingDraft)
         btnDlParakeetIndic = findViewById(R.id.btnDlParakeetIndic)
         btnDlSraVaani = findViewById(R.id.btnDlSraVaani)
-        btnDlIndicOr = findViewById(R.id.btnDlIndicOr)
 
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
         spinnerEngine.adapter = adapter
@@ -130,17 +128,6 @@ class MainActivity : AppCompatActivity() {
                 listOf(ModelDownloader.SILERO_VAD, ModelDownloader.SRAVAANI_DEC, ModelDownloader.SRAVAANI_ENC),
                 "SraVaani 1.0"
             )
-        }
-        btnDlIndicOr.setOnClickListener {
-            if (ModelDownloader.isOdiaInstalled(this) && ModelDownloader.isInstalled(this, ModelDownloader.SILERO_VAD)) return@setOnClickListener
-            downloadBatch(
-                btnDlIndicOr,
-                listOf(ModelDownloader.SILERO_VAD, ModelDownloader.INDIC_TOKENS, ModelDownloader.INDIC_OR),
-                "IndicConformer 600M"
-            )
-        }
-        findViewById<View>(R.id.btnCompare).setOnClickListener {
-            startActivity(Intent(this, CompareActivity::class.java))
         }
 
         findViewById<View>(R.id.btnSaveStart).setOnClickListener {
@@ -235,6 +222,5 @@ class MainActivity : AppCompatActivity() {
         styleModelBadge(btnDlParakeetIndic, indicOk)
         etHfToken.visibility = if (indicOk) View.GONE else View.VISIBLE
         styleModelBadge(btnDlSraVaani, vadOk && ModelDownloader.isSraVaaniInstalled(this))
-        styleModelBadge(btnDlIndicOr, vadOk && ModelDownloader.isOdiaInstalled(this))
     }
 }

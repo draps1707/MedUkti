@@ -17,10 +17,6 @@ object OfflineAsrEngines {
                 if (ModelDownloader.isParakeetIndicInstalled(ctx)) Result.success(engine)
                 else Result.failure(Exception("Download Parakeet-Indic v1 Pack first"))
             }
-            AsrEngineType.INDIC_CONFORMER_OR -> {
-                if (ModelDownloader.isOdiaInstalled(ctx)) Result.success(engine)
-                else Result.failure(Exception("Download Odia Offline Pack first"))
-            }
             AsrEngineType.SRAVAANI_OR -> {
                 if (ModelDownloader.isSraVaaniInstalled(ctx)) Result.success(engine)
                 else Result.failure(Exception("Download SraVaani 1.0 Odia Pack first"))

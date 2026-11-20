@@ -6,7 +6,6 @@ enum class AsrEngineType(val label: String) {
     WHISPER_TURBO("Indian/Medical Pro — Whisper Large-v3-Turbo"),
     PARAKEET_INDIC("Indian English Fast — Parakeet-Indic v1"),
     SRAVAANI_OR("Odia Natural — SraVaani 1.0"),
-    INDIC_CONFORMER_OR("Odia Backup — IndicConformer 600M")
 }
 
 object Prefs {
@@ -27,7 +26,7 @@ object Prefs {
     }
 
     fun isOdiaEngine(e: AsrEngineType): Boolean =
-        e == AsrEngineType.INDIC_CONFORMER_OR || e == AsrEngineType.SRAVAANI_OR
+        e == AsrEngineType.SRAVAANI_OR
 
     fun setEngine(ctx: Context, engine: AsrEngineType) {
         val editor = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
