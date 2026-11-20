@@ -8,6 +8,52 @@
     android:paddingTop="8dp"
     android:paddingBottom="6dp">
 
+    <!-- Optional 1-Tap Save Fix Bar (hidden unless Undo -> correction occurs) -->
+    <LinearLayout
+        android:id="@+id/saveFixBar"
+        android:layout_width="match_parent"
+        android:layout_height="34dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/bg_card_dark"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvSaveFixLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Save fix?"
+            android:textColor="#E8EAED"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/btnSaveFix"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:background="@drawable/bg_key_accent"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
+            android:text="Save"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnDismissFix"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_marginStart="6dp"
+            android:gravity="center"
+            android:text="✕"
+            android:textColor="#9AA0A6"
+            android:textSize="13sp" />
+    </LinearLayout>
+
     <!-- Row 1: Mode Toggle + Inline Mic Pill + Settings -->
     <LinearLayout
         android:layout_width="match_parent"

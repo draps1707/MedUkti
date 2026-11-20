@@ -10,6 +10,7 @@ object MedicalNormalizer {
     private val fuzzyBuckets = HashMap<Char, ArrayList<Pair<String, String>>>()
     private val skeletonMap = HashMap<String, String>()
     private val coreSkeletonMap = HashMap<String, String>()
+    private val drugTermsLower = HashSet<String>()
 
     @Volatile
     private var loaded = false
@@ -149,6 +150,17 @@ object MedicalNormalizer {
         "naltrex zone" to "Naltrexone",
         "faevukso-start" to "Febuxostat",
         "faevukso start" to "Febuxostat",
+        "sacubitril ablastin" to "Sacubitril/valsartan",
+        "insuring glargine" to "Insulin glargine",
+        "theochallic oxide" to "Thiocolchicoside",
+        "lama vadini" to "Lamivudine",
+        "alpha terrison b" to "Amphotericin B",
+        "warwickonazole" to "Voriconazole",
+        "n-terminal probe b-type" to "N-terminal pro-B-type",
+        "by basilar" to "bibasilar",
+        "adepnam" to "Ertapenem",
+        "nortriptifin" to "Nortriptyline",
+        "nortryptoline" to "Nortriptyline",
         "augmenting injection" to "Augmentin injection",
         "augmenting 625" to "Augmentin 625",
         "tab augmenting" to "Tab. Augmentin",
@@ -400,6 +412,33 @@ object MedicalNormalizer {
             val coreSkeletons = HashMap<String, String>()
             val extraSkelCounts = HashMap<String, Int>()
             val extraSkelTerm = HashMap<String, String>()
+            // Layer 1: 100% of core_drugs.txt into coreSkeletons (no line cap)
+            try {
+                ctx.assets.open("core_drugs.txt").bufferedReader().useLines { lines ->
+                    lines.forEach { raw ->
+                        val term = raw.trim()
+                        val lower = term.lowercase()
+                        if (lower.length >= 3 && lower !in PROTECTED_WORDS && lower.all { it.code < 128 }) {
+                            drugTermsLower.add(lower)
+                            if (' ' in lower) {
+                                multiWordRules.add(Regex("\\b${Regex.escape(lower)}\\b", RegexOption.IGNORE_CASE) to Regex.escapeReplacement(term))
+                            } else {
+                                singleWordMap.putIfAbsent(lower, term)
+                                if (lower.length >= 7) {
+                                    fuzzyBuckets.getOrPut(lower[0]) { ArrayList() }.add(lower to term)
+                                    val sk = englishSkeleton(lower)
+                                    if (sk.length >= 4) {
+                                        coreSkeletons.putIfAbsent(sk, term)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+
+            // Layer 2: medical_dictionary.txt (clinical terms + 98k open list)
             var lineNo = 0
             try {
                 ctx.assets.open("medical_dictionary.txt").bufferedReader().useLines { lines ->
@@ -419,10 +458,10 @@ object MedicalNormalizer {
                                 }
                                 if (lower.length >= 7) {
                                     val sk = englishSkeleton(lower)
-                                    if (sk.length >= 5) {
+                                    if (sk.length >= 4) {
                                         if (lineNo <= 3000) {
                                             coreSkeletons.putIfAbsent(sk, term)
-                                        } else {
+                                        } else if (sk.length >= 5) {
                                             extraSkelCounts[sk] = (extraSkelCounts[sk] ?: 0) + 1
                                             extraSkelTerm[sk] = term
                                         }
@@ -548,8 +587,8 @@ object MedicalNormalizer {
             val low1 = clean1.lowercase()
             val dehyphen1 = if ('-' in low1) low1.replace("-", "") else ""
 
-            // 2-word skeleton sliding window for split medical/drug terms (e.g. "ondan cetron", "gaipo sis")
-            if (ti + 1 < tokens.size && punct1.isEmpty() && clean1.length >= 3 && clean1.all { it.isLetter() } && low1 !in PROTECTED_WORDS) {
+            // 2-word skeleton sliding window (exact + distance-1 fuzzy for >= 9 char splits like "by basilar")
+            if (ti + 1 < tokens.size && punct1.isEmpty() && clean1.length >= 2 && clean1.all { it.isLetter() } && low1 !in PROTECTED_WORDS) {
                 val w2 = tokens[ti + 1]
                 val clean2 = w2.trimEnd('.', ',', ';', ':', '?', '!')
                 val punct2 = w2.substring(clean2.length)
@@ -557,12 +596,12 @@ object MedicalNormalizer {
                 if (clean2.length >= 3 && clean2.all { it.isLetter() } && low2 !in PROTECTED_WORDS) {
                     val joined = low1 + low2
                     if (joined.length >= 8) {
-                        val hit2 = singleWordMap[joined] ?: run {
-                            val sk2 = englishSkeleton(joined)
-                            if (sk2.length >= 6) coreSkeletonMap[sk2] else null
-                        }
+                        val sk2 = englishSkeleton(joined)
+                        val hit2 = singleWordMap[joined]
+                            ?: (if (sk2.length >= 5) coreSkeletonMap[sk2] else null)
+                            ?: (if (joined.length >= 9 && sk2.length >= 6) fuzzyCoreSkeleton(sk2, 1, joined) else null)
                         if (hit2 != null) {
-                            out.add(hit2 + punct2)
+                            out.add(preserveClinicalCase(hit2, clean1) + punct2)
                             ti += 2
                             continue
                         }
@@ -575,10 +614,11 @@ object MedicalNormalizer {
             } else {
                 val exact = singleWordMap[low1] ?: (if (dehyphen1.length >= 8) singleWordMap[dehyphen1] else null)
                 if (exact != null) {
-                    out.add(exact + punct1)
+                    out.add(preserveClinicalCase(exact, clean1) + punct1)
                 } else {
                     val rescued = rescueDrugToken(low1)
-                    out.add((rescued ?: clean1) + punct1)
+                    val finalTok = if (rescued != null) preserveClinicalCase(rescued, clean1) else clean1
+                    out.add(finalTok + punct1)
                 }
             }
             ti++
@@ -656,24 +696,38 @@ object MedicalNormalizer {
         "sarcoma", "carcinoma", "pnoea", "pnea", "rrhoea", "rrhea"
     )
 
+    private fun preserveClinicalCase(canonical: String, original: String): String {
+        val lowCan = canonical.lowercase()
+        // Keep acronyms (ECG, DKA, SpO2) and drugs/brands capitalized
+        if (canonical.count { it.isUpperCase() } >= 2 || lowCan in drugTermsLower) {
+            return canonical
+        }
+        // For general clinical nouns (dyspnoea, oedema, ultrasonography), preserve lowercase if spoken lowercase
+        if (original.isNotEmpty() && original[0].isLowerCase()) {
+            return lowCan
+        }
+        return canonical
+    }
+
     private fun rescueDrugToken(low: String): String? {
         if (low.length < 7 || low in PROTECTED_WORDS) return null
         val sk = englishSkeleton(low)
-        if (sk.length < 5) return null
+        if (sk.length < 4) return null
         coreSkeletonMap[sk]?.let { return it }
-        if (DRUG_SUFFIXES.any { low.endsWith(it) } || CLINICAL_SUFFIXES.any { low.endsWith(it) }) {
-            return fuzzyCoreSkeleton(sk, 1)
+        if (sk.length >= 5) {
+            return fuzzyCoreSkeleton(sk, 1, low)
         }
         return null
     }
 
-    private fun fuzzyCoreSkeleton(skel: String, maxDist: Int): String? {
-        if (skel.length < 6) return null
+    private fun fuzzyCoreSkeleton(skel: String, maxDist: Int, rawLower: String): String? {
+        if (skel.length < 5) return null
         var best: String? = null
         var bestD = maxDist + 1
         var tie = false
         for ((k, v) in coreSkeletonMap) {
             if (abs(k.length - skel.length) > maxDist) continue
+            if (abs(v.length - rawLower.length) > 3) continue
             val d = levenshtein(skel, k, maxDist)
             if (d < bestD) {
                 bestD = d
@@ -683,7 +737,12 @@ object MedicalNormalizer {
                 tie = true
             }
         }
-        return if (!tie && bestD <= maxDist) best else null
+        if (tie || bestD > maxDist || best == null) return null
+        // Sanity check: share first consonant or >= 50% character overlap so everyday English isn't hijacked
+        val bestLow = best.lowercase()
+        val sameFirst = skel[0] == englishSkeleton(bestLow).firstOrNull()
+        val common = rawLower.toSet().intersect(bestLow.toSet()).size
+        return if (sameFirst || common * 2 >= bestLow.toSet().size) best else null
     }
 
     fun isKnownMedicalWord(lowerWord: String): Boolean =

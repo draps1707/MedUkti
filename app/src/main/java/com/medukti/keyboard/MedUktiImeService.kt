@@ -51,6 +51,11 @@ class MedUktiImeService : InputMethodService() {
     private val isListening = AtomicBoolean(false)
     private var isProcessing = false
     private var lastCommittedLen = 0
+    private var lastCommittedPhrase = ""
+    private var pendingWrongPhrase: String? = null
+    private var pendingRightPhrase: String? = null
+    private var saveFixBar: View? = null
+    private var tvSaveFixLabel: TextView? = null
     private var vadConsumerJob: Job? = null
     private var liveLoopJob: Job? = null
     private var preloadJob: Job? = null
@@ -223,6 +228,28 @@ class MedUktiImeService : InputMethodService() {
             }
         }
 
+        saveFixBar = view.findViewById(R.id.saveFixBar)
+        tvSaveFixLabel = view.findViewById(R.id.tvSaveFixLabel)
+        view.findViewById<View>(R.id.btnSaveFix)?.setOnClickListener {
+            val w = pendingWrongPhrase
+            val r = pendingRightPhrase
+            if (!w.isNullOrBlank() && !r.isNullOrBlank()) {
+                val cur = Prefs.getPersonalDict(this).trim()
+                val entry = "$w = $r"
+                val updated = if (cur.isEmpty()) entry else "$cur\n$entry"
+                Prefs.setPersonalDict(this, updated)
+                Toast.makeText(this, "Saved: $entry", Toast.LENGTH_SHORT).show()
+            }
+            pendingWrongPhrase = null
+            pendingRightPhrase = null
+            saveFixBar?.visibility = View.GONE
+        }
+        view.findViewById<View>(R.id.btnDismissFix)?.setOnClickListener {
+            pendingWrongPhrase = null
+            pendingRightPhrase = null
+            saveFixBar?.visibility = View.GONE
+        }
+
         view.findViewById<View>(R.id.keyUndo).setOnClickListener {
             buzz(24L)
             undoLastCommitted()
@@ -373,7 +400,10 @@ class MedUktiImeService : InputMethodService() {
         if (lastCommittedLen > 0) {
             ic.deleteSurroundingText(lastCommittedLen, 0)
             lastCommittedLen = 0
-            Toast.makeText(this, "Undid last phrase", Toast.LENGTH_SHORT).show()
+            val candidate = lastCommittedPhrase.trim().trimEnd('.', ',', '!', '?')
+            if (candidate.isNotEmpty() && candidate.length <= 40 && candidate.split(Regex("\\s+")).size <= 3) {
+                pendingWrongPhrase = candidate
+            }
         }
     }
 
@@ -447,6 +477,16 @@ class MedUktiImeService : InputMethodService() {
             val outText = (if (needLeadingSpace) " " else "") + formatted + (if (needTrailingSpace) " " else "")
             ic.commitText(outText, 1)
             lastCommittedLen = outText.length
+            val cleanCommitted = formatted.trim().trimEnd('.', ',', '!', '?')
+            lastCommittedPhrase = cleanCommitted
+            val wrong = pendingWrongPhrase
+            if (wrong != null && cleanCommitted.isNotEmpty() && cleanCommitted.length <= 40 &&
+                cleanCommitted.split(Regex("\\s+")).size <= 3 && !wrong.equals(cleanCommitted, ignoreCase = true)
+            ) {
+                pendingRightPhrase = cleanCommitted
+                tvSaveFixLabel?.text = "Save fix: $wrong → $cleanCommitted"
+                saveFixBar?.visibility = View.VISIBLE
+            }
         }
     }
 
