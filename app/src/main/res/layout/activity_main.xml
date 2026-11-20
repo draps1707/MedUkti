@@ -391,7 +391,7 @@
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_input_dark"
                 android:gravity="top|start"
-                android:hint="wrong = right (one per line)\nsubhu = Subhu"
+                android:hint="wrong = right (one per line)\npiptas = Piptaz"
                 android:inputType="textMultiLine"
                 android:minLines="3"
                 android:padding="12dp"

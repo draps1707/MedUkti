@@ -160,7 +160,7 @@ object ModelDownloader {
         }
     }
 
-    private fun openWithRedirects(startUrl: String, bearerToken: String?): HttpURLConnection {
+    private fun openWithRedirects(startUrl: String, bearerToken: String?, rangeStart: Long = 0L): HttpURLConnection {
         var current = startUrl
         for (hop in 0..8) {
             val urlObj = URL(current)
@@ -168,7 +168,10 @@ object ModelDownloader {
                 instanceFollowRedirects = false
                 connectTimeout = 20000
                 readTimeout = 60000
-                setRequestProperty("User-Agent", "MedUkti/4.1")
+                setRequestProperty("User-Agent", "MedUkti/4.2")
+                if (rangeStart > 0L) {
+                    setRequestProperty("Range", "bytes=$rangeStart-")
+                }
                 if (!bearerToken.isNullOrBlank() && urlObj.host.endsWith("huggingface.co")) {
                     setRequestProperty("Authorization", "Bearer $bearerToken")
                 }
@@ -199,8 +202,20 @@ object ModelDownloader {
             if (artifact.requiresAuth && token.isEmpty()) {
                 return@withContext Result.failure(Exception("Paste your Hugging Face Token (hf_...) in Settings first"))
             }
-            conn = openWithRedirects(artifact.url, token)
-            val code = conn.responseCode
+            val existingBytes = if (tmp.exists() && tmp.length() > 0L) tmp.length() else 0L
+            conn = openWithRedirects(artifact.url, token, existingBytes)
+            var code = conn.responseCode
+            var appendMode = false
+            var baseBytes = 0L
+            if (code == 416) {
+                conn.disconnect()
+                tmp.delete()
+                conn = openWithRedirects(artifact.url, token, 0L)
+                code = conn.responseCode
+            } else if (code == 206 && existingBytes > 0L) {
+                appendMode = true
+                baseBytes = existingBytes
+            }
             if (code == 401 || code == 403) {
                 return@withContext Result.failure(Exception("HF access denied ($code): check token & repo approval"))
             }
@@ -208,11 +223,12 @@ object ModelDownloader {
                 return@withContext Result.failure(Exception("Download HTTP $code for ${artifact.fileName}"))
             }
 
-            val total = conn.contentLengthLong
-            var downloaded = 0L
+            val remaining = conn.contentLengthLong
+            val total = if (remaining > 0L) baseBytes + remaining else -1L
+            var downloaded = baseBytes
             var lastPct = -1
             conn.inputStream.use { input ->
-                FileOutputStream(tmp).use { output ->
+                FileOutputStream(tmp, appendMode).use { output ->
                     val buf = ByteArray(16384)
                     while (true) {
                         val n = input.read(buf)
