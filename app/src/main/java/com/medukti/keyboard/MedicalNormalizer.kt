@@ -745,6 +745,22 @@ object MedicalNormalizer {
         return if (sameFirst || common * 2 >= bestLow.toSet().size) best else null
     }
 
+    fun searchDictionary(ctx: Context, query: String): List<String> {
+        init(ctx)
+        val q = query.trim().lowercase()
+        if (q.length < 2) return emptyList()
+        val exact = singleWordMap[q]
+        val hits = LinkedHashSet<String>()
+        if (exact != null) hits.add(exact)
+        for ((k, v) in singleWordMap) {
+            if (k.startsWith(q)) {
+                hits.add(v)
+                if (hits.size >= 8) break
+            }
+        }
+        return hits.take(8)
+    }
+
     fun findCandidateHints(ctx: Context, rawText: String): List<String> {
         init(ctx)
         if (rawText.isBlank()) return emptyList()

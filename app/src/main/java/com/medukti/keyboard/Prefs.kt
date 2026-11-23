@@ -12,7 +12,7 @@ enum class AsrEngineType(val label: String, val badge: String) {
 enum class FocusPack(val label: String, val terms: String) {
     GENERAL(
         "General / Casualty & ICU",
-        "Sacubitril/valsartan, Dapagliflozin, Empagliflozin, Apixaban, Atorvastatin, Piptaz, Monocef, Augmentin, Pan-D, Telma, Glycomet, Dolo, Scrub typhus, Kyphosis, Lordosis, Rectus sheath, Procalcitonin, Troponin-I, NT-proBNP, Hyperkalaemia, Dyspnoea, Oedema"
+        "Sacubitril/valsartan, Dapagliflozin, Empagliflozin, Apixaban, Atorvastatin, Piperacillin, Tazobactam, Ceftriaxone, Pantoprazole, Telmisartan, Metformin, Paracetamol, Scrub typhus, Kyphosis, Lordosis, Rectus sheath, Procalcitonin, Troponin-I, NT-proBNP, Hyperkalaemia, Dyspnoea, Oedema"
     ),
     CARDIO_RENAL(
         "Cardio / Diabetes / Renal",

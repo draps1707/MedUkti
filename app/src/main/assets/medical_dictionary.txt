@@ -632,52 +632,24 @@ Tiotropium
 Ipratropium
 Montelukast
 Theophylline
-Augmentin
-Clavam
 Moxikind CV
 Taxim O
-Monocef
 Mahacef
 Zifi
 Azee
-Azithral
 Pan D
-Pantocid
-Sompraz
-Razo
 Rabekind
 Omez
-Glycomet
 Glycomet GP
-Amaryl
 Diamicron
 Istavel
-Galvus
 Trajenta
-Jardiance
-Forxiga
-Telma
 Telma AM
 Olmezest
-Amlong
-Stamlo
 Cilacar
-Concor
 Metolar XL
 Nebicard
-Lasix
-Dytor
-Aldactone
-Ecosprin
 Clopilet
-Atorva
-Rosuvas
-Thyronorm
-Eltroxin
-Asthalin
-Budecort
-Foracort
-Duolin
 Tiova OPD
 IPD
 ICU
@@ -1021,7 +993,6 @@ Dexlansoprazole
 Faropenem
 Avibactam
 Colistin
-Januvia
 Dolo 650
 UDCA
 Ursodeoxycholic
@@ -1042,18 +1013,12 @@ Gemer
 Glimestar M
 Galvus Met
 Oxra
-Mixtard
-Lantus
-Humalog
 Novomix
 Augmentin 625
 Clavam 625
 Magnex Forte
 Norflox TZ
-Metrogyl
-Piptaz
 Oflox OZ
-Ciplox
 Albendazole
 Ivermectin
 Primaquine
@@ -1064,50 +1029,31 @@ Chloroquine
 Pantocid D
 Razo D
 Sucrafil O
-Cremaffin
-Udiliv
 Ondem
-Emeset
 Drotin M
 Meftal Spas
-Buscopan
 Rifaximin
-Duphalac
-Looz
 Liv 52
 Silymarin
 ORS
 Zerodol SP
 Zerodol P
-Combiflam
-Voveran
-Ultracet
 Pregaba
 Gabapin
-Levipil
-Levera
-Eptoin
 Gardenal
-Vertin
 Stugeron
 Montair LC
-Deriphyllin
 Levolin
-Allegra
-Atarax
 Ascoril
 Grilinctus
 Mucomix
-Shelcal
 Orofer XT
 Autrin
 Livogen
 Uprise D3
 Neurobion Forte
-Becosules
 Evion
 Folvite
-Limcee
 Zincovit
 Dexorange
 Pause
@@ -1757,7 +1703,6 @@ Vinblastine
 Vincristine
 Vinorelbine
 Voriconazole
-Wysolone
 Xylometazoline
 Zidovudine
 Zoledronic
@@ -1870,76 +1815,6 @@ Transferrin saturation
 Reticulocyte count
 Peripheral smear
 Bone marrow aspiration
-Moxikind-CV
-Taxim
-Taxim-O
-Tazact
-Meronem
-Norflox
-Oflox
-Flagyl
-Pan-D
-Pantop
-Rantac
-Nexpro
-Telma-AM
-Telma-H
-Glycomet-GP
-Glucophage
-Glimestar
-Dolo
-Crocin
-Calpol
-Zerodol
-Zerodol-SP
-Nucoxia
-Etorica
-Neurobion
-Liv-52
-Montair
-Montair-LC
-Levocet
-Avil
-Clopitab
-Deplatt
-Tonact
-Metolar
-Metolar-XL
-Lanoxin
-Cordarone
-Gardinal
-Frisium
-Restyl
-Alprax
-Nexito
-Neomercazole
-Novorapid
-Actrapid
-Zofer
-Perinorm
-Stemetil
-Drotin
-Meftal
-Meftal-Spas
-Cyclopam
-Gelusil
-Mucaine
-Betnesol
-Dexona
-Omnacortil
-Solu-Medrol
-Kenacort
-T-Bact
-Mupimet
-Candid
-Candid-B
-Fluka
-Forcan
-Lulifin
-Tenovate
-Dermiford
-Hifenac
-Chymoral
 Rizatriptan
 Flecainide
 Venlafaxine
