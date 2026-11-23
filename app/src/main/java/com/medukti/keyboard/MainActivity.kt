@@ -75,7 +75,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         val spinnerEngine = findViewById<Spinner>(R.id.spinnerEngine)
-        val spinnerFocusPack = findViewById<Spinner>(R.id.spinnerFocusPack)
         val spinnerGroqAsr = findViewById<Spinner>(R.id.spinnerGroqAsr)
         val spinnerGroqLlm = findViewById<Spinner>(R.id.spinnerGroqLlm)
         val spinnerGeminiModel = findViewById<Spinner>(R.id.spinnerGeminiModel)
@@ -109,8 +108,6 @@ class MainActivity : AppCompatActivity() {
         spinnerEngine.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
         spinnerEngine.setSelection(AsrEngineType.entries.indexOf(Prefs.getEngine(this)).coerceAtLeast(0))
 
-        spinnerFocusPack.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, FocusPack.entries.map { it.label })
-        spinnerFocusPack.setSelection(FocusPack.entries.indexOf(Prefs.getFocusPack(this)).coerceAtLeast(0))
 
         bindModelSpinner(spinnerGroqAsr, etGroqAsrModel, groqAsrOptions, Prefs.getGroqAsrModel(this))
         val curLlm = if (!Prefs.isAiPolishEnabled(this)) "off" else Prefs.getGroqLlmModel(this)
@@ -171,7 +168,6 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.btnSaveStart).setOnClickListener {
             Prefs.setEngine(this, AsrEngineType.entries[spinnerEngine.selectedItemPosition])
-            Prefs.setFocusPack(this, FocusPack.entries[spinnerFocusPack.selectedItemPosition])
             Prefs.setAutoListen(this, switchAutoListen.isChecked)
             Prefs.setLiveStreamingEnabled(this, switchLiveStream.isChecked)
 

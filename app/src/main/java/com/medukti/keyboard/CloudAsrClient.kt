@@ -151,7 +151,7 @@ object CloudAsrClient {
     }
 
     private fun buildWhisperPrompt(ctx: Context): String {
-        val focusTerms = Prefs.getFocusPack(ctx).terms
+        val universalTerms = "Tab., Inj., Cap., Syp., SpO2, BP, Dyspnoea, Oedema, Haemoptysis, Scrub typhus, Rectus sheath, Troponin-I, NT-proBNP, Ceftriaxone, Piperacillin, Tazobactam, Augmentin, Azithromycin, Empagliflozin, Dapagliflozin, Apixaban, Sacubitril/valsartan, Atorvastatin, Telmisartan, Pantoprazole, Metformin, Paracetamol"
         val personal = Prefs.getPersonalDict(ctx)
         val customTerms = if (personal.isBlank()) emptyList() else personal.lines()
             .mapNotNull { line ->
@@ -161,9 +161,9 @@ object CloudAsrClient {
             .distinct()
             .take(25)
         val combined = if (customTerms.isEmpty()) {
-            "Indian clinical note: $focusTerms"
+            "Indian clinical note: $universalTerms"
         } else {
-            "Indian clinical note: ${customTerms.joinToString(", ")}, $focusTerms"
+            "Indian clinical note: ${customTerms.joinToString(", ")}, $universalTerms"
         }
         return combined.take(750)
     }

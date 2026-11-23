@@ -7,6 +7,7 @@ object MedicalNormalizer {
 
     private val singleWordMap = HashMap<String, String>()
     private val multiWordRules = ArrayList<Pair<Regex, String>>()
+    private val multiWordTerms = LinkedHashSet<String>()
     private val fuzzyBuckets = HashMap<Char, ArrayList<Pair<String, String>>>()
     private val skeletonMap = HashMap<String, String>()
     private val coreSkeletonMap = HashMap<String, String>()
@@ -406,6 +407,7 @@ object MedicalNormalizer {
             for ((k, v) in PHONETIC_AND_SPELLING_BRIDGES) {
                 if (' ' in k) {
                     multiWordRules.add(Regex("\\b${Regex.escape(k)}\\b", RegexOption.IGNORE_CASE) to Regex.escapeReplacement(v))
+                    multiWordTerms.add(v)
                 } else {
                     singleWordMap[k] = v
                 }
@@ -423,6 +425,7 @@ object MedicalNormalizer {
                             drugTermsLower.add(lower)
                             if (' ' in lower) {
                                 multiWordRules.add(Regex("\\b${Regex.escape(lower)}\\b", RegexOption.IGNORE_CASE) to Regex.escapeReplacement(term))
+                                multiWordTerms.add(term)
                             } else {
                                 singleWordMap.putIfAbsent(lower, term)
                                 if (lower.length >= 7) {
@@ -450,6 +453,7 @@ object MedicalNormalizer {
                         if (lower.length >= 2 && lower !in PROTECTED_WORDS && lower.all { it.code < 128 }) {
                             if (' ' in lower) {
                                 multiWordRules.add(Regex("\\b${Regex.escape(lower)}\\b", RegexOption.IGNORE_CASE) to Regex.escapeReplacement(term))
+                                multiWordTerms.add(term)
                             } else {
                                 if (lineNo <= 3000 || !(term.length >= 6 && term.all { it.isUpperCase() })) {
                                     singleWordMap.putIfAbsent(lower, term)
@@ -802,13 +806,25 @@ object MedicalNormalizer {
         init(ctx)
         val q = query.trim().lowercase()
         if (q.length < 2) return emptyList()
-        val exact = singleWordMap[q]
         val hits = LinkedHashSet<String>()
-        if (exact != null) hits.add(exact)
+        singleWordMap[q]?.let { hits.add(it) }
+        for (phrase in multiWordTerms) {
+            if (phrase.lowercase() == q) {
+                hits.add(phrase)
+            }
+        }
         for ((k, v) in singleWordMap) {
             if (k.startsWith(q)) {
                 hits.add(v)
                 if (hits.size >= 8) break
+            }
+        }
+        if (hits.size < 8) {
+            for (phrase in multiWordTerms) {
+                if (phrase.lowercase().contains(q)) {
+                    hits.add(phrase)
+                    if (hits.size >= 8) break
+                }
             }
         }
         return hits.take(8)
