@@ -151,20 +151,21 @@ object CloudAsrClient {
     }
 
     private fun buildWhisperPrompt(ctx: Context): String {
+        val focusTerms = Prefs.getFocusPack(ctx).terms
         val personal = Prefs.getPersonalDict(ctx)
-        if (personal.isBlank()) return BASE_WHISPER_PROMPT
-        val customTerms = personal.lines()
+        val customTerms = if (personal.isBlank()) emptyList() else personal.lines()
             .mapNotNull { line ->
                 val idx = line.indexOf('=')
                 if (idx > 0) line.substring(idx + 1).trim().takeIf { it.isNotEmpty() } else null
             }
             .distinct()
             .take(25)
-        return if (customTerms.isEmpty()) {
-            BASE_WHISPER_PROMPT
+        val combined = if (customTerms.isEmpty()) {
+            "Indian clinical note: $focusTerms"
         } else {
-            (customTerms.joinToString(", ") + ". " + BASE_WHISPER_PROMPT).take(750)
+            "Indian clinical note: ${customTerms.joinToString(", ")}, $focusTerms"
         }
+        return combined.take(750)
     }
 
     private fun callGroqWhisper(ctx: Context, wavBytes: ByteArray, model: String, isLivePreview: Boolean): String {
@@ -219,13 +220,18 @@ object CloudAsrClient {
 
         val model = Prefs.getGroqLlmModel(ctx)
         val personal = Prefs.getPersonalDict(ctx).trim()
+        val candidates = MedicalNormalizer.findCandidateHints(ctx, rawText)
         val sysPrompt = buildString {
             append("You are an ultra-fast medical & Hinglish transcription polisher for an Indian doctor. ")
             append("Fix punctuation, capitalization, filler words (umm, uh), and self-corrections. ")
-            append("Fix acoustic mishearings of generic drugs, Indian brand names, and clinical terms using sentence context ")
-            append("(e.g. 'epixabin'->Apixaban, 'Sacubitril ablastin'->Sacubitril/valsartan, 'by basilar'->bibasilar, ")
-            append("'insuring Glargine'->Insulin glargine, 'according' vs 'accordioning', 'monitor' vs 'Mononitrate'). ")
+            append("Watch for Indian-English ASR phonetic shifts: bh<->v (oseltamibhir->Oseltamivir, Bupibhaken->Bupivacaine), ")
+            append("z<->j (carbimajol->Carbimazole, omeprajol->Omeprazole), ph/p<->f (epixabin->Apixaban, phosphormycin->Fosfomycin), ")
+            append("dropped -r endings (acyclovia->Acyclovir, tenofova->Tenofovir), and 2-word splits (by basilar->bibasilar, Sacubitril ablastin->Sacubitril/valsartan). ")
+            append("Use sentence context so normal English words (monitor, according, patients) are never wrongly replaced. ")
             append("Preserve natural Romanized Hinglish words if spoken. ")
+            if (candidates.isNotEmpty()) {
+                append("Candidate Indian formulary/clinical terms that may match this audio: ${candidates.joinToString(", ")}. ")
+            }
             if (personal.isNotEmpty()) {
                 append("Always apply these exact user overrides: ${personal.replace("\n", "; ")}. ")
             }
@@ -235,7 +241,8 @@ object CloudAsrClient {
         val payload = JSONObject().apply {
             put("model", model)
             put("temperature", 0.0)
-            put("max_tokens", 512)
+            put("reasoning_effort", "low")
+            put("max_tokens", 1024)
             put("messages", JSONArray().apply {
                 put(JSONObject().put("role", "system").put("content", sysPrompt))
                 put(JSONObject().put("role", "user").put("content", rawText))
@@ -278,11 +285,11 @@ object CloudAsrClient {
         val b64Audio = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
 
         val prompt = buildString {
-            append("Transcribe this audio verbatim. ")
-            append("If spoken in Odia, write accurate Odia script (ଓଡ଼ିଆ)—never Malayalam, Gujarati, Bengali, or Devanagari. ")
-            append("Keep English medical terms, drug names, and numbers in accurate English/digits. ")
-            append("If spoken in Hinglish or English, preserve natural text. ")
-            append("Output ONLY the transcribed text, no explanations.")
+            append("The speaker is speaking Odia (ଓଡ଼ିଆ) with occasional English medical or drug terms. ")
+            append("Always transcribe Odia speech in pure Odia script (ଓଡ଼ିଆ)—never transliterate Odia into Roman/Hinglish letters, ")
+            append("and NEVER output Malayalam, Gujarati, Bengali, or Devanagari characters. ")
+            append("Write only actual English medical terms, drug/brand names (e.g. Piptaz, Monocef, SpO2, ECG), and digits in English. ")
+            append("Output ONLY the transcribed text with zero commentary.")
         }
 
         val payload = JSONObject().apply {

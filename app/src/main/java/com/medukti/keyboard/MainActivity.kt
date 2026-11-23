@@ -19,6 +19,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -46,7 +48,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val rootScroll = findViewById<View>(R.id.rootScroll)
+        ViewCompat.setOnApplyWindowInsetsListener(rootScroll) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+
         val spinnerEngine = findViewById<Spinner>(R.id.spinnerEngine)
+        val spinnerFocusPack = findViewById<Spinner>(R.id.spinnerFocusPack)
         val switchAutoListen = findViewById<Switch>(R.id.switchAutoListen)
         val switchLiveStream = findViewById<Switch>(R.id.switchLiveStream)
         val switchAiPolish = findViewById<Switch>(R.id.switchAiPolish)
@@ -63,6 +73,10 @@ class MainActivity : AppCompatActivity() {
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
         spinnerEngine.adapter = adapter
         spinnerEngine.setSelection(AsrEngineType.entries.indexOf(Prefs.getEngine(this)).coerceAtLeast(0))
+
+        val focusAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, FocusPack.entries.map { it.label })
+        spinnerFocusPack.adapter = focusAdapter
+        spinnerFocusPack.setSelection(FocusPack.entries.indexOf(Prefs.getFocusPack(this)).coerceAtLeast(0))
 
         switchAutoListen.isChecked = Prefs.isAutoListen(this)
         switchLiveStream.isChecked = Prefs.isLiveStreamingEnabled(this)
@@ -113,6 +127,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.btnSaveStart).setOnClickListener {
             Prefs.setEngine(this, AsrEngineType.entries[spinnerEngine.selectedItemPosition])
+            Prefs.setFocusPack(this, FocusPack.entries[spinnerFocusPack.selectedItemPosition])
             Prefs.setAutoListen(this, switchAutoListen.isChecked)
             Prefs.setLiveStreamingEnabled(this, switchLiveStream.isChecked)
             Prefs.setAiPolishEnabled(this, switchAiPolish.isChecked)

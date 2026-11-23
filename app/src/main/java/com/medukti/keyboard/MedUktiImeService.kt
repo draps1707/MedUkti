@@ -51,6 +51,7 @@ class MedUktiImeService : InputMethodService() {
     private var isProcessing = false
     private var lastCommittedLen = 0
     private var lastCommittedPhrase = ""
+    private var lastLiveDraftText = ""
     private var pendingWrongPhrase: String? = null
     private var pendingRightPhrase: String? = null
     private var saveFixBar: View? = null
@@ -403,6 +404,7 @@ class MedUktiImeService : InputMethodService() {
     private fun updateLiveDraft(rawDraft: String) {
         val clean = rawDraft.trim()
         if (clean.isEmpty()) return
+        lastLiveDraftText = clean
         mainHandler.post {
             val ic = currentInputConnection ?: return@post
             val before = ic.getTextBeforeCursor(50, 0)?.toString() ?: ""
@@ -411,11 +413,19 @@ class MedUktiImeService : InputMethodService() {
         }
     }
 
-    private fun clearLiveDraft() {
+    private fun lockOrClearLiveDraft() {
+        val draft = lastLiveDraftText
+        lastLiveDraftText = ""
         mainHandler.post {
             val ic = currentInputConnection ?: return@post
-            ic.setComposingText("", 1)
-            ic.finishComposingText()
+            if (draft.isNotEmpty()) {
+                ic.finishComposingText()
+                lastCommittedLen = draft.length
+                lastCommittedPhrase = draft
+            } else {
+                ic.setComposingText("", 1)
+                ic.finishComposingText()
+            }
         }
     }
 
@@ -426,6 +436,7 @@ class MedUktiImeService : InputMethodService() {
 
         mainHandler.post {
             val ic = currentInputConnection ?: return@post
+            lastLiveDraftText = ""
             ic.setComposingText("", 1)
             ic.finishComposingText()
 
@@ -522,10 +533,10 @@ class MedUktiImeService : InputMethodService() {
                     if (text.isNotEmpty()) {
                         commitTranscript(text)
                     } else {
-                        clearLiveDraft()
+                        lockOrClearLiveDraft()
                     }
                 }.onFailure { err ->
-                    clearLiveDraft()
+                    lockOrClearLiveDraft()
                     mainHandler.post {
                         Toast.makeText(this@MedUktiImeService, err.message ?: "Network error", Toast.LENGTH_SHORT).show()
                     }
@@ -633,8 +644,8 @@ class MedUktiImeService : InputMethodService() {
                 previewJob?.cancel()
                 if (inSpeech && speechBuf.size >= 3200) {
                     segmentChannel.trySend(speechBuf.toFloatArray() to activeResolvedEngine.get())
-                } else {
-                    clearLiveDraft()
+                } else if (lastLiveDraftText.isNotEmpty()) {
+                    lockOrClearLiveDraft()
                 }
             } catch (e: Exception) {
                 mainHandler.post {

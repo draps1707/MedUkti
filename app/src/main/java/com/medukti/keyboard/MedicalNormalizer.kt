@@ -745,6 +745,42 @@ object MedicalNormalizer {
         return if (sameFirst || common * 2 >= bestLow.toSet().size) best else null
     }
 
+    fun findCandidateHints(ctx: Context, rawText: String): List<String> {
+        init(ctx)
+        if (rawText.isBlank()) return emptyList()
+        val tokens = rawText.split(Regex("\\s+")).map {
+            it.trim().trimEnd('.', ',', ';', ':', '?', '!', ')').trimStart('(').lowercase()
+        }.filter { it.length >= 4 }
+
+        val hints = LinkedHashSet<String>()
+        fun addSkeletonMatches(word: String) {
+            if (word in PROTECTED_WORDS) return
+            singleWordMap[word]?.let { hints.add(it); return }
+            if (word.length < 6) return
+            val sk = englishSkeleton(word)
+            if (sk.length < 4) return
+            coreSkeletonMap[sk]?.let { hints.add(it) }
+            if (sk.length >= 5) {
+                for ((k, v) in coreSkeletonMap) {
+                    if (abs(k.length - sk.length) <= 1 && levenshtein(sk, k, 1) <= 1) {
+                        hints.add(v)
+                        if (hints.size >= 15) return
+                    }
+                }
+            }
+        }
+
+        for (i in tokens.indices) {
+            addSkeletonMatches(tokens[i])
+            if (i + 1 < tokens.size) {
+                val joined = tokens[i] + tokens[i + 1]
+                if (joined.length >= 8) addSkeletonMatches(joined)
+            }
+            if (hints.size >= 15) break
+        }
+        return hints.take(15)
+    }
+
     fun isKnownMedicalWord(lowerWord: String): Boolean =
         lowerWord !in PROTECTED_WORDS && (singleWordMap.containsKey(lowerWord) || fuzzyLookup(lowerWord) != null)
 

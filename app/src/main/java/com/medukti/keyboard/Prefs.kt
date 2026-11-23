@@ -7,9 +7,29 @@ enum class AsrEngineType(val label: String) {
     GEMINI_ODIA("OD (Odia + Hinglish + English) — Gemini Flash"),
 }
 
+enum class FocusPack(val label: String, val terms: String) {
+    GENERAL(
+        "General / Casualty & ICU",
+        "Sacubitril/valsartan, Dapagliflozin, Empagliflozin, Apixaban, Atorvastatin, Piptaz, Monocef, Augmentin, Pan-D, Telma, Glycomet, Dolo, Scrub typhus, Kyphosis, Lordosis, Rectus sheath, Procalcitonin, Troponin-I, NT-proBNP, Hyperkalaemia, Dyspnoea, Oedema"
+    ),
+    CARDIO_RENAL(
+        "Cardio / Diabetes / Renal",
+        "Sacubitril/valsartan, Dapagliflozin, Empagliflozin, Sitagliptin, Vildagliptin, Teneligliptin, Glimepiride, Gliclazide, Metformin, Glargine, Apixaban, Dabigatran, Rivaroxaban, Clopidogrel, Ticagrelor, Atorvastatin, Rosuvastatin, Telmisartan, Metoprolol, Bisoprolol, Diltiazem, Furosemide, Torsemide, Spironolactone, NT-proBNP, Troponin-I, HbA1c"
+    ),
+    ANTIMICROBIALS(
+        "Antimicrobials / Infectious",
+        "Amoxicillin, Clavulanic acid, Augmentin, Azithromycin, Clarithromycin, Cefixime, Cefotaxime, Ceftriaxone, Cefuroxime, Ceftazidime, Cefoperazone, Sulbactam, Piperacillin, Tazobactam, Piptaz, Meropenem, Imipenem, Ertapenem, Faropenem, Tigecycline, Linezolid, Vancomycin, Teicoplanin, Fosfomycin, Cotrimoxazole, Isoniazid, Rifampicin, Pyrazinamide, Ethambutol, Bedaquiline, Oseltamivir, Valacyclovir, Favipiravir, Tenofovir, Entecavir, Lamivudine, Voriconazole, Amphotericin B"
+    ),
+    ORTHO_DERM_NEURO(
+        "Ortho / Derm / Neuropsych",
+        "Pregabalin, Gabapentin, Amitriptyline, Nortriptyline, Duloxetine, Venlafaxine, Mirtazapine, Bupropion, Quetiapine, Levetiracetam, Lamotrigine, Baclofen, Thiocolchicoside, Etoricoxib, Celecoxib, Aceclofenac, Nimesulide, Ketorolac, Tramadol, Tapentadol, Rizatriptan, Fitzpatrick, Thoracic kyphosis, Lumbar lordosis, Cervical spondylosis, Luliconazole, Clobetasol"
+    )
+}
+
 object Prefs {
     private const val FILE = "medukti_prefs"
     private const val KEY_ENGINE = "asr_engine"
+    private const val KEY_FOCUS_PACK = "focus_pack"
     private const val KEY_GROQ_KEY = "groq_api_key"
     private const val KEY_GEMINI_KEY = "gemini_api_key"
     private const val KEY_GROQ_ASR_MODEL = "groq_asr_model"
@@ -32,6 +52,19 @@ object Prefs {
     fun setEngine(ctx: Context, engine: AsrEngineType) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString(KEY_ENGINE, engine.name)
+            .apply()
+    }
+
+    fun getFocusPack(ctx: Context): FocusPack {
+        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .getString(KEY_FOCUS_PACK, FocusPack.GENERAL.name)
+        return FocusPack.entries.firstOrNull { it.name == raw }
+            ?: FocusPack.GENERAL
+    }
+
+    fun setFocusPack(ctx: Context, pack: FocusPack) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_FOCUS_PACK, pack.name)
             .apply()
     }
 
