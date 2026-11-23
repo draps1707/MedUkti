@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.Spinner
@@ -36,7 +37,25 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etGroqLlmModel: EditText
     private lateinit var etGeminiModel: EditText
     private lateinit var tvKeyTestResult: TextView
+    private lateinit var tvDictSearchResult: TextView
     private val uiScope = CoroutineScope(Dispatchers.Main + Job())
+
+    private val groqAsrOptions = listOf(
+        "Whisper Large-v3 (Best Accuracy)" to "whisper-large-v3",
+        "Whisper Large-v3 Turbo (Fastest)" to "whisper-large-v3-turbo",
+        "Custom…" to "__CUSTOM__"
+    )
+    private val groqLlmOptions = listOf(
+        "GPT-OSS 120B (Recommended)" to "openai/gpt-oss-120b",
+        "Llama 3.3 70B (Backup)" to "llama-3.3-70b-versatile",
+        "Off (Raw Whisper + Dictionary only)" to "off",
+        "Custom…" to "__CUSTOM__"
+    )
+    private val geminiOptions = listOf(
+        "Gemini 3.5 Flash-Lite (Fastest)" to "gemini-3.5-flash-lite",
+        "Gemini 3.8 Flash (Best Quality)" to "gemini-3.8-flash",
+        "Custom…" to "__CUSTOM__"
+    )
 
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -57,10 +76,16 @@ class MainActivity : AppCompatActivity() {
 
         val spinnerEngine = findViewById<Spinner>(R.id.spinnerEngine)
         val spinnerFocusPack = findViewById<Spinner>(R.id.spinnerFocusPack)
+        val spinnerGroqAsr = findViewById<Spinner>(R.id.spinnerGroqAsr)
+        val spinnerGroqLlm = findViewById<Spinner>(R.id.spinnerGroqLlm)
+        val spinnerGeminiModel = findViewById<Spinner>(R.id.spinnerGeminiModel)
+
         val switchAutoListen = findViewById<Switch>(R.id.switchAutoListen)
         val switchLiveStream = findViewById<Switch>(R.id.switchLiveStream)
-        val switchAiPolish = findViewById<Switch>(R.id.switchAiPolish)
         val etPersonalDict = findViewById<EditText>(R.id.etPersonalDict)
+        val etDictSearch = findViewById<EditText>(R.id.etDictSearch)
+        val advancedContainer = findViewById<View>(R.id.advancedContainer)
+        val btnToggleAdvanced = findViewById<TextView>(R.id.btnToggleAdvanced)
 
         tvSetupBadge = findViewById(R.id.tvSetupBadge)
         etGroqKey = findViewById(R.id.etGroqKey)
@@ -69,24 +94,34 @@ class MainActivity : AppCompatActivity() {
         etGroqLlmModel = findViewById(R.id.etGroqLlmModel)
         etGeminiModel = findViewById(R.id.etGeminiModel)
         tvKeyTestResult = findViewById(R.id.tvKeyTestResult)
+        tvDictSearchResult = findViewById(R.id.tvDictSearchResult)
 
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
-        spinnerEngine.adapter = adapter
+        btnToggleAdvanced.setOnClickListener {
+            val open = advancedContainer.visibility != View.VISIBLE
+            advancedContainer.visibility = if (open) View.VISIBLE else View.GONE
+            btnToggleAdvanced.text = if (open) {
+                "ADVANCED OPTIONS (MODELS & VOICE) ▴"
+            } else {
+                "ADVANCED OPTIONS (MODELS & VOICE) ▾"
+            }
+        }
+
+        spinnerEngine.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, AsrEngineType.entries.map { it.label })
         spinnerEngine.setSelection(AsrEngineType.entries.indexOf(Prefs.getEngine(this)).coerceAtLeast(0))
 
-        val focusAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, FocusPack.entries.map { it.label })
-        spinnerFocusPack.adapter = focusAdapter
+        spinnerFocusPack.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, FocusPack.entries.map { it.label })
         spinnerFocusPack.setSelection(FocusPack.entries.indexOf(Prefs.getFocusPack(this)).coerceAtLeast(0))
+
+        bindModelSpinner(spinnerGroqAsr, etGroqAsrModel, groqAsrOptions, Prefs.getGroqAsrModel(this))
+        val curLlm = if (!Prefs.isAiPolishEnabled(this)) "off" else Prefs.getGroqLlmModel(this)
+        bindModelSpinner(spinnerGroqLlm, etGroqLlmModel, groqLlmOptions, curLlm)
+        bindModelSpinner(spinnerGeminiModel, etGeminiModel, geminiOptions, Prefs.getGeminiModel(this))
 
         switchAutoListen.isChecked = Prefs.isAutoListen(this)
         switchLiveStream.isChecked = Prefs.isLiveStreamingEnabled(this)
-        switchAiPolish.isChecked = Prefs.isAiPolishEnabled(this)
 
         etGroqKey.setText(Prefs.getGroqKey(this))
         etGeminiKey.setText(Prefs.getGeminiKey(this))
-        etGroqAsrModel.setText(Prefs.getGroqAsrModel(this))
-        etGroqLlmModel.setText(Prefs.getGroqLlmModel(this))
-        etGeminiModel.setText(Prefs.getGeminiModel(this))
         etPersonalDict.setText(Prefs.getPersonalDict(this))
 
         findViewById<View>(R.id.btnEnableKb).setOnClickListener {
@@ -97,18 +132,10 @@ class MainActivity : AppCompatActivity() {
             imm.showInputMethodPicker()
         }
 
-        findViewById<View>(R.id.btnGetGroqKey).setOnClickListener {
-            openUrl("https://console.groq.com/keys")
-        }
-        findViewById<View>(R.id.btnGetGeminiKey).setOnClickListener {
-            openUrl("https://aistudio.google.com/apikey")
-        }
-        findViewById<View>(R.id.btnPasteGroqKey).setOnClickListener {
-            pasteInto(etGroqKey, "Groq key pasted")
-        }
-        findViewById<View>(R.id.btnPasteGeminiKey).setOnClickListener {
-            pasteInto(etGeminiKey, "Gemini key pasted")
-        }
+        findViewById<View>(R.id.btnGetGroqKey).setOnClickListener { openUrl("https://console.groq.com/keys") }
+        findViewById<View>(R.id.btnGetGeminiKey).setOnClickListener { openUrl("https://aistudio.google.com/apikey") }
+        findViewById<View>(R.id.btnPasteGroqKey).setOnClickListener { pasteInto(etGroqKey, "Groq key pasted") }
+        findViewById<View>(R.id.btnPasteGeminiKey).setOnClickListener { pasteInto(etGeminiKey, "Gemini key pasted") }
 
         findViewById<View>(R.id.btnTestKeys).setOnClickListener {
             val gKey = etGroqKey.text.toString().trim()
@@ -125,25 +152,83 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        findViewById<View>(R.id.btnDictSearch).setOnClickListener {
+            val q = etDictSearch.text.toString().trim()
+            if (q.isEmpty()) return@setOnClickListener
+            uiScope.launch {
+                val matches = withContext(Dispatchers.IO) {
+                    MedicalNormalizer.searchDictionary(this@MainActivity, q)
+                }
+                if (matches.isEmpty()) {
+                    tvDictSearchResult.text = "Not in built-in dictionary — add to Personal Fixes below if needed."
+                    tvDictSearchResult.setTextColor(Color.parseColor("#FDD663"))
+                } else {
+                    tvDictSearchResult.text = "✓ Built-in: ${matches.joinToString(", ")}"
+                    tvDictSearchResult.setTextColor(Color.parseColor("#6DD58C"))
+                }
+            }
+        }
+
         findViewById<View>(R.id.btnSaveStart).setOnClickListener {
             Prefs.setEngine(this, AsrEngineType.entries[spinnerEngine.selectedItemPosition])
             Prefs.setFocusPack(this, FocusPack.entries[spinnerFocusPack.selectedItemPosition])
             Prefs.setAutoListen(this, switchAutoListen.isChecked)
             Prefs.setLiveStreamingEnabled(this, switchLiveStream.isChecked)
-            Prefs.setAiPolishEnabled(this, switchAiPolish.isChecked)
+
+            Prefs.setGroqAsrModel(this, resolveModelValue(spinnerGroqAsr, etGroqAsrModel, groqAsrOptions))
+            val llmChoice = resolveModelValue(spinnerGroqLlm, etGroqLlmModel, groqLlmOptions)
+            if (llmChoice == "off") {
+                Prefs.setAiPolishEnabled(this, false)
+            } else {
+                Prefs.setAiPolishEnabled(this, true)
+                Prefs.setGroqLlmModel(this, llmChoice)
+            }
+            Prefs.setGeminiModel(this, resolveModelValue(spinnerGeminiModel, etGeminiModel, geminiOptions))
+
             Prefs.setGroqKey(this, etGroqKey.text.toString())
             Prefs.setGeminiKey(this, etGeminiKey.text.toString())
-            Prefs.setGroqAsrModel(this, etGroqAsrModel.text.toString())
-            Prefs.setGroqLlmModel(this, etGroqLlmModel.text.toString())
-            Prefs.setGeminiModel(this, etGeminiModel.text.toString())
             Prefs.setPersonalDict(this, etPersonalDict.text.toString())
             requestNeededPermissions()
             updateStatus()
-            Toast.makeText(this, "Online settings saved!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
         }
 
         requestNeededPermissions()
         updateStatus()
+    }
+
+    private fun bindModelSpinner(
+        spinner: Spinner,
+        customEdit: EditText,
+        options: List<Pair<String, String>>,
+        currentVal: String
+    ) {
+        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, options.map { it.first })
+        val idx = options.indexOfFirst { it.second.equals(currentVal, ignoreCase = true) }
+        if (idx >= 0) {
+            spinner.setSelection(idx)
+            customEdit.visibility = View.GONE
+        } else {
+            spinner.setSelection(options.lastIndex)
+            customEdit.setText(currentVal)
+            customEdit.visibility = View.VISIBLE
+        }
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, pos: Int, id: Long) {
+                val isCustom = options[pos].second == "__CUSTOM__"
+                customEdit.visibility = if (isCustom) View.VISIBLE else View.GONE
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    private fun resolveModelValue(
+        spinner: Spinner,
+        customEdit: EditText,
+        options: List<Pair<String, String>>
+    ): String {
+        val sel = options[spinner.selectedItemPosition].second
+        return if (sel == "__CUSTOM__") customEdit.text.toString().trim() else sel
     }
 
     override fun onResume() {

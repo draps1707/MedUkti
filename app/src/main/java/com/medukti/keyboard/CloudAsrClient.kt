@@ -383,11 +383,11 @@ object CloudAsrClient {
     }
 
     private val WHISPER_HALLUCINATIONS = listOf(
-        Regex("(?i)\b(?:please\s+)?(?:like,?\s+)?(?:share,?\s+)?(?:and\s+)?subscribe!?\b"),
-        Regex("(?i)\bthank(?:s|\s+you)\s+for\s+watching!?\b"),
-        Regex("(?i)\band\s+many\s+more\.?\b"),
-        Regex("(?i)\bsubtitles\s+by\b[^.]*\.?"),
-        Regex("(?i)\bamara\.org\b")
+        Regex("""(?i)(?:please\s+)?(?:like,?\s+)?(?:share,?\s+)?(?:and\s+)?subscribe!?"""),
+        Regex("""(?i)thank(?:s|\s+you)\s+for\s+watching!?"""),
+        Regex("""(?i)and\s+many\s+more\.?"""),
+        Regex("""(?i)subtitles\s+by[^.]*\.?"""),
+        Regex("""(?i)amara\.org""")
     )
 
     fun postProcessTranscript(ctx: Context, raw: String, engine: AsrEngineType): String {
