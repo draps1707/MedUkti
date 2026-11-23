@@ -281,7 +281,19 @@ object CloudAsrClient {
         if (apiKey.isBlank()) {
             throw IllegalStateException("Add your free Gemini API key in MedUkti Settings for Odia")
         }
-        val model = Prefs.getGeminiModel(ctx)
+        val primaryModel = Prefs.getGeminiModel(ctx)
+        return try {
+            callGeminiWithModel(apiKey, primaryModel, wavBytes, useMinimalThinking = !primaryModel.contains("lite", ignoreCase = true))
+        } catch (e: Exception) {
+            if (primaryModel != "gemini-3.5-flash-lite" || !primaryModel.contains("lite", ignoreCase = true)) {
+                callGeminiWithModel(apiKey, "gemini-3.5-flash-lite", wavBytes, useMinimalThinking = false)
+            } else {
+                throw e
+            }
+        }
+    }
+
+    private fun callGeminiWithModel(apiKey: String, model: String, wavBytes: ByteArray, useMinimalThinking: Boolean): String {
         val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
         val b64Audio = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
 
@@ -306,7 +318,7 @@ object CloudAsrClient {
             })
             put("generationConfig", JSONObject().apply {
                 put("temperature", 0.0)
-                if (!model.contains("lite", ignoreCase = true)) {
+                if (useMinimalThinking) {
                     put("thinkingConfig", JSONObject().put("thinkingLevel", "MINIMAL"))
                 }
             })
@@ -418,7 +430,7 @@ object CloudAsrClient {
 
     fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            if (samples.size < 4800 || computeRms(samples) < 0.008f) return Result.success("")
+            if (samples.size < 4800 || computeRms(samples) < 0.002f) return Result.success("")
             if (engine == AsrEngineType.GEMINI_ODIA) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = callGroqWhisper(ctx, wav, "whisper-large-v3-turbo", isLivePreview = true)
@@ -430,7 +442,7 @@ object CloudAsrClient {
 
     fun transcribeFinal(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            if (samples.size < 3200 || computeRms(samples) < 0.008f) return Result.success("")
+            if (samples.size < 3200 || computeRms(samples) < 0.002f) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
                 AsrEngineType.GROQ_MED -> {
