@@ -163,7 +163,6 @@ object Prefs {
         val prefix = "${w.lowercase()}="
         existing.removeAll { it.substringBefore('=').trim().lowercase() + "=" == prefix }
         existing.add("$w = $r")
-        setPersonalDict(ctx, existing.joinToString("
-"))
+        setPersonalDict(ctx, existing.joinToString("\\n"))
     }
 }
