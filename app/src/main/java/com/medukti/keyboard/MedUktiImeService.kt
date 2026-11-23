@@ -129,8 +129,14 @@ class MedUktiImeService : InputMethodService() {
         }
 
         micRingContainer?.setOnClickListener {
-            if (isProcessing) return@setOnClickListener
             buzz(22L)
+            if (isProcessing && !isListening.get()) {
+                mainHandler.removeCallbacks(processingWatchdog)
+                vadConsumerJob?.cancel()
+                isProcessing = false
+                setMicUiState(MicUiState.IDLE)
+                return@setOnClickListener
+            }
             if (!isListening.get()) startContinuousDictation() else stopContinuousDictation()
         }
 
@@ -661,7 +667,7 @@ class MedUktiImeService : InputMethodService() {
                         isProcessing = true
                         setMicUiState(MicUiState.POLISHING)
                         mainHandler.removeCallbacks(processingWatchdog)
-                        mainHandler.postDelayed(processingWatchdog, 15000L)
+                        mainHandler.postDelayed(processingWatchdog, 10000L)
                     } else {
                         isProcessing = false
                         setMicUiState(MicUiState.IDLE)
@@ -675,6 +681,6 @@ class MedUktiImeService : InputMethodService() {
         isListening.set(false)
         setMicUiState(MicUiState.POLISHING)
         mainHandler.removeCallbacks(processingWatchdog)
-        mainHandler.postDelayed(processingWatchdog, 15000L)
+        mainHandler.postDelayed(processingWatchdog, 10000L)
     }
 }

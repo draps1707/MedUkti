@@ -290,6 +290,7 @@ object CloudAsrClient {
             append("Always transcribe Odia speech in pure Odia script (ଓଡ଼ିଆ)—never transliterate Odia into Roman/Hinglish letters, ")
             append("and NEVER output Malayalam, Gujarati, Bengali, or Devanagari characters. ")
             append("Write only actual English medical terms, drug/brand names (e.g. Piptaz, Monocef, SpO2, ECG), and digits in English. ")
+            append("If the audio is only breath, filler ('hmm', 'humm', 'uh'), or background noise, return an empty string. ")
             append("Output ONLY the transcribed text with zero commentary.")
         }
 
@@ -303,13 +304,18 @@ object CloudAsrClient {
                     }))
                 }))
             })
-            put("generationConfig", JSONObject().put("temperature", 0.0))
+            put("generationConfig", JSONObject().apply {
+                put("temperature", 0.0)
+                if (!model.contains("lite", ignoreCase = true)) {
+                    put("thinkingConfig", JSONObject().put("thinkingLevel", "MINIMAL"))
+                }
+            })
         }
 
         val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 9000
-            readTimeout = 25000
+            readTimeout = 12000
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
         }
