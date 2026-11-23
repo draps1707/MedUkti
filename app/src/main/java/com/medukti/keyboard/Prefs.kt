@@ -3,8 +3,8 @@ package com.medukti.keyboard
 import android.content.Context
 
 enum class AsrEngineType(val label: String, val badge: String) {
-    CLINICAL("MED — English + Hinglish + Medical (Groq Whisper + LLM)", "MED"),
-    ODIA("OD — Conversational Odia (ElevenLabs Scribe / Gemini)", "OD"),
+    CLINICAL("🩺 — English + Hinglish + Medical (Groq Whisper + LLM)", "🩺"),
+    ODIA("ଓ — Conversational Odia (ElevenLabs Scribe / Gemini)", "ଓ"),
 }
 
 enum class OdiaBackend(val label: String) {
@@ -88,12 +88,12 @@ object Prefs {
 
     fun getGroqAsrModel(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_GROQ_ASR_MODEL, "whisper-large-v3-turbo")
-            ?.ifBlank { "whisper-large-v3-turbo" } ?: "whisper-large-v3-turbo"
+            .getString(KEY_GROQ_ASR_MODEL, "whisper-large-v3")
+            ?.ifBlank { "whisper-large-v3" } ?: "whisper-large-v3"
 
     fun setGroqAsrModel(ctx: Context, value: String) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_GROQ_ASR_MODEL, value.trim().ifBlank { "whisper-large-v3-turbo" })
+            .putString(KEY_GROQ_ASR_MODEL, value.trim().ifBlank { "whisper-large-v3" })
             .apply()
     }
 
@@ -138,7 +138,7 @@ object Prefs {
     }
 
     fun isLiveStreamingEnabled(ctx: Context): Boolean =
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_LIVE_STREAM, true)
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_LIVE_STREAM, false)
 
     fun setLiveStreamingEnabled(ctx: Context, enabled: Boolean) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
@@ -163,6 +163,6 @@ object Prefs {
         val prefix = "${w.lowercase()}="
         existing.removeAll { it.substringBefore('=').trim().lowercase() + "=" == prefix }
         existing.add("$w = $r")
-        setPersonalDict(ctx, existing.joinToString("\\n"))
+        setPersonalDict(ctx, existing.joinToString("\n"))
     }
 }

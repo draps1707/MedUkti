@@ -63,8 +63,6 @@ class MedUktiImeService : InputMethodService() {
 
     private var btnModeToggle: TextView? = null
     private var micRingContainer: LinearLayout? = null
-    private var tvMicPillLabel: TextView? = null
-    private var keyPeriod: TextView? = null
 
     private val processingWatchdog = Runnable {
         if (isProcessing && !isListening.get()) {
@@ -117,17 +115,15 @@ class MedUktiImeService : InputMethodService() {
         val view = layoutInflater.inflate(R.layout.keyboard_medukti, null)
         btnModeToggle = view.findViewById(R.id.btnModeToggle)
         micRingContainer = view.findViewById(R.id.micRingContainer)
-        tvMicPillLabel = view.findViewById(R.id.tvMicPillLabel)
-        keyPeriod = view.findViewById(R.id.keyPeriod)
 
-        btnModeToggle?.setOnClickListener { showLanguagePicker(it) }
-        btnModeToggle?.setOnLongClickListener { toggleLanguage(); true }
-        view.findViewById<View>(R.id.btnOpenSettings).setOnClickListener {
-            buzz()
+        btnModeToggle?.setOnClickListener { toggleLanguage() }
+        btnModeToggle?.setOnLongClickListener {
+            buzz(18L)
             val intent = Intent(this, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(intent)
+            true
         }
 
         micRingContainer?.setOnClickListener {
@@ -140,121 +136,6 @@ class MedUktiImeService : InputMethodService() {
                 return@setOnClickListener
             }
             if (!isListening.get()) startContinuousDictation() else stopContinuousDictation()
-        }
-
-        view.findViewById<View>(R.id.keySwitchKb).setOnClickListener {
-            buzz()
-            if (isListening.get()) stopContinuousDictation()
-            val switched = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                switchToPreviousInputMethod()
-            } else false
-            if (!switched) {
-                val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.showInputMethodPicker()
-            }
-        }
-
-        val keyComma = view.findViewById<View>(R.id.keyComma)
-        keyComma.setOnClickListener {
-            buzz(10L)
-            commitQuickToken(", ")
-        }
-        keyComma.setOnLongClickListener {
-            buzz(18L)
-            commitQuickToken(": ")
-            true
-        }
-
-        keyPeriod?.setOnClickListener {
-            buzz(10L)
-            val ch = if (Prefs.isIndicScriptEngine(Prefs.getEngine(this))) "।" else ". "
-            commitQuickToken(ch)
-        }
-        keyPeriod?.setOnLongClickListener {
-            buzz(18L)
-            commitQuickToken("? ")
-            true
-        }
-
-        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop.toFloat()
-        val stepPx = 12f * resources.displayMetrics.density
-        var spaceDownX = 0f
-        var spaceLastStepX = 0f
-        var spaceSwiping = false
-        view.findViewById<View>(R.id.keySpace).setOnTouchListener { _, ev ->
-            when (ev.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    spaceDownX = ev.x
-                    spaceLastStepX = ev.x
-                    spaceSwiping = false
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dxTotal = ev.x - spaceDownX
-                    if (!spaceSwiping && abs(dxTotal) > touchSlop) {
-                        spaceSwiping = true
-                        spaceLastStepX = ev.x
-                    }
-                    if (spaceSwiping) {
-                        val delta = ev.x - spaceLastStepX
-                        if (abs(delta) >= stepPx) {
-                            val steps = (delta / stepPx).toInt()
-                            val keyCode = if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
-                            val ic = currentInputConnection
-                            if (ic != null) {
-                                ic.finishComposingText()
-                                repeat(abs(steps)) {
-                                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-                                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
-                                }
-                            }
-                            buzz(8L)
-                            spaceLastStepX += steps * stepPx
-                        }
-                    }
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
-                    if (!spaceSwiping) {
-                        buzz(10L)
-                        commitQuickToken(" ")
-                    }
-                    spaceSwiping = false
-                    true
-                }
-                MotionEvent.ACTION_CANCEL -> {
-                    spaceSwiping = false
-                    true
-                }
-                else -> false
-            }
-        }
-
-        saveFixBar = view.findViewById(R.id.saveFixBar)
-        tvSaveFixLabel = view.findViewById(R.id.tvSaveFixLabel)
-        view.findViewById<View>(R.id.btnSaveFix)?.setOnClickListener {
-            val w = pendingWrongPhrase
-            val r = pendingRightPhrase
-            if (!w.isNullOrBlank() && !r.isNullOrBlank()) {
-                val cur = Prefs.getPersonalDict(this).trim()
-                val entry = "$w = $r"
-                val updated = if (cur.isEmpty()) entry else "$cur\n$entry"
-                Prefs.setPersonalDict(this, updated)
-                Toast.makeText(this, "Saved: $entry", Toast.LENGTH_SHORT).show()
-            }
-            pendingWrongPhrase = null
-            pendingRightPhrase = null
-            saveFixBar?.visibility = View.GONE
-        }
-        view.findViewById<View>(R.id.btnDismissFix)?.setOnClickListener {
-            pendingWrongPhrase = null
-            pendingRightPhrase = null
-            saveFixBar?.visibility = View.GONE
-        }
-
-        view.findViewById<View>(R.id.keyUndo).setOnClickListener {
-            buzz(24L)
-            undoLastCommitted()
         }
 
         val bsRepeatRunnable = object : Runnable {
@@ -277,11 +158,6 @@ class MedUktiImeService : InputMethodService() {
                 }
                 else -> false
             }
-        }
-
-        view.findViewById<View>(R.id.keyEnter).setOnClickListener {
-            buzz(15L)
-            performEnterOrAction()
         }
 
         refreshModeUi()
@@ -323,7 +199,6 @@ class MedUktiImeService : InputMethodService() {
     private fun refreshModeUi() {
         val engine = Prefs.getEngine(this)
         btnModeToggle?.text = engine.badge
-        keyPeriod?.text = if (Prefs.isIndicScriptEngine(engine)) "।" else "."
         setMicUiState(
             when {
                 isListening.get() -> MicUiState.LISTENING
@@ -334,26 +209,10 @@ class MedUktiImeService : InputMethodService() {
     }
 
     private fun setMicUiState(state: MicUiState) {
-        val engine = Prefs.getEngine(this)
         when (state) {
-            MicUiState.IDLE -> {
-                micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
-                tvMicPillLabel?.text = when (engine) {
-                    AsrEngineType.ODIA -> "ଓଡ଼ିଆ କୁହନ୍ତୁ"
-                    AsrEngineType.CLINICAL -> "Tap to Speak"
-                }
-            }
-            MicUiState.LISTENING -> {
-                micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
-                tvMicPillLabel?.text = when (engine) {
-                    AsrEngineType.ODIA -> "ଶୁଣୁଛି… ଟ୍ୟାପ୍"
-                    AsrEngineType.CLINICAL -> "Listening… Tap"
-                }
-            }
-            MicUiState.POLISHING -> {
-                micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_polishing)
-                tvMicPillLabel?.text = "Polishing…"
-            }
+            MicUiState.IDLE -> micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
+            MicUiState.LISTENING -> micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
+            MicUiState.POLISHING -> micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_polishing)
         }
     }
 
@@ -612,6 +471,7 @@ class MedUktiImeService : InputMethodService() {
                 val floatBuf = FloatArray(frameSamples)
 
                 val speechBuf = ArrayList<Float>(16000 * 10)
+                val preRoll = ArrayDeque<FloatArray>(12)
                 var inSpeech = false
                 var consecSpeechFrames = 0
                 var silenceFrames = 0
@@ -630,21 +490,31 @@ class MedUktiImeService : InputMethodService() {
                     }
                     val curEngine = activeResolvedEngine.get()
                     val isOdiaNow = Prefs.isIndicScriptEngine(curEngine)
-                    val speechRmsThreshold = if (isOdiaNow) 0.010f else 0.015f
-                    val hangoverFrames = if (isOdiaNow) 16 else 14 // ~450–510ms
+                    val speechRmsThreshold = if (isOdiaNow) 0.0045f else 0.006f
+                    val hangoverFrames = 20 // ~640ms natural pause tolerance
 
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
                     val isSpeechFrame = rms >= speechRmsThreshold
 
+                    if (!inSpeech) {
+                        val copy = FloatArray(read)
+                        System.arraycopy(floatBuf, 0, copy, 0, read)
+                        if (preRoll.size >= 10) preRoll.removeFirst()
+                        preRoll.addLast(copy)
+                    }
+
                     if (isSpeechFrame) {
                         consecSpeechFrames++
-                        if (consecSpeechFrames >= 3) {
+                        if (!inSpeech && consecSpeechFrames >= 2) {
                             inSpeech = true
-                        }
-                        silenceFrames = 0
-                        if (inSpeech) {
+                            while (preRoll.isNotEmpty()) {
+                                val pf = preRoll.removeFirst()
+                                for (v in pf) speechBuf.add(v)
+                            }
+                        } else if (inSpeech) {
                             for (i in 0 until read) speechBuf.add(floatBuf[i])
                         }
+                        silenceFrames = 0
                     } else {
                         consecSpeechFrames = 0
                         if (inSpeech) {

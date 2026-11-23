@@ -530,7 +530,7 @@ object CloudAsrClient {
 
     fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            val minRms = if (!Prefs.isIndicScriptEngine(engine)) 0.006f else 0.002f
+            val minRms = 0.002f
             if (samples.size < 4800 || computeRms(samples) < minRms) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
