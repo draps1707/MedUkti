@@ -11,11 +11,8 @@ android {
         applicationId = "com.medukti.keyboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 35
-        versionName = "5.0.1"
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
+        versionCode = 37
+        versionName = "6.0.1"
     }
 
     signingConfigs {
@@ -32,7 +29,9 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
+            isDebuggable = false
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -48,19 +47,11 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
-    packaging {
-        jniLibs {
-            pickFirsts += listOf("lib/**/libonnxruntime.so")
-        }
-    }
 }
 
 dependencies {
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 }

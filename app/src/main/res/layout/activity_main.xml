@@ -34,7 +34,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Medଉକ୍ତି"
+                        android:text="Medଉକ୍ତି Online"
                         android:textColor="#FFFFFF"
                         android:textSize="24sp"
                         android:textStyle="bold" />
@@ -43,7 +43,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="Offline Indian English &amp; Odia Voice Keyboard"
+                        android:text="v6.0.1 • Instant Cloud Medical, Hinglish &amp; Odia"
                         android:textColor="#9AA0A6"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -116,7 +116,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="Active Engine"
+                android:text="Default Mode"
                 android:textColor="#E8EAED"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -139,16 +139,25 @@
                 android:textSize="14sp" />
 
             <Switch
-                android:id="@+id/switchStreamingDraft"
+                android:id="@+id/switchLiveStream"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Live Indian-EN streaming draft"
+                android:text="Live typing preview while speaking (MED)"
+                android:textColor="#E8EAED"
+                android:textSize="14sp" />
+
+            <Switch
+                android:id="@+id/switchAiPolish"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="AI context polish (GPT-OSS 120B)"
                 android:textColor="#E8EAED"
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <!-- Card 2: Offline Models -->
+        <!-- Card 2: Free Cloud API Keys (BYOK) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -160,158 +169,69 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="OFFLINE MODELS"
+                android:text="FREE CLOUD API KEYS (BYOK • ₹0/MO)"
                 android:textColor="#8AB4F8"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
-            <!-- Model 1: Whisper Turbo -->
+            <!-- Groq Key Row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="10dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <LinearLayout
+                <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Whisper Large-v3-Turbo"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="1.04 GB • Indian English &amp; Medical"
-                        android:textColor="#9AA0A6"
-                        android:textSize="11sp" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/btnDlWhisperTurbo"
-                    android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:background="@drawable/bg_btn_compact"
-                    android:gravity="center"
-                    android:minWidth="86dp"
-                    android:paddingHorizontal="12dp"
-                    android:text="Download"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
+                    android:text="Groq Key (MED)"
+                    android:textColor="#E8EAED"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- Model 2: Indian-EN Streaming Draft -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Indian-EN Streaming Draft"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="71 MB • Instant live typing"
-                        android:textColor="#9AA0A6"
-                        android:textSize="11sp" />
-                </LinearLayout>
 
                 <TextView
-                    android:id="@+id/btnDlStreamingDraft"
+                    android:id="@+id/btnGetGroqKey"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:background="@drawable/bg_btn_compact"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_key_action"
                     android:gravity="center"
-                    android:minWidth="86dp"
-                    android:paddingHorizontal="12dp"
-                    android:text="Download"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Get Free Key ↗"
+                    android:textColor="#8AB4F8"
+                    android:textSize="11sp"
                     android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- Model 3: Parakeet-Indic v1 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Parakeet-Indic v1"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="850 MB • Needs HF approval &amp; token"
-                        android:textColor="#9AA0A6"
-                        android:textSize="11sp" />
-                </LinearLayout>
 
                 <TextView
-                    android:id="@+id/btnDlParakeetIndic"
+                    android:id="@+id/btnPasteGroqKey"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:background="@drawable/bg_btn_compact"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_key_action"
                     android:gravity="center"
-                    android:minWidth="86dp"
-                    android:paddingHorizontal="12dp"
-                    android:text="Download"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Paste"
+                    android:textColor="#E8EAED"
+                    android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <EditText
-                android:id="@+id/etHfToken"
+                android:id="@+id/etGroqKey"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
                 android:background="@drawable/bg_input_dark"
-                android:hint="Hugging Face Token (hf_...) for Parakeet-Indic"
-                android:inputType="textNoSuggestions"
+                android:hint="gsk_... (free at console.groq.com)"
+                android:inputType="textPassword"
                 android:paddingHorizontal="12dp"
                 android:singleLine="true"
                 android:textColor="#FFFFFF"
                 android:textColorHint="#6E7681"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
-            <!-- Model 4: SraVaani 1.0 -->
+            <!-- Gemini Key Row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -319,55 +239,136 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <LinearLayout
+                <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="SraVaani 1.0 (Odia)"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="1.81 GB • Regional &amp; natural Odia"
-                        android:textColor="#9AA0A6"
-                        android:textSize="11sp" />
-                </LinearLayout>
+                    android:text="Gemini Key (OD)"
+                    android:textColor="#E8EAED"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/btnDlSraVaani"
+                    android:id="@+id/btnGetGeminiKey"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:background="@drawable/bg_btn_compact"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_key_action"
                     android:gravity="center"
-                    android:minWidth="86dp"
-                    android:paddingHorizontal="12dp"
-                    android:text="Download"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Get Free Key ↗"
+                    android:textColor="#8AB4F8"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnPasteGeminiKey"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_key_action"
+                    android:gravity="center"
+                    android:paddingHorizontal="10dp"
+                    android:text="Paste"
+                    android:textColor="#E8EAED"
+                    android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
+            <EditText
+                android:id="@+id/etGeminiKey"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_input_dark"
+                android:hint="AIza... (free at aistudio.google.com)"
+                android:inputType="textPassword"
+                android:paddingHorizontal="12dp"
+                android:singleLine="true"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#6E7681"
+                android:textSize="13sp" />
 
-
-            <TextView
-                android:id="@+id/tvStatus"
+            <!-- Test Keys Row -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:textColor="#8AB4F8"
-                android:textSize="12sp"
-                android:visibility="gone" />
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnTestKeys"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:background="@drawable/bg_key_action"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="Test Keys ✓"
+                    android:textColor="#6DD58C"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvKeyTestResult"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:text="Tap Test Keys to verify"
+                    android:textColor="#9AA0A6"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="MODEL IDS (EDITABLE)"
+                android:textColor="#9AA0A6"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/etGroqAsrModel"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_input_dark"
+                android:hint="whisper-large-v3"
+                android:paddingHorizontal="12dp"
+                android:singleLine="true"
+                android:textColor="#E8EAED"
+                android:textColorHint="#6E7681"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/etGroqLlmModel"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_input_dark"
+                android:hint="openai/gpt-oss-120b"
+                android:paddingHorizontal="12dp"
+                android:singleLine="true"
+                android:textColor="#E8EAED"
+                android:textColorHint="#6E7681"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/etGeminiModel"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_input_dark"
+                android:hint="gemini-3.5-flash-lite"
+                android:paddingHorizontal="12dp"
+                android:singleLine="true"
+                android:textColor="#E8EAED"
+                android:textColorHint="#6E7681"
+                android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- Card 3: Personal Dictionary & Actions -->
+        <!-- Card 3: Personal Dictionary -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -379,7 +380,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="PERSONAL DICTIONARY"
+                android:text="PERSONAL DICTIONARY (WRONG = RIGHT)"
                 android:textColor="#8AB4F8"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -387,30 +388,29 @@
             <EditText
                 android:id="@+id/etPersonalDict"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="110dp"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_input_dark"
                 android:gravity="top|start"
-                android:hint="wrong = right (one per line)\npiptas = Piptaz"
+                android:hint="epixabin = Apixaban\npan dee = Pan-D"
                 android:inputType="textMultiLine"
-                android:minLines="3"
-                android:padding="12dp"
+                android:padding="10dp"
                 android:textColor="#FFFFFF"
                 android:textColorHint="#6E7681"
                 android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/btnSaveStart"
-                android:layout_width="match_parent"
-                android:layout_height="42dp"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/bg_btn_compact"
-                android:gravity="center"
-                android:text="Save Settings"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold" />
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/btnSaveStart"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="20dp"
+            android:background="@drawable/bg_btn_compact"
+            android:gravity="center"
+            android:text="Save Settings"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </ScrollView>

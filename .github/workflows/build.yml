@@ -1,4 +1,4 @@
-name: Build Debug APK
+name: Build Release APK
 
 on:
   push:
@@ -17,20 +17,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download official sherpa-onnx Android AAR
-        run: |
-          mkdir -p app/libs
-          AARS=$(curl -sSL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/k2-fsa/sherpa-onnx/releases/latest | grep -o 'https://[^"]*\.aar' | grep -v 'rknn' || true)
-          AAR_URL=$(echo "$AARS" | grep 'static-link-onnxruntime' | head -n 1 || true)
-          if [ -z "$AAR_URL" ]; then
-            AAR_URL=$(echo "$AARS" | head -n 1 || true)
-          fi
-          if [ -z "$AAR_URL" ]; then
-            AAR_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.2/sherpa-onnx-2.0.2.aar"
-          fi
-          echo "Downloading $AAR_URL"
-          curl -fsSL -o app/libs/sherpa-onnx.aar "$AAR_URL"
-
       - name: Compile 3-layer medical dictionary (Indian core + 2026 molecules + 98k open list)
         run: |
           curl -fsSL https://raw.githubusercontent.com/glutanimate/wordlist-medicalterms-en/master/wordlist.txt -o /tmp/med_extra.txt || true
@@ -48,12 +34,7 @@ jobs:
           }
           seen = set()
           out = []
-          import glob
           os.makedirs(os.path.dirname(core_path), exist_ok=True)
-          if not os.path.exists(core_path):
-              hits = glob.glob("**/medical_dictionary.txt", recursive=True)
-              if hits:
-                  core_path = hits[0]
           if os.path.exists(core_path):
               with open(core_path, encoding="utf-8") as f:
                   for line in f:
@@ -61,7 +42,6 @@ jobs:
                       if t and t.lower() not in seen:
                           seen.add(t.lower())
                           out.append(t)
-          core_path = "app/src/main/assets/medical_dictionary.txt"
           if os.path.exists(extra_path) and os.path.getsize(extra_path) > 0:
               with open(extra_path, encoding="utf-8", errors="ignore") as f:
                   for line in f:
@@ -71,7 +51,6 @@ jobs:
                       low = t.lower()
                       if low in hinglish_stop or low in seen:
                           continue
-                      # Skip short ALL-CAPS acronyms (e.g. AAP, HAI) from external list
                       if len(t) <= 5 and t.isupper() and t.isalpha():
                           continue
                       seen.add(low)
@@ -81,70 +60,16 @@ jobs:
           print("Compiled medical_dictionary.txt entries:", len(out))
           '
 
-      - name: Extract SraVaani SentencePiece tokens into assets
-        run: |
-          curl -fsSL https://huggingface.co/killbanhar/sravaani-onnx/resolve/main/tokenizer.model -o /tmp/sravaani_tok.model || true
-          python3 - << 'PYEOF'
-          import os
-          src = "/tmp/sravaani_tok.model"
-          dst = "app/src/main/assets/sravaani_tokens.txt"
-          if os.path.exists(src) and os.path.getsize(src) > 1000:
-              data = open(src, "rb").read()
-              def read_varint(buf, i):
-                  val, shift = 0, 0
-                  while True:
-                      b = buf[i]; i += 1
-                      val |= (b & 0x7F) << shift
-                      if not (b & 0x80): return val, i
-                      shift += 7
-              def parse_piece(buf):
-                  i = 0
-                  while i < len(buf):
-                      tag, i = read_varint(buf, i)
-                      fn, wt = tag >> 3, tag & 7
-                      if wt == 2:
-                          ln, i = read_varint(buf, i)
-                          if fn == 1:
-                              return buf[i:i+ln].decode("utf-8", errors="replace")
-                          i += ln
-                      elif wt == 0:
-                          _, i = read_varint(buf, i)
-                      elif wt == 5:
-                          i += 4
-                      elif wt == 1:
-                          i += 8
-                  return ""
-              pieces = []
-              i = 0
-              while i < len(data):
-                  tag, i = read_varint(data, i)
-                  fn, wt = tag >> 3, tag & 7
-                  if wt == 2:
-                      ln, i = read_varint(data, i)
-                      if fn == 1:
-                          pieces.append(parse_piece(data[i:i+ln]))
-                      i += ln
-                  elif wt == 0:
-                      _, i = read_varint(data, i)
-                  elif wt == 5:
-                      i += 4
-                  elif wt == 1:
-                      i += 8
-              with open(dst, "w", encoding="utf-8") as f:
-                  f.write("\n".join(pieces) + "\n")
-              print("Extracted SraVaani tokens:", len(pieces))
-          PYEOF
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
-      - name: Build Debug APK
-        run: gradle assembleDebug
+      - name: Build Release APK
+        run: gradle assembleRelease
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: MedUkti-Android-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk

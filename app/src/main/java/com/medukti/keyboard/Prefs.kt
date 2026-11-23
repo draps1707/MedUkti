@@ -3,81 +3,122 @@ package com.medukti.keyboard
 import android.content.Context
 
 enum class AsrEngineType(val label: String) {
-    WHISPER_TURBO("Indian/Medical Pro — Whisper Large-v3-Turbo"),
-    PARAKEET_INDIC("Indian English Fast — Parakeet-Indic v1"),
-    SRAVAANI_OR("Odia Natural — SraVaani 1.0"),
+    GROQ_MED("MED (English + Hinglish + Drugs) — Groq Whisper + GPT-OSS 120B"),
+    GEMINI_ODIA("OD (Odia + Hinglish + English) — Gemini Flash"),
 }
 
 object Prefs {
     private const val FILE = "medukti_prefs"
     private const val KEY_ENGINE = "asr_engine"
-    private const val KEY_MED_ENGINE = "med_asr_engine"
-    private const val KEY_ODIA_ENGINE = "odia_asr_engine"
-    private const val KEY_PERSONAL_DICT = "personal_dictionary"
-    private const val KEY_HF_TOKEN = "hf_token"
+    private const val KEY_GROQ_KEY = "groq_api_key"
+    private const val KEY_GEMINI_KEY = "gemini_api_key"
+    private const val KEY_GROQ_ASR_MODEL = "groq_asr_model"
+    private const val KEY_GROQ_LLM_MODEL = "groq_llm_model"
+    private const val KEY_GEMINI_MODEL = "gemini_model"
+    private const val KEY_AI_POLISH = "ai_polish_enabled"
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
-    private const val KEY_STREAMING_DRAFT = "streaming_draft_med"
+    private const val KEY_LIVE_STREAM = "live_streaming_preview"
+    private const val KEY_PERSONAL_DICT = "personal_dictionary"
 
     fun getEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_ENGINE, AsrEngineType.WHISPER_TURBO.name)
+            .getString(KEY_ENGINE, AsrEngineType.GROQ_MED.name)
         return AsrEngineType.entries.firstOrNull { it.name == raw }
-            ?: AsrEngineType.WHISPER_TURBO
+            ?: AsrEngineType.GROQ_MED
     }
 
-    fun isOdiaEngine(e: AsrEngineType): Boolean =
-        e == AsrEngineType.SRAVAANI_OR
+    fun isOdiaEngine(e: AsrEngineType): Boolean = e == AsrEngineType.GEMINI_ODIA
 
     fun setEngine(ctx: Context, engine: AsrEngineType) {
-        val editor = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString(KEY_ENGINE, engine.name)
-        if (isOdiaEngine(engine)) {
-            editor.putString(KEY_ODIA_ENGINE, engine.name)
-        } else {
-            editor.putString(KEY_MED_ENGINE, engine.name)
-        }
-        editor.apply()
+            .apply()
     }
 
-    fun getMedEngine(ctx: Context): AsrEngineType {
-        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_MED_ENGINE, AsrEngineType.WHISPER_TURBO.name)
-        val parsed = AsrEngineType.entries.firstOrNull { it.name == raw }
-        return if (parsed != null && !isOdiaEngine(parsed)) parsed else AsrEngineType.WHISPER_TURBO
+    fun getGroqKey(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_GROQ_KEY, "") ?: ""
+
+    fun setGroqKey(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_GROQ_KEY, value.trim())
+            .apply()
     }
 
-    fun getOdiaEngine(ctx: Context): AsrEngineType {
-        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_ODIA_ENGINE, AsrEngineType.SRAVAANI_OR.name)
-        val parsed = AsrEngineType.entries.firstOrNull { it.name == raw }
-        return if (parsed != null && isOdiaEngine(parsed)) parsed else AsrEngineType.SRAVAANI_OR
+    fun getGeminiKey(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_GEMINI_KEY, "") ?: ""
+
+    fun setGeminiKey(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_GEMINI_KEY, value.trim())
+            .apply()
+    }
+
+    fun getGroqAsrModel(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .getString(KEY_GROQ_ASR_MODEL, "whisper-large-v3")
+            ?.ifBlank { "whisper-large-v3" } ?: "whisper-large-v3"
+
+    fun setGroqAsrModel(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_GROQ_ASR_MODEL, value.trim().ifBlank { "whisper-large-v3" })
+            .apply()
+    }
+
+    fun getGroqLlmModel(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .getString(KEY_GROQ_LLM_MODEL, "openai/gpt-oss-120b")
+            ?.ifBlank { "openai/gpt-oss-120b" } ?: "openai/gpt-oss-120b"
+
+    fun setGroqLlmModel(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_GROQ_LLM_MODEL, value.trim().ifBlank { "openai/gpt-oss-120b" })
+            .apply()
+    }
+
+    fun getGeminiModel(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .getString(KEY_GEMINI_MODEL, "gemini-3.5-flash-lite")
+            ?.ifBlank { "gemini-3.5-flash-lite" } ?: "gemini-3.5-flash-lite"
+
+    fun setGeminiModel(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_GEMINI_MODEL, value.trim().ifBlank { "gemini-3.5-flash-lite" })
+            .apply()
+    }
+
+    fun isAiPolishEnabled(ctx: Context): Boolean =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_AI_POLISH, true)
+
+    fun setAiPolishEnabled(ctx: Context, enabled: Boolean) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_AI_POLISH, enabled)
+            .apply()
     }
 
     fun isAutoListen(ctx: Context): Boolean =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_AUTO_LISTEN, true)
 
     fun setAutoListen(ctx: Context, enabled: Boolean) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean(KEY_AUTO_LISTEN, enabled).apply()
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_AUTO_LISTEN, enabled)
+            .apply()
     }
 
-    fun isStreamingDraftEnabled(ctx: Context): Boolean =
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_STREAMING_DRAFT, false)
+    fun isLiveStreamingEnabled(ctx: Context): Boolean =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_LIVE_STREAM, true)
 
-    fun setStreamingDraftEnabled(ctx: Context, enabled: Boolean) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean(KEY_STREAMING_DRAFT, enabled).apply()
-    }
-
-    fun getHfToken(ctx: Context): String =
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_HF_TOKEN, "") ?: ""
-
-    fun setHfToken(ctx: Context, value: String) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_HF_TOKEN, value.trim()).apply()
+    fun setLiveStreamingEnabled(ctx: Context, enabled: Boolean) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_LIVE_STREAM, enabled)
+            .apply()
     }
 
     fun getPersonalDict(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_PERSONAL_DICT, "") ?: ""
 
     fun setPersonalDict(ctx: Context, value: String) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_PERSONAL_DICT, value).apply()
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_PERSONAL_DICT, value)
+            .apply()
     }
 }

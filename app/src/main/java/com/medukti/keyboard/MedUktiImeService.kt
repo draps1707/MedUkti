@@ -38,7 +38,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
 
@@ -58,21 +57,12 @@ class MedUktiImeService : InputMethodService() {
     private var tvSaveFixLabel: TextView? = null
     private var vadConsumerJob: Job? = null
     private var liveLoopJob: Job? = null
-    private var preloadJob: Job? = null
-    private val activeResolvedEngine = AtomicReference<AsrEngineType>(AsrEngineType.WHISPER_TURBO)
+    private val activeResolvedEngine = AtomicReference<AsrEngineType>(AsrEngineType.GROQ_MED)
 
     private var btnModeToggle: TextView? = null
     private var micRingContainer: LinearLayout? = null
     private var tvMicPillLabel: TextView? = null
     private var keyPeriod: TextView? = null
-
-    private val idleSleepRunnable = Runnable {
-        if (!isListening.get() && !isProcessing) {
-            serviceScope.launch(Dispatchers.IO) {
-                SherpaOnnxEngine.releaseRecognizer()
-            }
-        }
-    }
 
     private val processingWatchdog = Runnable {
         if (isProcessing && !isListening.get()) {
@@ -85,16 +75,8 @@ class MedUktiImeService : InputMethodService() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == Intent.ACTION_SCREEN_OFF) {
                 if (isListening.get()) stopContinuousDictation()
-                serviceScope.launch(Dispatchers.IO) {
-                    SherpaOnnxEngine.releaseRecognizer()
-                }
             }
         }
-    }
-
-    private fun resetIdleSleepTimer() {
-        mainHandler.removeCallbacks(idleSleepRunnable)
-        mainHandler.postDelayed(idleSleepRunnable, 10 * 60 * 1000L)
     }
 
     private fun buzz(ms: Long = 16L) {
@@ -113,17 +95,17 @@ class MedUktiImeService : InputMethodService() {
     override fun onCreate() {
         super.onCreate()
         registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
-        resetIdleSleepTimer()
+        serviceScope.launch(Dispatchers.IO) {
+            MedicalNormalizer.init(this@MedUktiImeService)
+        }
     }
 
     override fun onDestroy() {
         try { unregisterReceiver(screenOffReceiver) } catch (_: Exception) {}
         mainHandler.removeCallbacksAndMessages(null)
         isListening.set(false)
-        preloadJob?.cancel()
         liveLoopJob?.cancel()
         vadConsumerJob?.cancel()
-        SherpaOnnxEngine.releaseRecognizer()
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -163,15 +145,26 @@ class MedUktiImeService : InputMethodService() {
             }
         }
 
-        view.findViewById<View>(R.id.keyComma).setOnClickListener {
+        val keyComma = view.findViewById<View>(R.id.keyComma)
+        keyComma.setOnClickListener {
             buzz(10L)
             commitQuickToken(", ")
+        }
+        keyComma.setOnLongClickListener {
+            buzz(18L)
+            commitQuickToken(": ")
+            true
         }
 
         keyPeriod?.setOnClickListener {
             buzz(10L)
             val ch = if (Prefs.isOdiaEngine(Prefs.getEngine(this))) "। " else ". "
             commitQuickToken(ch)
+        }
+        keyPeriod?.setOnLongClickListener {
+            buzz(18L)
+            commitQuickToken("? ")
+            true
         }
 
         val touchSlop = ViewConfiguration.get(this).scaledTouchSlop.toFloat()
@@ -290,9 +283,7 @@ class MedUktiImeService : InputMethodService() {
         super.onStartInputView(info, restarting)
         lastCommittedLen = 0
         refreshModeUi()
-        resetIdleSleepTimer()
         activeResolvedEngine.set(Prefs.getEngine(this))
-        scheduleDebouncedPreload(0L)
         if (vadConsumerJob?.isActive != true) {
             isProcessing = false
             setMicUiState(MicUiState.IDLE)
@@ -309,70 +300,57 @@ class MedUktiImeService : InputMethodService() {
                 } else {
                     startContinuousDictation()
                 }
-            } else {
-                tvMicPillLabel?.text = "Grant Mic in App"
             }
         }
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        super.onFinishInputView(finishingInput)
         if (isListening.get()) {
             stopContinuousDictation()
         }
-        resetIdleSleepTimer()
-        super.onFinishInputView(finishingInput)
     }
 
     private fun refreshModeUi() {
-        val eng = Prefs.getEngine(this)
-        val isOdia = Prefs.isOdiaEngine(eng)
+        val engine = Prefs.getEngine(this)
+        val isOdia = Prefs.isOdiaEngine(engine)
         btnModeToggle?.text = if (isOdia) "OD" else "MED"
         keyPeriod?.text = if (isOdia) "।" else "."
+        setMicUiState(
+            when {
+                isListening.get() -> MicUiState.LISTENING
+                isProcessing -> MicUiState.POLISHING
+                else -> MicUiState.IDLE
+            }
+        )
     }
 
-    private fun scheduleDebouncedPreload(delayMs: Long) {
-        preloadJob?.cancel()
-        preloadJob = serviceScope.launch(Dispatchers.IO) {
-            if (delayMs > 0L) delay(delayMs)
-            OfflineAsrEngines.preload(this@MedUktiImeService)
+    private fun setMicUiState(state: MicUiState) {
+        val engine = Prefs.getEngine(this)
+        val isOdia = Prefs.isOdiaEngine(engine)
+        when (state) {
+            MicUiState.IDLE -> {
+                micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
+                tvMicPillLabel?.text = if (isOdia) "ଓଡ଼ିଆ କୁହନ୍ତୁ" else "Tap to Speak"
+            }
+            MicUiState.LISTENING -> {
+                micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
+                tvMicPillLabel?.text = if (isOdia) "ଶୁଣୁଛି… ଟ୍ୟାପ୍" else "Listening… Tap"
+            }
+            MicUiState.POLISHING -> {
+                micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_polishing)
+                tvMicPillLabel?.text = "Polishing…"
+            }
         }
     }
 
     private fun toggleLanguage() {
+        buzz(22L)
         val cur = Prefs.getEngine(this)
-        val next = if (Prefs.isOdiaEngine(cur)) Prefs.getMedEngine(this) else Prefs.getOdiaEngine(this)
-        val resolvedRes = OfflineAsrEngines.resolveEngine(this, next)
-        if (resolvedRes.isFailure) {
-            Toast.makeText(this, resolvedRes.exceptionOrNull()?.message ?: "Download model first", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val resolvedNext = resolvedRes.getOrThrow()
-        Prefs.setEngine(this, resolvedNext)
-        activeResolvedEngine.set(resolvedNext)
+        val next = if (Prefs.isOdiaEngine(cur)) AsrEngineType.GROQ_MED else AsrEngineType.GEMINI_ODIA
+        Prefs.setEngine(this, next)
+        activeResolvedEngine.set(next)
         refreshModeUi()
-        buzz(25L)
-        if (isListening.get()) {
-            currentInputConnection?.finishComposingText()
-            tvMicPillLabel?.text = if (Prefs.isOdiaEngine(resolvedNext)) "Listening (Odia)..." else "Listening..."
-        } else {
-            tvMicPillLabel?.text = "Tap to Speak"
-        }
-        // Debounced off-main-thread preload: never blocks UI or thrashes native memory on rapid taps
-        scheduleDebouncedPreload(300L)
-    }
-
-    private fun setMicUiState(state: MicUiState) {
-        val res = when (state) {
-            MicUiState.IDLE -> R.drawable.bg_mic_pill_idle
-            MicUiState.LISTENING -> R.drawable.bg_mic_pill_active
-            MicUiState.POLISHING -> R.drawable.bg_mic_pill_polishing
-        }
-        micRingContainer?.setBackgroundResource(res)
-        tvMicPillLabel?.text = when (state) {
-            MicUiState.IDLE -> "Tap to Speak"
-            MicUiState.LISTENING -> if (Prefs.isOdiaEngine(activeResolvedEngine.get())) "Listening (Odia)..." else "Listening..."
-            MicUiState.POLISHING -> "Finishing..."
-        }
     }
 
     private fun commitQuickToken(token: String) {
@@ -404,6 +382,7 @@ class MedUktiImeService : InputMethodService() {
             if (candidate.isNotEmpty() && candidate.length <= 40 && candidate.split(Regex("\\s+")).size <= 3) {
                 pendingWrongPhrase = candidate
             }
+            Toast.makeText(this, "Undid last phrase", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -416,21 +395,39 @@ class MedUktiImeService : InputMethodService() {
         if (!multiLine && action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
             ic.performEditorAction(action)
         } else {
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+            ic.commitText("\n", 1)
         }
         lastCommittedLen = 0
     }
 
-    private fun commitSpokenText(phrase: String) {
-        if (phrase.isEmpty()) return
-        val isPureNewline = phrase.all { it == '\n' }
-        val rawClean = if (isPureNewline) phrase else phrase.trim()
+    private fun updateLiveDraft(rawDraft: String) {
+        val clean = rawDraft.trim()
+        if (clean.isEmpty()) return
+        mainHandler.post {
+            val ic = currentInputConnection ?: return@post
+            val before = ic.getTextBeforeCursor(50, 0)?.toString() ?: ""
+            val needSpace = before.isNotEmpty() && !before.endsWith(" ") && !before.endsWith("\n")
+            ic.setComposingText((if (needSpace) " " else "") + clean, 1)
+        }
+    }
+
+    private fun clearLiveDraft() {
+        mainHandler.post {
+            val ic = currentInputConnection ?: return@post
+            ic.setComposingText("", 1)
+            ic.finishComposingText()
+        }
+    }
+
+    private fun commitTranscript(text: String) {
+        val isPureNewline = text == "\n" || text == "\n\n"
+        val rawClean = if (isPureNewline) text else text.trim()
         if (rawClean.isEmpty()) return
 
         mainHandler.post {
-            resetIdleSleepTimer()
             val ic = currentInputConnection ?: return@post
+            ic.setComposingText("", 1)
+            ic.finishComposingText()
 
             val lowerCmd = rawClean.lowercase().trimEnd('.', ',', '!', '?')
             if (lowerCmd == "undo that" || lowerCmd == "delete last" || lowerCmd == "undo last") {
@@ -439,7 +436,6 @@ class MedUktiImeService : InputMethodService() {
             }
 
             if (isPureNewline) {
-                ic.finishComposingText()
                 ic.commitText(rawClean, 1)
                 lastCommittedLen = rawClean.length
                 return@post
@@ -477,6 +473,7 @@ class MedUktiImeService : InputMethodService() {
             val outText = (if (needLeadingSpace) " " else "") + formatted + (if (needTrailingSpace) " " else "")
             ic.commitText(outText, 1)
             lastCommittedLen = outText.length
+
             val cleanCommitted = formatted.trim().trimEnd('.', ',', '!', '?')
             lastCommittedPhrase = cleanCommitted
             val wrong = pendingWrongPhrase
@@ -492,173 +489,181 @@ class MedUktiImeService : InputMethodService() {
 
     @SuppressLint("MissingPermission")
     private fun startContinuousDictation() {
-        resetIdleSleepTimer()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, "Grant Microphone permission in MedUkti app", Toast.LENGTH_SHORT).show()
             return
         }
+        if (!CloudAsrClient.isNetworkAvailable(this)) {
+            Toast.makeText(this, "No internet — tap 🌐 to switch", Toast.LENGTH_SHORT).show()
+            return
+        }
         val selected = Prefs.getEngine(this)
-        val resolvedRes = OfflineAsrEngines.resolveEngine(this, selected)
-        if (resolvedRes.isFailure) {
-            Toast.makeText(this, resolvedRes.exceptionOrNull()?.message ?: "Download model pack first", Toast.LENGTH_LONG).show()
+        if (selected == AsrEngineType.GROQ_MED && Prefs.getGroqKey(this).isBlank()) {
+            Toast.makeText(this, "Add your free Groq API key in MedUkti Settings", Toast.LENGTH_LONG).show()
             return
         }
-        val resolved = resolvedRes.getOrThrow()
-        activeResolvedEngine.set(resolved)
-        if (SherpaOnnxEngine.getOrCreateVad(this, resolved == AsrEngineType.WHISPER_TURBO) == null) {
-            Toast.makeText(this, "Download a model pack first (includes Silero VAD)", Toast.LENGTH_LONG).show()
+        if (selected == AsrEngineType.GEMINI_ODIA && Prefs.getGeminiKey(this).isBlank()) {
+            Toast.makeText(this, "Add your free Gemini API key in MedUkti Settings", Toast.LENGTH_LONG).show()
             return
         }
 
+        activeResolvedEngine.set(selected)
         isListening.set(true)
-        tvMicPillLabel?.text = "Starting..." 
-        val segmentChannel = Channel<Pair<FloatArray, AsrEngineType>>(Channel.UNLIMITED)
+        isProcessing = false
+        setMicUiState(MicUiState.LISTENING)
 
-        val streamingAvailable = Prefs.isStreamingDraftEnabled(this) && ModelDownloader.isStreamingZipformerInstalled(this)
-        var streamObj = if (streamingAvailable && !Prefs.isOdiaEngine(resolved)) StreamingZipformerEngine.createStream(this) else null
-        val streamLock = Any()
-        val pendingSegments = AtomicInteger(0)
+        val segmentChannel = Channel<Pair<FloatArray, AsrEngineType>>(Channel.UNLIMITED)
+        val liveStreamEnabled = Prefs.isLiveStreamingEnabled(this)
 
         vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
-            try {
-                for ((seg, segEngine) in segmentChannel) {
-                    pendingSegments.incrementAndGet()
-                    val res = OfflineAsrEngines.transcribeSamples(this@MedUktiImeService, segEngine, seg)
-                    try {
-                        res.onSuccess { raw ->
-                            val isNewlineCmd = raw.isNotEmpty() && raw.all { it == '\n' }
-                            val finalOut = if (isNewlineCmd) raw else raw.trim()
-                            if (finalOut.isNotEmpty()) {
-                                commitSpokenText(finalOut)
-                            } else {
-                                mainHandler.post { currentInputConnection?.finishComposingText() }
-                            }
-                        }.onFailure {
-                            mainHandler.post { currentInputConnection?.finishComposingText() }
-                        }
-                    } finally {
-                        pendingSegments.decrementAndGet()
+            for ((seg, segEngine) in segmentChannel) {
+                val res = CloudAsrClient.transcribeFinal(this@MedUktiImeService, segEngine, seg)
+                res.onSuccess { text ->
+                    if (text.isNotEmpty()) {
+                        commitTranscript(text)
+                    } else {
+                        clearLiveDraft()
+                    }
+                }.onFailure { err ->
+                    clearLiveDraft()
+                    mainHandler.post {
+                        Toast.makeText(this@MedUktiImeService, err.message ?: "Network error", Toast.LENGTH_SHORT).show()
                     }
                 }
-            } finally {
-                synchronized(streamLock) {
-                    try { streamObj?.release() } catch (_: Exception) {}
-                    streamObj = null
-                }
-                withContext(Dispatchers.Main + NonCancellable) {
-                    currentInputConnection?.finishComposingText()
-                    mainHandler.removeCallbacks(processingWatchdog)
-                    isProcessing = false
+            }
+            withContext(Dispatchers.Main + NonCancellable) {
+                mainHandler.removeCallbacks(processingWatchdog)
+                isProcessing = false
+                if (!isListening.get()) {
                     setMicUiState(MicUiState.IDLE)
-                    resetIdleSleepTimer()
                 }
             }
         }
 
         liveLoopJob = serviceScope.launch(Dispatchers.IO) {
-            var ar: AudioRecord? = null
+            val sampleRate = 16000
+            val frameSamples = 512 // 32 ms
+            val minBuf = AudioRecord.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            ).coerceAtLeast(frameSamples * 4)
+
+            var recorder: AudioRecord? = null
             try {
-                val vad = SherpaOnnxEngine.getOrCreateVad(this@MedUktiImeService, resolved == AsrEngineType.WHISPER_TURBO)
-                    ?: throw IllegalStateException("Silero VAD not installed")
-                vad.reset()
-
-                val sampleRate = 16000
-                val minBuf = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                val bufSize = maxOf(minBuf * 4, 16384)
-                ar = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
-                if (ar.state != AudioRecord.STATE_INITIALIZED) {
-                    throw IllegalStateException("Mic failed to initialize")
+                recorder = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                    sampleRate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    minBuf
+                )
+                if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+                    throw IllegalStateException("Mic unavailable")
                 }
-                ar.startRecording()
-                mainHandler.post {
-                    if (isListening.get()) setMicUiState(MicUiState.LISTENING)
-                }
+                recorder.startRecording()
 
-                val windowSize = 512
-                val shortBuf = ShortArray(windowSize)
-                val floatBuf = FloatArray(windowSize)
-                var frameCount = 0
-                var lastDraft = ""
+                val shortBuf = ShortArray(frameSamples)
+                val floatBuf = FloatArray(frameSamples)
+
+                val speechBuf = ArrayList<Float>(16000 * 10)
+                var inSpeech = false
+                var silenceFrames = 0
+                var lastPreviewSamples = 0
+                var previewJob: Job? = null
+
+                val speechRmsThreshold = 0.012f
+                val hangoverFrames = if (Prefs.isOdiaEngine(activeResolvedEngine.get())) 28 else 22 // ~700–900ms
+                val maxSegSamples = sampleRate * 18
 
                 while (isListening.get()) {
-                    val read = ar.read(shortBuf, 0, windowSize)
-                    if (read == windowSize) {
-                        for (i in 0 until windowSize) {
-                            floatBuf[i] = shortBuf[i] / 32768.0f
-                        }
-                        val curEngine = activeResolvedEngine.get()
-                        val useDraftNow = streamingAvailable && !Prefs.isOdiaEngine(curEngine)
-                        if (useDraftNow) {
-                            val draftNow = synchronized(streamLock) {
-                                if (streamObj == null) {
-                                    streamObj = StreamingZipformerEngine.createStream(this@MedUktiImeService)
+                    val read = recorder.read(shortBuf, 0, frameSamples)
+                    if (read <= 0) {
+                        delay(10)
+                        continue
+                    }
+                    for (i in 0 until read) {
+                        floatBuf[i] = shortBuf[i] / 32768.0f
+                    }
+                    val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
+                    val isSpeechFrame = rms >= speechRmsThreshold
+
+                    if (isSpeechFrame) {
+                        inSpeech = true
+                        silenceFrames = 0
+                        for (i in 0 until read) speechBuf.add(floatBuf[i])
+                    } else if (inSpeech) {
+                        silenceFrames++
+                        for (i in 0 until read) speechBuf.add(floatBuf[i])
+                    }
+
+                    // Live streaming preview every ~2.2 seconds of active MED speech
+                    val curEngine = activeResolvedEngine.get()
+                    if (liveStreamEnabled && !Prefs.isOdiaEngine(curEngine) && inSpeech &&
+                        speechBuf.size - lastPreviewSamples >= sampleRate * 2.2 &&
+                        previewJob?.isActive != true
+                    ) {
+                        lastPreviewSamples = speechBuf.size
+                        val snap = speechBuf.toFloatArray()
+                        previewJob = launch(Dispatchers.IO) {
+                            val pRes = CloudAsrClient.transcribeLivePreview(this@MedUktiImeService, curEngine, snap)
+                            pRes.onSuccess { pText ->
+                                if (isListening.get() && pText.isNotEmpty()) {
+                                    updateLiveDraft(pText)
                                 }
-                                streamObj?.let { StreamingZipformerEngine.acceptAndDecode(it, floatBuf) } ?: ""
-                            }
-                            frameCount++
-                            if (frameCount % 5 == 0 && pendingSegments.get() == 0 && draftNow.isNotEmpty() && draftNow != lastDraft) {
-                                lastDraft = draftNow
-                                mainHandler.post {
-                                    if (isListening.get() && !Prefs.isOdiaEngine(activeResolvedEngine.get())) {
-                                        currentInputConnection?.setComposingText(draftNow, 1)
-                                    }
-                                }
                             }
                         }
-                        vad.acceptWaveform(floatBuf)
-                        var emitted = false
-                        while (!vad.empty()) {
-                            val seg = vad.front()
-                            if (seg.samples.isNotEmpty()) {
-                                segmentChannel.trySend(seg.samples to activeResolvedEngine.get())
-                                emitted = true
-                            }
-                            vad.pop()
+                    }
+
+                    val segDone = inSpeech && (silenceFrames >= hangoverFrames || speechBuf.size >= maxSegSamples)
+                    if (segDone) {
+                        previewJob?.cancel()
+                        if (speechBuf.size >= 4800) {
+                            segmentChannel.trySend(speechBuf.toFloatArray() to curEngine)
+                        } else {
+                            clearLiveDraft()
                         }
-                        if (emitted && useDraftNow) {
-                            synchronized(streamLock) {
-                                try { streamObj?.release() } catch (_: Exception) {}
-                                streamObj = StreamingZipformerEngine.createStream(this@MedUktiImeService)
-                            }
-                            lastDraft = ""
-                        }
+                        speechBuf.clear()
+                        inSpeech = false
+                        silenceFrames = 0
+                        lastPreviewSamples = 0
                     }
                 }
 
-                vad.flush()
-                val tailEngine = activeResolvedEngine.get()
-                while (!vad.empty()) {
-                    val seg = vad.front()
-                    if (seg.samples.isNotEmpty()) {
-                        segmentChannel.trySend(seg.samples to tailEngine)
-                    }
-                    vad.pop()
+                previewJob?.cancel()
+                if (inSpeech && speechBuf.size >= 3200) {
+                    segmentChannel.trySend(speechBuf.toFloatArray() to activeResolvedEngine.get())
+                } else {
+                    clearLiveDraft()
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
+                mainHandler.post {
                     Toast.makeText(this@MedUktiImeService, e.message ?: "Mic error", Toast.LENGTH_SHORT).show()
                 }
             } finally {
-                try {
-                    ar?.stop()
-                    ar?.release()
-                } catch (_: Exception) {
-                }
                 segmentChannel.close()
+                try { recorder?.stop() } catch (_: Exception) {}
+                try { recorder?.release() } catch (_: Exception) {}
+                mainHandler.post {
+                    isListening.set(false)
+                    if (vadConsumerJob?.isActive == true) {
+                        isProcessing = true
+                        setMicUiState(MicUiState.POLISHING)
+                        mainHandler.removeCallbacks(processingWatchdog)
+                        mainHandler.postDelayed(processingWatchdog, 15000L)
+                    } else {
+                        isProcessing = false
+                        setMicUiState(MicUiState.IDLE)
+                    }
+                }
             }
         }
     }
 
     private fun stopContinuousDictation() {
         isListening.set(false)
-        if (vadConsumerJob?.isActive == true) {
-            isProcessing = true
-            setMicUiState(MicUiState.POLISHING)
-            mainHandler.removeCallbacks(processingWatchdog)
-            mainHandler.postDelayed(processingWatchdog, 6000L)
-        } else {
-            isProcessing = false
-            setMicUiState(MicUiState.IDLE)
-        }
+        setMicUiState(MicUiState.POLISHING)
+        mainHandler.removeCallbacks(processingWatchdog)
+        mainHandler.postDelayed(processingWatchdog, 15000L)
     }
 }
