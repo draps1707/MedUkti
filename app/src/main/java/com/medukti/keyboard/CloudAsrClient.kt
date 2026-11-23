@@ -495,7 +495,7 @@ object CloudAsrClient {
         }
         conn.outputStream.use { it.write(reqJson.toString().toByteArray(Charsets.UTF_8)) }
         val code = conn.responseCode
-        val body = readHttpBody(conn, code)
+        val body = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.readText().orEmpty()
         if (code !in 200..299) {
             throw IllegalStateException("BHASHINI config failed ($code)")
         }
@@ -559,7 +559,7 @@ object CloudAsrClient {
         }
         conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
         val code = conn.responseCode
-        val body = readHttpBody(conn, code)
+        val body = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.readText().orEmpty()
         if (code !in 200..299) {
             cachedBhashiniCallbackUrl = null
             throw IllegalStateException("BHASHINI ASR error ($code)")
