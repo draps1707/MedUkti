@@ -2,9 +2,11 @@ package com.medukti.keyboard
 
 import android.content.Context
 
-enum class AsrEngineType(val label: String) {
-    GROQ_MED("MED (English + Hinglish + Drugs) — Groq Whisper + GPT-OSS 120B"),
-    GEMINI_ODIA("OD (Odia + Hinglish + English) — Gemini Flash"),
+enum class AsrEngineType(val label: String, val badge: String) {
+    GROQ_MED("MED — English + Medical (Groq Whisper + GPT-OSS 120B)", "MED"),
+    GROQ_HINGLISH("HINGLISH — Hinglish + Medical (Groq Whisper + GPT-OSS 120B)", "HIN"),
+    GEMINI_ODIA("OD — Odia + Medical (Gemini Flash)", "OD"),
+    GEMINI_HINDI("HI — Hindi + Medical (Gemini Flash)", "HI"),
 }
 
 enum class FocusPack(val label: String, val terms: String) {
@@ -48,6 +50,11 @@ object Prefs {
     }
 
     fun isOdiaEngine(e: AsrEngineType): Boolean = e == AsrEngineType.GEMINI_ODIA
+
+    fun isGeminiEngine(e: AsrEngineType): Boolean =
+        e == AsrEngineType.GEMINI_ODIA || e == AsrEngineType.GEMINI_HINDI
+
+    fun isIndicScriptEngine(e: AsrEngineType): Boolean = isGeminiEngine(e)
 
     fun setEngine(ctx: Context, engine: AsrEngineType) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()

@@ -24,6 +24,7 @@ import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -119,7 +120,8 @@ class MedUktiImeService : InputMethodService() {
         tvMicPillLabel = view.findViewById(R.id.tvMicPillLabel)
         keyPeriod = view.findViewById(R.id.keyPeriod)
 
-        btnModeToggle?.setOnClickListener { toggleLanguage() }
+        btnModeToggle?.setOnClickListener { showLanguagePicker(it) }
+        btnModeToggle?.setOnLongClickListener { toggleLanguage(); true }
         view.findViewById<View>(R.id.btnOpenSettings).setOnClickListener {
             buzz()
             val intent = Intent(this, MainActivity::class.java).apply {
@@ -165,7 +167,7 @@ class MedUktiImeService : InputMethodService() {
 
         keyPeriod?.setOnClickListener {
             buzz(10L)
-            val ch = if (Prefs.isOdiaEngine(Prefs.getEngine(this))) "। " else ". "
+            val ch = if (Prefs.isIndicScriptEngine(Prefs.getEngine(this))) "।" else ". "
             commitQuickToken(ch)
         }
         keyPeriod?.setOnLongClickListener {
@@ -320,9 +322,8 @@ class MedUktiImeService : InputMethodService() {
 
     private fun refreshModeUi() {
         val engine = Prefs.getEngine(this)
-        val isOdia = Prefs.isOdiaEngine(engine)
-        btnModeToggle?.text = if (isOdia) "OD" else "MED"
-        keyPeriod?.text = if (isOdia) "।" else "."
+        btnModeToggle?.text = engine.badge
+        keyPeriod?.text = if (Prefs.isIndicScriptEngine(engine)) "।" else "."
         setMicUiState(
             when {
                 isListening.get() -> MicUiState.LISTENING
@@ -334,15 +335,23 @@ class MedUktiImeService : InputMethodService() {
 
     private fun setMicUiState(state: MicUiState) {
         val engine = Prefs.getEngine(this)
-        val isOdia = Prefs.isOdiaEngine(engine)
         when (state) {
             MicUiState.IDLE -> {
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
-                tvMicPillLabel?.text = if (isOdia) "ଓଡ଼ିଆ କୁହନ୍ତୁ" else "Tap to Speak"
+                tvMicPillLabel?.text = when (engine) {
+                    AsrEngineType.GEMINI_ODIA -> "ଓଡ଼ିଆ କୁହନ୍ତୁ"
+                    AsrEngineType.GEMINI_HINDI -> "हिन्दी बोलें"
+                    AsrEngineType.GROQ_HINGLISH -> "Speak Hinglish"
+                    AsrEngineType.GROQ_MED -> "Tap to Speak"
+                }
             }
             MicUiState.LISTENING -> {
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
-                tvMicPillLabel?.text = if (isOdia) "ଶୁଣୁଛି… ଟ୍ୟାପ୍" else "Listening… Tap"
+                tvMicPillLabel?.text = when (engine) {
+                    AsrEngineType.GEMINI_ODIA -> "ଶୁଣୁଛି… ଟ୍ୟାପ୍"
+                    AsrEngineType.GEMINI_HINDI -> "सुन रहा हूँ… टैप"
+                    else -> "Listening… Tap"
+                }
             }
             MicUiState.POLISHING -> {
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_polishing)
@@ -351,10 +360,33 @@ class MedUktiImeService : InputMethodService() {
         }
     }
 
+    private fun showLanguagePicker(anchor: View) {
+        buzz(18L)
+        val popup = PopupMenu(this, anchor)
+        popup.menu.add(0, 0, 0, "English (Medical)")
+        popup.menu.add(0, 1, 1, "Hinglish (Medical)")
+        popup.menu.add(0, 2, 2, "Odia (ଓଡ଼ିଆ + Medical)")
+        popup.menu.add(0, 3, 3, "Hindi (हिन्दी + Medical)")
+        popup.setOnMenuItemClickListener { item ->
+            val next = when (item.itemId) {
+                1 -> AsrEngineType.GROQ_HINGLISH
+                2 -> AsrEngineType.GEMINI_ODIA
+                3 -> AsrEngineType.GEMINI_HINDI
+                else -> AsrEngineType.GROQ_MED
+            }
+            Prefs.setEngine(this, next)
+            activeResolvedEngine.set(next)
+            refreshModeUi()
+            true
+        }
+        popup.show()
+    }
+
     private fun toggleLanguage() {
         buzz(22L)
         val cur = Prefs.getEngine(this)
-        val next = if (Prefs.isOdiaEngine(cur)) AsrEngineType.GROQ_MED else AsrEngineType.GEMINI_ODIA
+        val entries = AsrEngineType.entries
+        val next = entries[(entries.indexOf(cur) + 1) % entries.size]
         Prefs.setEngine(this, next)
         activeResolvedEngine.set(next)
         refreshModeUi()
@@ -515,11 +547,11 @@ class MedUktiImeService : InputMethodService() {
             return
         }
         val selected = Prefs.getEngine(this)
-        if (selected == AsrEngineType.GROQ_MED && Prefs.getGroqKey(this).isBlank()) {
+        if (!Prefs.isIndicScriptEngine(selected) && Prefs.getGroqKey(this).isBlank()) {
             Toast.makeText(this, "Add your free Groq API key in MedUkti Settings", Toast.LENGTH_LONG).show()
             return
         }
-        if (selected == AsrEngineType.GEMINI_ODIA && Prefs.getGeminiKey(this).isBlank()) {
+        if (Prefs.isIndicScriptEngine(selected) && Prefs.getGeminiKey(this).isBlank()) {
             Toast.makeText(this, "Add your free Gemini API key in MedUkti Settings", Toast.LENGTH_LONG).show()
             return
         }
@@ -585,12 +617,10 @@ class MedUktiImeService : InputMethodService() {
 
                 val speechBuf = ArrayList<Float>(16000 * 10)
                 var inSpeech = false
+                var consecSpeechFrames = 0
                 var silenceFrames = 0
                 var lastPreviewSamples = 0
                 var previewJob: Job? = null
-
-                val speechRmsThreshold = 0.010f
-                val hangoverFrames = if (Prefs.isOdiaEngine(activeResolvedEngine.get())) 28 else 14 // ~450–900ms
                 val maxSegSamples = sampleRate * 18
 
                 while (isListening.get()) {
@@ -602,21 +632,33 @@ class MedUktiImeService : InputMethodService() {
                     for (i in 0 until read) {
                         floatBuf[i] = shortBuf[i] / 32768.0f
                     }
+                    val curEngine = activeResolvedEngine.get()
+                    val isOdiaNow = Prefs.isIndicScriptEngine(curEngine)
+                    val speechRmsThreshold = if (isOdiaNow) 0.010f else 0.015f
+                    val hangoverFrames = if (isOdiaNow) 16 else 14 // ~450–510ms
+
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
                     val isSpeechFrame = rms >= speechRmsThreshold
 
                     if (isSpeechFrame) {
-                        inSpeech = true
+                        consecSpeechFrames++
+                        if (consecSpeechFrames >= 3) {
+                            inSpeech = true
+                        }
                         silenceFrames = 0
-                        for (i in 0 until read) speechBuf.add(floatBuf[i])
-                    } else if (inSpeech) {
-                        silenceFrames++
-                        for (i in 0 until read) speechBuf.add(floatBuf[i])
+                        if (inSpeech) {
+                            for (i in 0 until read) speechBuf.add(floatBuf[i])
+                        }
+                    } else {
+                        consecSpeechFrames = 0
+                        if (inSpeech) {
+                            silenceFrames++
+                            for (i in 0 until read) speechBuf.add(floatBuf[i])
+                        }
                     }
 
-                    // Live streaming preview every ~2.2 seconds of active MED speech
-                    val curEngine = activeResolvedEngine.get()
-                    if (liveStreamEnabled && !Prefs.isOdiaEngine(curEngine) && inSpeech &&
+                    // Live streaming preview every ~2.2 seconds of active speech (both MED & OD)
+                    if (liveStreamEnabled && inSpeech &&
                         speechBuf.size - lastPreviewSamples >= sampleRate * 2.2 &&
                         previewJob?.isActive != true
                     ) {
