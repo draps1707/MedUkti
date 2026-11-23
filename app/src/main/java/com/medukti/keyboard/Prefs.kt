@@ -3,67 +3,42 @@ package com.medukti.keyboard
 import android.content.Context
 
 enum class AsrEngineType(val label: String, val badge: String) {
-    GROQ_MED("MED — English + Medical (Groq Whisper + GPT-OSS 120B)", "MED"),
-    GROQ_HINGLISH("HINGLISH — Hinglish + Medical (Groq Whisper + GPT-OSS 120B)", "HIN"),
-    GEMINI_ODIA("OD — Odia + Medical (Gemini Flash)", "OD"),
-    GEMINI_HINDI("HI — Hindi + Medical (Gemini Flash)", "HI"),
+    CLINICAL("MED — English + Hinglish + Medical (Groq Whisper + LLM)", "MED"),
+    ODIA("OD — Conversational Odia (ElevenLabs Scribe / Gemini)", "OD"),
 }
 
 enum class OdiaBackend(val label: String) {
-    ANDROID_NATIVE("Android Live (or-IN — Google Online, 0 keys)"),
-    BHASHINI("BHASHINI (AI4Bharat Odia Conformer — Free Govt API)"),
-    GEMINI("Gemini Flash (Current Google Gemini)")
-}
-
-enum class FocusPack(val label: String, val terms: String) {
-    GENERAL(
-        "General / Casualty & ICU",
-        "Sacubitril/valsartan, Dapagliflozin, Empagliflozin, Apixaban, Atorvastatin, Piperacillin, Tazobactam, Ceftriaxone, Pantoprazole, Telmisartan, Metformin, Paracetamol, Scrub typhus, Kyphosis, Lordosis, Rectus sheath, Procalcitonin, Troponin-I, NT-proBNP, Hyperkalaemia, Dyspnoea, Oedema"
-    ),
-    CARDIO_RENAL(
-        "Cardio / Diabetes / Renal",
-        "Sacubitril/valsartan, Dapagliflozin, Empagliflozin, Sitagliptin, Vildagliptin, Teneligliptin, Glimepiride, Gliclazide, Metformin, Glargine, Apixaban, Dabigatran, Rivaroxaban, Clopidogrel, Ticagrelor, Atorvastatin, Rosuvastatin, Telmisartan, Metoprolol, Bisoprolol, Diltiazem, Furosemide, Torsemide, Spironolactone, NT-proBNP, Troponin-I, HbA1c"
-    ),
-    ANTIMICROBIALS(
-        "Antimicrobials / Infectious",
-        "Amoxicillin, Clavulanic acid, Augmentin, Azithromycin, Clarithromycin, Cefixime, Cefotaxime, Ceftriaxone, Cefuroxime, Ceftazidime, Cefoperazone, Sulbactam, Piperacillin, Tazobactam, Piptaz, Meropenem, Imipenem, Ertapenem, Faropenem, Tigecycline, Linezolid, Vancomycin, Teicoplanin, Fosfomycin, Cotrimoxazole, Isoniazid, Rifampicin, Pyrazinamide, Ethambutol, Bedaquiline, Oseltamivir, Valacyclovir, Favipiravir, Tenofovir, Entecavir, Lamivudine, Voriconazole, Amphotericin B"
-    ),
-    ORTHO_DERM_NEURO(
-        "Ortho / Derm / Neuropsych",
-        "Pregabalin, Gabapentin, Amitriptyline, Nortriptyline, Duloxetine, Venlafaxine, Mirtazapine, Bupropion, Quetiapine, Levetiracetam, Lamotrigine, Baclofen, Thiocolchicoside, Etoricoxib, Celecoxib, Aceclofenac, Nimesulide, Ketorolac, Tramadol, Tapentadol, Rizatriptan, Fitzpatrick, Thoracic kyphosis, Lumbar lordosis, Cervical spondylosis, Luliconazole, Clobetasol"
-    )
+    ELEVENLABS("ElevenLabs Scribe v2 (Fastest & Best Casual Odia)"),
+    GEMINI("Gemini 3.8 Flash (Tuned Casual Odisha Odia)")
 }
 
 object Prefs {
     private const val FILE = "medukti_prefs"
     private const val KEY_ENGINE = "asr_engine"
-    private const val KEY_FOCUS_PACK = "focus_pack"
     private const val KEY_GROQ_KEY = "groq_api_key"
     private const val KEY_GEMINI_KEY = "gemini_api_key"
+    private const val KEY_ELEVENLABS_KEY = "elevenlabs_api_key"
     private const val KEY_GROQ_ASR_MODEL = "groq_asr_model"
     private const val KEY_GROQ_LLM_MODEL = "groq_llm_model"
     private const val KEY_GEMINI_MODEL = "gemini_model"
+    private const val KEY_ODIA_BACKEND = "odia_backend"
     private const val KEY_AI_POLISH = "ai_polish_enabled"
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
     private const val KEY_LIVE_STREAM = "live_streaming_preview"
     private const val KEY_PERSONAL_DICT = "personal_dictionary"
-    private const val KEY_ODIA_BACKEND = "odia_backend"
-    private const val KEY_BHASHINI_USER_ID = "bhashini_user_id"
-    private const val KEY_BHASHINI_API_KEY = "bhashini_api_key"
 
     fun getEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_ENGINE, AsrEngineType.GROQ_MED.name)
-        return AsrEngineType.entries.firstOrNull { it.name == raw }
-            ?: AsrEngineType.GROQ_MED
+            .getString(KEY_ENGINE, AsrEngineType.CLINICAL.name)
+        return when (raw) {
+            "ODIA", "GEMINI_ODIA" -> AsrEngineType.ODIA
+            else -> AsrEngineType.CLINICAL
+        }
     }
 
-    fun isOdiaEngine(e: AsrEngineType): Boolean = e == AsrEngineType.GEMINI_ODIA
+    fun isOdiaEngine(e: AsrEngineType): Boolean = e == AsrEngineType.ODIA
 
-    fun isGeminiEngine(e: AsrEngineType): Boolean =
-        e == AsrEngineType.GEMINI_ODIA || e == AsrEngineType.GEMINI_HINDI
-
-    fun isIndicScriptEngine(e: AsrEngineType): Boolean = isGeminiEngine(e)
+    fun isIndicScriptEngine(e: AsrEngineType): Boolean = e == AsrEngineType.ODIA
 
     fun setEngine(ctx: Context, engine: AsrEngineType) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
@@ -71,16 +46,16 @@ object Prefs {
             .apply()
     }
 
-    fun getFocusPack(ctx: Context): FocusPack {
+    fun getOdiaBackend(ctx: Context): OdiaBackend {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_FOCUS_PACK, FocusPack.GENERAL.name)
-        return FocusPack.entries.firstOrNull { it.name == raw }
-            ?: FocusPack.GENERAL
+            .getString(KEY_ODIA_BACKEND, OdiaBackend.ELEVENLABS.name)
+        return OdiaBackend.entries.firstOrNull { it.name == raw }
+            ?: OdiaBackend.ELEVENLABS
     }
 
-    fun setFocusPack(ctx: Context, pack: FocusPack) {
+    fun setOdiaBackend(ctx: Context, backend: OdiaBackend) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_FOCUS_PACK, pack.name)
+            .putString(KEY_ODIA_BACKEND, backend.name)
             .apply()
     }
 
@@ -102,14 +77,23 @@ object Prefs {
             .apply()
     }
 
+    fun getElevenLabsKey(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_ELEVENLABS_KEY, "") ?: ""
+
+    fun setElevenLabsKey(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_ELEVENLABS_KEY, value.trim())
+            .apply()
+    }
+
     fun getGroqAsrModel(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_GROQ_ASR_MODEL, "whisper-large-v3")
-            ?.ifBlank { "whisper-large-v3" } ?: "whisper-large-v3"
+            .getString(KEY_GROQ_ASR_MODEL, "whisper-large-v3-turbo")
+            ?.ifBlank { "whisper-large-v3-turbo" } ?: "whisper-large-v3-turbo"
 
     fun setGroqAsrModel(ctx: Context, value: String) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_GROQ_ASR_MODEL, value.trim().ifBlank { "whisper-large-v3" })
+            .putString(KEY_GROQ_ASR_MODEL, value.trim().ifBlank { "whisper-large-v3-turbo" })
             .apply()
     }
 
@@ -126,12 +110,12 @@ object Prefs {
 
     fun getGeminiModel(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_GEMINI_MODEL, "gemini-3.5-flash-lite")
-            ?.ifBlank { "gemini-3.5-flash-lite" } ?: "gemini-3.5-flash-lite"
+            .getString(KEY_GEMINI_MODEL, "gemini-3.8-flash")
+            ?.ifBlank { "gemini-3.8-flash" } ?: "gemini-3.8-flash"
 
     fun setGeminiModel(ctx: Context, value: String) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_GEMINI_MODEL, value.trim().ifBlank { "gemini-3.5-flash-lite" })
+            .putString(KEY_GEMINI_MODEL, value.trim().ifBlank { "gemini-3.8-flash" })
             .apply()
     }
 
@@ -145,7 +129,7 @@ object Prefs {
     }
 
     fun isAutoListen(ctx: Context): Boolean =
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_AUTO_LISTEN, true)
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_AUTO_LISTEN, false)
 
     fun setAutoListen(ctx: Context, enabled: Boolean) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
@@ -165,40 +149,21 @@ object Prefs {
     fun getPersonalDict(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_PERSONAL_DICT, "") ?: ""
 
-    fun setPersonalDict(ctx: Context, value: String) {
+    fun setPersonalDict(ctx: Context, raw: String) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_PERSONAL_DICT, value)
+            .putString(KEY_PERSONAL_DICT, raw.trim())
             .apply()
     }
 
-    fun getOdiaBackend(ctx: Context): OdiaBackend {
-        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_ODIA_BACKEND, OdiaBackend.ANDROID_NATIVE.name)
-        return OdiaBackend.entries.firstOrNull { it.name == raw }
-            ?: OdiaBackend.ANDROID_NATIVE
-    }
-
-    fun setOdiaBackend(ctx: Context, backend: OdiaBackend) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_ODIA_BACKEND, backend.name)
-            .apply()
-    }
-
-    fun getBhashiniUserId(ctx: Context): String =
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_BHASHINI_USER_ID, "") ?: ""
-
-    fun setBhashiniUserId(ctx: Context, value: String) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_BHASHINI_USER_ID, value.trim())
-            .apply()
-    }
-
-    fun getBhashiniApiKey(ctx: Context): String =
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_BHASHINI_API_KEY, "") ?: ""
-
-    fun setBhashiniApiKey(ctx: Context, value: String) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_BHASHINI_API_KEY, value.trim())
-            .apply()
+    fun appendPersonalFix(ctx: Context, wrong: String, right: String) {
+        val w = wrong.trim()
+        val r = right.trim()
+        if (w.isEmpty() || r.isEmpty() || w.equals(r, ignoreCase = true)) return
+        val existing = getPersonalDict(ctx).lines().filter { it.isNotBlank() }.toMutableList()
+        val prefix = "${w.lowercase()}="
+        existing.removeAll { it.substringBefore('=').trim().lowercase() + "=" == prefix }
+        existing.add("$w = $r")
+        setPersonalDict(ctx, existing.joinToString("
+"))
     }
 }

@@ -496,31 +496,47 @@
                     android:background="@drawable/bg_input_dark"
                     android:paddingHorizontal="10dp" />
 
-                <EditText
-                    android:id="@+id/etBhashiniUserId"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_input_dark"
-                    android:hint="BHASHINI User ID (only if testing BHASHINI)"
-                    android:inputType="textNoSuggestions"
-                    android:padding="12dp"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#9AA0A6"
-                    android:textSize="13sp" />
+                    android:layout_marginTop="12dp"
+                    android:text="ElevenLabs API Key (for Odia Scribe v2)"
+                    android:textColor="#E8EAED"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
-                <EditText
-                    android:id="@+id/etBhashiniApiKey"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:background="@drawable/bg_input_dark"
-                    android:hint="BHASHINI ULCA API Key (only if testing BHASHINI)"
-                    android:inputType="textNoSuggestions"
-                    android:padding="12dp"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#9AA0A6"
-                    android:textSize="13sp" />
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/etElevenLabsKey"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_input_dark"
+                        android:hint="sk_..."
+                        android:inputType="textPassword|textNoSuggestions"
+                        android:padding="12dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#9AA0A6"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/btnPasteElevenLabsKey"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/bg_btn_compact"
+                        android:gravity="center"
+                        android:paddingHorizontal="14dp"
+                        android:text="Paste"
+                        android:textColor="#E8EAED"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <Switch
                     android:id="@+id/switchAutoListen"

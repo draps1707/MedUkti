@@ -79,8 +79,7 @@ class MainActivity : AppCompatActivity() {
         val spinnerGroqLlm = findViewById<Spinner>(R.id.spinnerGroqLlm)
         val spinnerGeminiModel = findViewById<Spinner>(R.id.spinnerGeminiModel)
         val spinnerOdiaBackend = findViewById<Spinner>(R.id.spinnerOdiaBackend)
-        val etBhashiniUserId = findViewById<EditText>(R.id.etBhashiniUserId)
-        val etBhashiniApiKey = findViewById<EditText>(R.id.etBhashiniApiKey)
+        val etElevenLabsKey = findViewById<EditText>(R.id.etElevenLabsKey)
 
         val switchAutoListen = findViewById<Switch>(R.id.switchAutoListen)
         val switchLiveStream = findViewById<Switch>(R.id.switchLiveStream)
@@ -118,8 +117,7 @@ class MainActivity : AppCompatActivity() {
         bindModelSpinner(spinnerGeminiModel, etGeminiModel, geminiOptions, Prefs.getGeminiModel(this))
         spinnerOdiaBackend.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, OdiaBackend.entries.map { it.label })
         spinnerOdiaBackend.setSelection(OdiaBackend.entries.indexOf(Prefs.getOdiaBackend(this)).coerceAtLeast(0))
-        etBhashiniUserId.setText(Prefs.getBhashiniUserId(this))
-        etBhashiniApiKey.setText(Prefs.getBhashiniApiKey(this))
+        etElevenLabsKey.setText(Prefs.getElevenLabsKey(this))
 
         switchAutoListen.isChecked = Prefs.isAutoListen(this)
         switchLiveStream.isChecked = Prefs.isLiveStreamingEnabled(this)
@@ -140,18 +138,24 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnGetGeminiKey).setOnClickListener { openUrl("https://aistudio.google.com/apikey") }
         findViewById<View>(R.id.btnPasteGroqKey).setOnClickListener { pasteInto(etGroqKey, "Groq key pasted") }
         findViewById<View>(R.id.btnPasteGeminiKey).setOnClickListener { pasteInto(etGeminiKey, "Gemini key pasted") }
+        findViewById<View>(R.id.btnPasteElevenLabsKey).setOnClickListener { pasteInto(etElevenLabsKey, "ElevenLabs key pasted") }
 
         findViewById<View>(R.id.btnTestKeys).setOnClickListener {
             val gKey = etGroqKey.text.toString().trim()
             val mKey = etGeminiKey.text.toString().trim()
+            val elKey = etElevenLabsKey.text.toString().trim()
             Prefs.setGroqKey(this, gKey)
             Prefs.setGeminiKey(this, mKey)
+            Prefs.setElevenLabsKey(this, elKey)
             tvKeyTestResult.text = "Testing…"
             uiScope.launch {
-                val (gRes, mRes) = withContext(Dispatchers.IO) {
-                    CloudAsrClient.testGroqKey(gKey) to CloudAsrClient.testGeminiKey(mKey)
+                val resStr = withContext(Dispatchers.IO) {
+                    val gRes = CloudAsrClient.testGroqKey(gKey)
+                    val mRes = CloudAsrClient.testGeminiKey(mKey)
+                    val eRes = CloudAsrClient.testElevenLabsKey(elKey)
+                    "$gRes  |  $mRes  |  $eRes"
                 }
-                tvKeyTestResult.text = "$gRes  |  $mRes"
+                tvKeyTestResult.text = resStr
                 updateStatus()
             }
         }
@@ -188,8 +192,7 @@ class MainActivity : AppCompatActivity() {
             }
             Prefs.setGeminiModel(this, resolveModelValue(spinnerGeminiModel, etGeminiModel, geminiOptions))
             Prefs.setOdiaBackend(this, OdiaBackend.entries[spinnerOdiaBackend.selectedItemPosition])
-            Prefs.setBhashiniUserId(this, etBhashiniUserId.text.toString())
-            Prefs.setBhashiniApiKey(this, etBhashiniApiKey.text.toString())
+            Prefs.setElevenLabsKey(this, etElevenLabsKey.text.toString())
 
             Prefs.setGroqKey(this, etGroqKey.text.toString())
             Prefs.setGeminiKey(this, etGeminiKey.text.toString())
@@ -275,7 +278,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateStatus() {
         val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val imeOk = isImeEnabled()
-        val keyOk = Prefs.getGroqKey(this).isNotBlank() || Prefs.getGeminiKey(this).isNotBlank()
+        val keyOk = Prefs.getGroqKey(this).isNotBlank() || Prefs.getGeminiKey(this).isNotBlank() || Prefs.getElevenLabsKey(this).isNotBlank()
 
         when {
             imeOk && micOk && keyOk -> {

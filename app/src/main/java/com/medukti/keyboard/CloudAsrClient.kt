@@ -150,6 +150,22 @@ object CloudAsrClient {
         }
     }
 
+    fun testElevenLabsKey(apiKey: String): String {
+        if (apiKey.isBlank()) return "ElevenLabs: missing"
+        return try {
+            val conn = (URL("https://api.elevenlabs.io/v1/user").openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 6000
+                readTimeout = 6000
+                setRequestProperty("xi-api-key", apiKey.trim())
+            }
+            val code = conn.responseCode
+            if (code in 200..299) "11Labs: ✓ OK" else "11Labs: HTTP $code"
+        } catch (e: Exception) {
+            "11Labs: ${e.message?.take(40) ?: "error"}"
+        }
+    }
+
     private fun buildWhisperPrompt(ctx: Context): String {
         val universalTerms = "Tab., Inj., Cap., Syp., SpO2, BP, Dyspnoea, Oedema, Haemoptysis, Scrub typhus, Rectus sheath, Troponin-I, NT-proBNP, Ceftriaxone, Piperacillin, Tazobactam, Augmentin, Azithromycin, Empagliflozin, Dapagliflozin, Apixaban, Sacubitril/valsartan, Atorvastatin, Telmisartan, Pantoprazole, Metformin, Paracetamol"
         val personal = Prefs.getPersonalDict(ctx)
@@ -215,7 +231,7 @@ object CloudAsrClient {
         return JSONObject(body).optString("text", "").trim()
     }
 
-    private fun callGroqPolish(ctx: Context, rawText: String, isHinglish: Boolean): String {
+    private fun callGroqPolish(ctx: Context, rawText: String): String {
         val apiKey = Prefs.getGroqKey(ctx)
         if (apiKey.isBlank() || rawText.isBlank()) return rawText
 
@@ -229,11 +245,8 @@ object CloudAsrClient {
             append("z<->j (carbimajol->Carbimazole, omeprajol->Omeprazole), ph/p<->f (epixabin->Apixaban, phosphormycin->Fosfomycin), ")
             append("dropped -r endings (acyclovia->Acyclovir, tenofova->Tenofovir), and 2-word splits (by basilar->bibasilar, Sacubitril ablastin->Sacubitril/valsartan). ")
             append("Use sentence context so normal English words (monitor, according, patients) are never wrongly replaced. ")
-            if (isHinglish) {
-                append("The speaker is speaking Hinglish (mixed Hindi + English) with medical terms. Keep casual Hindi words in natural Romanized Hinglish (e.g. 'Patient ko kal raat se fever hai') and medical/drug terms in accurate English. Never output Devanagari, French, or Spanish. ")
-            } else {
-                append("Output strictly in English (and Romanized Hinglish only if clearly spoken; never Devanagari, French, Spanish, or other foreign languages). ")
-            }
+            append("The speaker is an Indian doctor dictating naturally in English, Hinglish (Hindi + English in Roman script), or mixed clinical notes (e.g. 'Inj. Ceftriaxone 1 gm BD for Pneumonia' or 'Yeh patient ka hum agar Ceftriaxone ke saath Azithromycin de denge toh uska mortality ratio kam ho jayega'). ")
+            append("Preserve natural Hinglish phrasing in Roman letters when spoken—never translate Hinglish into formal English and never output Devanagari, French, or Spanish. ")
             if (candidates.isNotEmpty()) {
                 append("Candidate Indian formulary/clinical terms that may match this audio: ${candidates.joinToString(", ")}. ")
             }
@@ -301,23 +314,14 @@ object CloudAsrClient {
         val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
         val b64Audio = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
 
-        val prompt = if (isHindi) {
-            buildString {
-                append("The speaker is speaking Hindi (हिन्दी) with occasional English medical or drug terms. ")
-                append("Transcribe Hindi speech in clean Devanagari script (हिन्दी)—never transliterate Hindi into Roman letters. ")
-                append("Write English medical terms, drug/brand names (e.g. Ceftriaxone, Piptaz, SpO2, ECG), and digits in English. ")
-                append("If the audio is only breath, filler ('hmm', 'uh'), or background noise, return an empty string. ")
-                append("Output ONLY the transcribed text with zero commentary.")
-            }
-        } else {
-            buildString {
-                append("The speaker is speaking Odia (ଓଡ଼ିଆ) with occasional English medical or drug terms. ")
-                append("Always transcribe Odia speech in pure Odia script (ଓଡ଼ିଆ)—never transliterate Odia into Roman/Hinglish letters, ")
-                append("and NEVER output Malayalam, Gujarati, Bengali, or Devanagari characters. ")
-                append("Write only actual English medical terms, drug/brand names (e.g. Piptaz, Monocef, SpO2, ECG), and digits in English. ")
-                append("If the audio is only breath, filler ('hmm', 'humm', 'uh'), or background noise, return an empty string. ")
-                append("Output ONLY the transcribed text with zero commentary.")
-            }
+        val prompt = buildString {
+            append("The speaker is from Odisha speaking natural, casual conversational Odia (ଓଡ଼ିଆ) with occasional English medical or drug terms. ")
+            append("Transcribe colloquial Odisha speech faithfully in clean Odia script (ଓଡ଼ିଆ) without forcing stiff textbook grammar, and keep compound words intact (e.g. ଆମେମାନେ, ଶୀତଳ). ")
+            append("Use proper sentence punctuation (। or ?)—never use '|' pipe characters. ")
+            append("Never transliterate Odia into Roman letters, and NEVER output Bengali, Devanagari, Malayalam, or Gujarati characters. ")
+            append("Keep actual English medical terms, drug names (e.g. Ceftriaxone, Piptaz, SpO2, ECG), and digits in English. ")
+            append("If the audio is only breath, filler ('hmm', 'humm', 'uh'), or background noise, return an empty string. ")
+            append("Output ONLY the transcribed text with zero commentary.")
         }
 
         val payload = JSONObject().apply {
@@ -393,6 +397,9 @@ object CloudAsrClient {
     fun postProcessTranscript(ctx: Context, raw: String, engine: AsrEngineType): String {
         var text = Normalizer.normalize(raw.trim(), Normalizer.Form.NFC)
         if (text.isEmpty()) return ""
+        if (Prefs.isIndicScriptEngine(engine)) {
+            text = text.replace(" |", "।").replace("|", "।")
+        }
         if (!Prefs.isIndicScriptEngine(engine)) {
             for (rx in WHISPER_HALLUCINATIONS) {
                 text = text.replace(rx, " ")
@@ -457,118 +464,68 @@ object CloudAsrClient {
         )
     }
 
-    @Volatile
-    private var cachedBhashiniCallbackUrl: String? = null
-    @Volatile
-    private var cachedBhashiniAuthHeader: String? = null
-    @Volatile
-    private var cachedBhashiniAuthValue: String? = null
-    @Volatile
-    private var cachedBhashiniServiceId: String? = null
-
-    private fun ensureBhashiniOdiaConfig(userId: String, apiKey: String) {
-        if (!cachedBhashiniCallbackUrl.isNullOrBlank() &&
-            !cachedBhashiniAuthValue.isNullOrBlank() &&
-            !cachedBhashiniServiceId.isNullOrBlank()
-        ) return
-
-        val url = URL("https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline")
+    private fun callElevenLabsOdia(ctx: Context, wavBytes: ByteArray): String {
+        val apiKey = Prefs.getElevenLabsKey(ctx)
+        if (apiKey.isBlank()) {
+            throw IllegalStateException("Add your ElevenLabs API key in MedUkti Settings")
+        }
+        val boundary = "----MedUkti11Labs${System.currentTimeMillis()}"
+        val url = URL("https://api.elevenlabs.io/v1/speech-to-text")
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
-            connectTimeout = 15000
+            connectTimeout = 10000
             readTimeout = 20000
             doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("userID", userId)
-            setRequestProperty("ulcaApiKey", apiKey)
+            setRequestProperty("xi-api-key", apiKey)
+            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
         }
-        val reqJson = JSONObject().apply {
-            put("pipelineTasks", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("taskType", "asr")
-                    put("config", JSONObject().apply {
-                        put("language", JSONObject().put("sourceLanguage", "or"))
-                    })
-                })
-            })
-            put("pipelineRequestConfig", JSONObject().put("pipelineId", "64392f96daac500b55c543cd"))
-        }
-        conn.outputStream.use { it.write(reqJson.toString().toByteArray(Charsets.UTF_8)) }
-        val code = conn.responseCode
-        val body = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.readText().orEmpty()
-        if (code !in 200..299) {
-            throw IllegalStateException("BHASHINI config failed ($code)")
-        }
-        val root = JSONObject(body)
-        val ep = root.getJSONObject("pipelineInferenceAPIEndPoint")
-        val callbackUrl = ep.getString("callbackUrl")
-        val authKeyObj = ep.getJSONObject("inferenceApiKey")
-        val authName = authKeyObj.getString("name")
-        val authVal = authKeyObj.getString("value")
-        val serviceId = root.getJSONArray("pipelineResponseConfig")
-            .getJSONObject(0)
-            .getJSONArray("config")
-            .getJSONObject(0)
-            .getString("serviceId")
 
-        cachedBhashiniCallbackUrl = callbackUrl
-        cachedBhashiniAuthHeader = authName
-        cachedBhashiniAuthValue = authVal
-        cachedBhashiniServiceId = serviceId
+        DataOutputStream(conn.outputStream).use { out ->
+            fun writeField(name: String, value: String) {
+                out.writeBytes("--$boundary\r\n")
+                out.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
+                out.write(value.toByteArray(Charsets.UTF_8))
+                out.writeBytes("\r\n")
+            }
+            writeField("model_id", "scribe_v2")
+            writeField("language_code", "or")
+            out.writeBytes("--$boundary\r\n")
+            out.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n")
+            out.writeBytes("Content-Type: audio/wav\r\n\r\n")
+            out.write(wavBytes)
+            out.writeBytes("\r\n--$boundary--\r\n")
+        }
+
+        val code = conn.responseCode
+        val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
+            ?.bufferedReader()?.readText().orEmpty()
+        if (code !in 200..299) {
+            throw IllegalStateException("ElevenLabs STT error ($code): ${body.take(160)}")
+        }
+        return JSONObject(body).optString("text", "").trim()
     }
 
-    private fun callBhashiniOdia(ctx: Context, wavBytes: ByteArray): String {
-        val userId = Prefs.getBhashiniUserId(ctx)
-        val apiKey = Prefs.getBhashiniApiKey(ctx)
-        if (userId.isBlank() || apiKey.isBlank()) {
-            throw IllegalStateException("Add your free BHASHINI User ID & API Key in MedUkti Settings")
+    private fun transcribeOdiaBest(ctx: Context, wavBytes: ByteArray): String {
+        val backend = Prefs.getOdiaBackend(ctx)
+        if (backend == OdiaBackend.ELEVENLABS) {
+            val elKey = Prefs.getElevenLabsKey(ctx)
+            if (elKey.isNotBlank()) {
+                return try {
+                    callElevenLabsOdia(ctx, wavBytes)
+                } catch (e: Exception) {
+                    if (Prefs.getGeminiKey(ctx).isNotBlank()) {
+                        callGeminiIndic(ctx, wavBytes, isHindi = false)
+                    } else {
+                        throw e
+                    }
+                }
+            }
+            if (Prefs.getGeminiKey(ctx).isNotBlank()) {
+                return callGeminiIndic(ctx, wavBytes, isHindi = false)
+            }
+            throw IllegalStateException("Add your ElevenLabs or Gemini API key in MedUkti Settings")
         }
-        ensureBhashiniOdiaConfig(userId, apiKey)
-        val callbackUrl = cachedBhashiniCallbackUrl ?: throw IllegalStateException("BHASHINI endpoint unavailable")
-        val authName = cachedBhashiniAuthHeader ?: "Authorization"
-        val authVal = cachedBhashiniAuthValue ?: ""
-        val serviceId = cachedBhashiniServiceId ?: ""
-
-        val b64Audio = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
-        val payload = JSONObject().apply {
-            put("pipelineTasks", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("taskType", "asr")
-                    put("config", JSONObject().apply {
-                        put("language", JSONObject().put("sourceLanguage", "or"))
-                        put("serviceId", serviceId)
-                        put("audioFormat", "wav")
-                        put("samplingRate", 16000)
-                    })
-                })
-            })
-            put("inputData", JSONObject().apply {
-                put("audio", JSONArray().apply {
-                    put(JSONObject().put("audioContent", b64Audio))
-                })
-            })
-        }
-
-        val conn = (URL(callbackUrl).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 15000
-            readTimeout = 25000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            if (authVal.isNotBlank()) setRequestProperty(authName, authVal)
-        }
-        conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
-        val code = conn.responseCode
-        val body = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.readText().orEmpty()
-        if (code !in 200..299) {
-            cachedBhashiniCallbackUrl = null
-            throw IllegalStateException("BHASHINI ASR error ($code)")
-        }
-        val resp = JSONObject(body)
-        val outputArr = resp.optJSONArray("pipelineResponse")
-            ?.optJSONObject(0)
-            ?.optJSONArray("output")
-        return outputArr?.optJSONObject(0)?.optString("source")?.trim() ?: ""
+        return callGeminiIndic(ctx, wavBytes, isHindi = false)
     }
 
     fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
@@ -577,17 +534,13 @@ object CloudAsrClient {
             if (samples.size < 4800 || computeRms(samples) < minRms) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
-                AsrEngineType.GROQ_MED, AsrEngineType.GROQ_HINGLISH ->
+                AsrEngineType.CLINICAL ->
                     callGroqWhisper(ctx, wav, "whisper-large-v3-turbo", isLivePreview = true)
-                AsrEngineType.GEMINI_ODIA -> {
+                AsrEngineType.ODIA -> {
                     if (Prefs.getOdiaBackend(ctx) == OdiaBackend.GEMINI) {
                         val key = Prefs.getGeminiKey(ctx)
                         if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHindi = false)
                     } else ""
-                }
-                AsrEngineType.GEMINI_HINDI -> {
-                    val key = Prefs.getGeminiKey(ctx)
-                    if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHindi = true)
                 }
             }
             Result.success(postProcessTranscript(ctx, raw, engine))
@@ -601,19 +554,15 @@ object CloudAsrClient {
             if (samples.size < 3200 || computeRms(samples) < 0.002f) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
-                AsrEngineType.GROQ_MED, AsrEngineType.GROQ_HINGLISH -> {
+                AsrEngineType.CLINICAL -> {
                     val stt = callGroqWhisper(ctx, wav, Prefs.getGroqAsrModel(ctx), isLivePreview = false)
                     if (stt.isNotBlank() && Prefs.isAiPolishEnabled(ctx)) {
-                        callGroqPolish(ctx, stt, engine == AsrEngineType.GROQ_HINGLISH)
+                        callGroqPolish(ctx, stt)
                     } else {
                         stt
                     }
                 }
-                AsrEngineType.GEMINI_ODIA -> when (Prefs.getOdiaBackend(ctx)) {
-                    OdiaBackend.BHASHINI -> callBhashiniOdia(ctx, wav)
-                    OdiaBackend.GEMINI, OdiaBackend.ANDROID_NATIVE -> callGeminiIndic(ctx, wav, isHindi = false)
-                }
-                AsrEngineType.GEMINI_HINDI -> callGeminiIndic(ctx, wav, isHindi = true)
+                AsrEngineType.ODIA -> transcribeOdiaBest(ctx, wav)
             }
             Result.success(postProcessTranscript(ctx, raw, engine))
         } catch (e: Exception) {

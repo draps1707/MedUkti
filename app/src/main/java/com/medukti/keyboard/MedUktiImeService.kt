@@ -12,10 +12,6 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
-import android.os.Bundle
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.os.Handler
 import android.os.Looper
 import android.os.VibrationEffect
@@ -62,9 +58,8 @@ class MedUktiImeService : InputMethodService() {
     private var saveFixBar: View? = null
     private var tvSaveFixLabel: TextView? = null
     private var vadConsumerJob: Job? = null
-    private var androidOdiaRecognizer: SpeechRecognizer? = null
     private var liveLoopJob: Job? = null
-    private val activeResolvedEngine = AtomicReference<AsrEngineType>(AsrEngineType.GROQ_MED)
+    private val activeResolvedEngine = AtomicReference<AsrEngineType>(AsrEngineType.CLINICAL)
 
     private var btnModeToggle: TextView? = null
     private var micRingContainer: LinearLayout? = null
@@ -344,18 +339,15 @@ class MedUktiImeService : InputMethodService() {
             MicUiState.IDLE -> {
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
                 tvMicPillLabel?.text = when (engine) {
-                    AsrEngineType.GEMINI_ODIA -> "ଓଡ଼ିଆ କୁହନ୍ତୁ"
-                    AsrEngineType.GEMINI_HINDI -> "हिन्दी बोलें"
-                    AsrEngineType.GROQ_HINGLISH -> "Speak Hinglish"
-                    AsrEngineType.GROQ_MED -> "Tap to Speak"
+                    AsrEngineType.ODIA -> "ଓଡ଼ିଆ କୁହନ୍ତୁ"
+                    AsrEngineType.CLINICAL -> "Tap to Speak"
                 }
             }
             MicUiState.LISTENING -> {
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
                 tvMicPillLabel?.text = when (engine) {
-                    AsrEngineType.GEMINI_ODIA -> "ଶୁଣୁଛି… ଟ୍ୟାପ୍"
-                    AsrEngineType.GEMINI_HINDI -> "सुन रहा हूँ… टैप"
-                    else -> "Listening… Tap"
+                    AsrEngineType.ODIA -> "ଶୁଣୁଛି… ଟ୍ୟାପ୍"
+                    AsrEngineType.CLINICAL -> "Listening… Tap"
                 }
             }
             MicUiState.POLISHING -> {
@@ -368,16 +360,12 @@ class MedUktiImeService : InputMethodService() {
     private fun showLanguagePicker(anchor: View) {
         buzz(18L)
         val popup = PopupMenu(this, anchor)
-        popup.menu.add(0, 0, 0, "English (Medical)")
-        popup.menu.add(0, 1, 1, "Hinglish (Medical)")
-        popup.menu.add(0, 2, 2, "Odia (ଓଡ଼ିଆ + Medical)")
-        popup.menu.add(0, 3, 3, "Hindi (हिन्दी + Medical)")
+        popup.menu.add(0, 0, 0, "Clinical (English + Hinglish + Medical)")
+        popup.menu.add(0, 1, 1, "Odia (ଓଡ଼ିଆ Conversational)")
         popup.setOnMenuItemClickListener { item ->
             val next = when (item.itemId) {
-                1 -> AsrEngineType.GROQ_HINGLISH
-                2 -> AsrEngineType.GEMINI_ODIA
-                3 -> AsrEngineType.GEMINI_HINDI
-                else -> AsrEngineType.GROQ_MED
+                1 -> AsrEngineType.ODIA
+                else -> AsrEngineType.CLINICAL
             }
             Prefs.setEngine(this, next)
             activeResolvedEngine.set(next)
@@ -552,20 +540,15 @@ class MedUktiImeService : InputMethodService() {
             return
         }
         val selected = Prefs.getEngine(this)
-        if (selected == AsrEngineType.GEMINI_ODIA && Prefs.getOdiaBackend(this) == OdiaBackend.ANDROID_NATIVE) {
-            startAndroidOdiaContinuous()
-            return
-        }
-        if (selected == AsrEngineType.GEMINI_ODIA && Prefs.getOdiaBackend(this) == OdiaBackend.BHASHINI) {
-            if (Prefs.getBhashiniUserId(this).isBlank() || Prefs.getBhashiniApiKey(this).isBlank()) {
-                Toast.makeText(this, "Add your free BHASHINI User ID & API Key in MedUkti Settings", Toast.LENGTH_LONG).show()
-                return
-            }
-        } else if (!Prefs.isIndicScriptEngine(selected) && Prefs.getGroqKey(this).isBlank()) {
+        if (selected == AsrEngineType.CLINICAL && Prefs.getGroqKey(this).isBlank()) {
             Toast.makeText(this, "Add your free Groq API key in MedUkti Settings", Toast.LENGTH_LONG).show()
             return
-        } else if (Prefs.isIndicScriptEngine(selected) && Prefs.getGeminiKey(this).isBlank()) {
-            Toast.makeText(this, "Add your free Gemini API key in MedUkti Settings", Toast.LENGTH_LONG).show()
+        }
+        if (selected == AsrEngineType.ODIA &&
+            Prefs.getElevenLabsKey(this).isBlank() &&
+            Prefs.getGeminiKey(this).isBlank()
+        ) {
+            Toast.makeText(this, "Add your ElevenLabs or Gemini API key in MedUkti Settings", Toast.LENGTH_LONG).show()
             return
         }
 
@@ -732,108 +715,8 @@ class MedUktiImeService : InputMethodService() {
         }
     }
 
-    private fun startAndroidOdiaContinuous() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(this, "Google Speech Service unavailable — switch Odia Engine in Settings", Toast.LENGTH_LONG).show()
-            return
-        }
-        activeResolvedEngine.set(AsrEngineType.GEMINI_ODIA)
-        isListening.set(true)
-        isProcessing = false
-        setMicUiState(MicUiState.LISTENING)
-        launchAndroidOdiaSession()
-    }
-
-    private fun launchAndroidOdiaSession() {
-        mainHandler.post {
-            if (!isListening.get()) return@post
-            try {
-                androidOdiaRecognizer?.destroy()
-            } catch (_: Exception) {
-            }
-            val sr = SpeechRecognizer.createSpeechRecognizer(this)
-            androidOdiaRecognizer = sr
-            sr.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {}
-                override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {}
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-
-                override fun onPartialResults(partialResults: Bundle?) {
-                    if (!isListening.get()) return
-                    val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim() ?: ""
-                    if (text.isNotEmpty()) {
-                        updateLiveDraft(text)
-                    }
-                }
-
-                override fun onResults(results: Bundle?) {
-                    val raw = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim() ?: ""
-                    if (raw.isNotEmpty()) {
-                        val cleaned = MedicalNormalizer.normalize(this@MedUktiImeService, raw, AsrEngineType.GEMINI_ODIA)
-                        if (cleaned.isNotEmpty()) {
-                            commitTranscript(cleaned)
-                        } else {
-                            lockOrClearLiveDraft()
-                        }
-                    } else {
-                        lockOrClearLiveDraft()
-                    }
-                    if (isListening.get()) {
-                        mainHandler.postDelayed({ launchAndroidOdiaSession() }, 120L)
-                    } else {
-                        isProcessing = false
-                        setMicUiState(MicUiState.IDLE)
-                    }
-                }
-
-                override fun onError(error: Int) {
-                    lockOrClearLiveDraft()
-                    if (isListening.get() && (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)) {
-                        mainHandler.postDelayed({ launchAndroidOdiaSession() }, 150L)
-                    } else {
-                        isListening.set(false)
-                        isProcessing = false
-                        setMicUiState(MicUiState.IDLE)
-                        if (error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT) {
-                            Toast.makeText(this@MedUktiImeService, "Odia speech network error", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            })
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "or-IN")
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "or-IN")
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            }
-            sr.startListening(intent)
-        }
-    }
-
-    private fun destroyAndroidOdiaRecognizer() {
-        mainHandler.post {
-            try {
-                androidOdiaRecognizer?.stopListening()
-                androidOdiaRecognizer?.destroy()
-            } catch (_: Exception) {
-            }
-            androidOdiaRecognizer = null
-        }
-    }
-
     private fun stopContinuousDictation() {
         isListening.set(false)
-        if (androidOdiaRecognizer != null) {
-            destroyAndroidOdiaRecognizer()
-            lockOrClearLiveDraft()
-            isProcessing = false
-            setMicUiState(MicUiState.IDLE)
-            return
-        }
         setMicUiState(MicUiState.POLISHING)
         mainHandler.removeCallbacks(processingWatchdog)
         mainHandler.postDelayed(processingWatchdog, 10000L)
