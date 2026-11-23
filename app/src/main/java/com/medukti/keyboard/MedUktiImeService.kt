@@ -632,7 +632,7 @@ class MedUktiImeService : InputMethodService() {
                         if (speechBuf.size >= 4800) {
                             segmentChannel.trySend(speechBuf.toFloatArray() to curEngine)
                         } else {
-                            clearLiveDraft()
+                            lockOrClearLiveDraft()
                         }
                         speechBuf.clear()
                         inSpeech = false
