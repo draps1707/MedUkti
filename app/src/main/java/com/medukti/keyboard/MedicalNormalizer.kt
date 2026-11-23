@@ -350,15 +350,16 @@ object MedicalNormalizer {
     private fun englishSkeleton(word: String): String {
         val norm = word.lowercase()
             .replace("ph", "f")
+            .replace("x", "ks")
             .replace(Regex("c(?=[eiy])"), "s")
         val sb = StringBuilder()
         var prev = '\u0000'
         for (ch in norm) {
             val mapped = when (ch) {
-                'a', 'e', 'i', 'o', 'u', 'y', 'h', 'w' -> continue
+                'a', 'e', 'i', 'o', 'u', 'y', 'h' -> continue
                 'c', 'k', 'q' -> 'k'
                 'p', 'f' -> 'p'
-                'b', 'v' -> 'b'
+                'b', 'v', 'w' -> 'b'
                 't', 'd' -> 't'
                 's', 'z' -> 's'
                 'g', 'j' -> 'j'
@@ -580,12 +581,40 @@ object MedicalNormalizer {
         val tokens = text.split(Regex("\\s+"))
         val out = ArrayList<String>(tokens.size)
         var ti = 0
+        var prevCleanLow = ""
         while (ti < tokens.size) {
             val w1 = tokens[ti]
             val clean1 = w1.trimEnd('.', ',', ';', ':', '?', '!')
             val punct1 = w1.substring(clean1.length)
             val low1 = clean1.lowercase()
             val dehyphen1 = if ('-' in low1) low1.replace("-", "") else ""
+            val inRxContext = prevCleanLow in RX_CONTEXT_TRIGGERS
+
+            // 3-word split-drug joiner (exact skeleton match for >= 10 char splits like "empa gli flozin")
+            if (ti + 2 < tokens.size && punct1.isEmpty() && clean1.length >= 2 && clean1.all { it.isLetter() } && low1 !in PROTECTED_WORDS) {
+                val w2 = tokens[ti + 1]
+                val clean2 = w2.trimEnd('.', ',', ';', ':', '?', '!')
+                val punct2 = w2.substring(clean2.length)
+                val low2 = clean2.lowercase()
+                val w3 = tokens[ti + 2]
+                val clean3 = w3.trimEnd('.', ',', ';', ':', '?', '!')
+                val punct3 = w3.substring(clean3.length)
+                val low3 = clean3.lowercase()
+                if (punct2.isEmpty() && clean2.length >= 2 && clean2.all { it.isLetter() } && low2 !in PROTECTED_WORDS &&
+                    clean3.length >= 2 && clean3.all { it.isLetter() } && low3 !in PROTECTED_WORDS) {
+                    val joined3 = low1 + low2 + low3
+                    if (joined3.length >= 10) {
+                        val sk3 = englishSkeleton(joined3)
+                        val hit3 = singleWordMap[joined3] ?: (if (sk3.length >= 5) coreSkeletonMap[sk3] else null)
+                        if (hit3 != null) {
+                            out.add(preserveClinicalCase(hit3, clean1) + punct3)
+                            prevCleanLow = hit3.lowercase()
+                            ti += 3
+                            continue
+                        }
+                    }
+                }
+            }
 
             // 2-word skeleton sliding window (exact + distance-1 fuzzy for >= 9 char splits like "by basilar")
             if (ti + 1 < tokens.size && punct1.isEmpty() && clean1.length >= 2 && clean1.all { it.isLetter() } && low1 !in PROTECTED_WORDS) {
@@ -602,6 +631,7 @@ object MedicalNormalizer {
                             ?: (if (joined.length >= 9 && sk2.length >= 6) fuzzyCoreSkeleton(sk2, 1, joined) else null)
                         if (hit2 != null) {
                             out.add(preserveClinicalCase(hit2, clean1) + punct2)
+                            prevCleanLow = hit2.lowercase()
                             ti += 2
                             continue
                         }
@@ -611,14 +641,17 @@ object MedicalNormalizer {
 
             if (clean1.any { it.isDigit() } || low1 in PROTECTED_WORDS) {
                 out.add(w1)
+                prevCleanLow = low1
             } else {
                 val exact = singleWordMap[low1] ?: (if (dehyphen1.length >= 8) singleWordMap[dehyphen1] else null)
                 if (exact != null) {
                     out.add(preserveClinicalCase(exact, clean1) + punct1)
+                    prevCleanLow = exact.lowercase()
                 } else {
-                    val rescued = rescueDrugToken(low1)
+                    val rescued = rescueDrugToken(low1, inRxContext)
                     val finalTok = if (rescued != null) preserveClinicalCase(rescued, clean1) else clean1
                     out.add(finalTok + punct1)
+                    prevCleanLow = finalTok.lowercase()
                 }
             }
             ti++
@@ -680,13 +713,23 @@ object MedicalNormalizer {
         return t.trim()
     }
 
+    private val RX_CONTEXT_TRIGGERS = setOf(
+        "tab", "tablet", "cap", "capsule", "inj", "injection", "syp", "syrup",
+        "drop", "drops", "oint", "ointment", "cream", "gel", "spray", "inhaler",
+        "started", "start", "given", "give", "prescribed", "prescribe",
+        "advise", "advised", "continue", "continued", "stop", "stopped",
+        "add", "added", "dose", "iv", "im", "sc", "po"
+    )
+
     private val DRUG_SUFFIXES = listOf(
         "xone", "bactam", "gliptin", "gliflozin", "dipine", "coxib",
-        "prazole", "prazol", "sartan", "statin", "mycin", "cillin",
-        "zolam", "pril", "olol", "fibrate", "glitazone",
+        "prazole", "prazol", "prazan", "glutide", "sartan", "statin", "mycin", "cillin",
+        "zolam", "pril", "olol", "fibrate", "glitazone", "glinide",
         "azine", "agin", "majol", "trizin", "triptan", "setron",
         "cetron", "cycline", "conazole", "floxacin", "caine",
-        "sone", "solone", "lukast", "tidine", "dopa", "ase"
+        "sone", "solone", "lukast", "tidine", "dopa", "ase",
+        "mab", "nib", "vir", "navir", "previr", "buvir", "trelvir",
+        "parib", "ciclib", "zomib", "tinib", "zolamide", "prost", "relin"
     )
 
     private val CLINICAL_SUFFIXES = listOf(
@@ -709,13 +752,23 @@ object MedicalNormalizer {
         return canonical
     }
 
-    private fun rescueDrugToken(low: String): String? {
-        if (low.length < 7 || low in PROTECTED_WORDS) return null
+    private fun hasDrugSuffix(low: String): Boolean =
+        DRUG_SUFFIXES.any { low.endsWith(it) }
+
+    private fun rescueDrugToken(low: String, rxBoost: Boolean = false): String? {
+        val minLen = if (rxBoost) 5 else 7
+        if (low.length < minLen || low in PROTECTED_WORDS) return null
         val sk = englishSkeleton(low)
         if (sk.length < 4) return null
         coreSkeletonMap[sk]?.let { return it }
+        // In Rx context, also try Indian z/j swap on exact skeleton
+        if (rxBoost && ('j' in low || 'z' in low)) {
+            val swapped = low.replace('j', 'z')
+            coreSkeletonMap[englishSkeleton(swapped)]?.let { return it }
+        }
         if (sk.length >= 5) {
-            return fuzzyCoreSkeleton(sk, 1, low)
+            val maxDist = if (rxBoost && sk.length >= 7 && hasDrugSuffix(low)) 2 else 1
+            return fuzzyCoreSkeleton(sk, maxDist, low)
         }
         return null
     }

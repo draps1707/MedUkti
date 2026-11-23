@@ -11,8 +11,8 @@ android {
         applicationId = "com.medukti.keyboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 45
-        versionName = "6.3.0"
+        versionCode = 46
+        versionName = "6.4.0"
     }
 
     signingConfigs {
