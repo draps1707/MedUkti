@@ -457,6 +457,120 @@ object CloudAsrClient {
         )
     }
 
+    @Volatile
+    private var cachedBhashiniCallbackUrl: String? = null
+    @Volatile
+    private var cachedBhashiniAuthHeader: String? = null
+    @Volatile
+    private var cachedBhashiniAuthValue: String? = null
+    @Volatile
+    private var cachedBhashiniServiceId: String? = null
+
+    private fun ensureBhashiniOdiaConfig(userId: String, apiKey: String) {
+        if (!cachedBhashiniCallbackUrl.isNullOrBlank() &&
+            !cachedBhashiniAuthValue.isNullOrBlank() &&
+            !cachedBhashiniServiceId.isNullOrBlank()
+        ) return
+
+        val url = URL("https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline")
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15000
+            readTimeout = 20000
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("userID", userId)
+            setRequestProperty("ulcaApiKey", apiKey)
+        }
+        val reqJson = JSONObject().apply {
+            put("pipelineTasks", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("taskType", "asr")
+                    put("config", JSONObject().apply {
+                        put("language", JSONObject().put("sourceLanguage", "or"))
+                    })
+                })
+            })
+            put("pipelineRequestConfig", JSONObject().put("pipelineId", "64392f96daac500b55c543cd"))
+        }
+        conn.outputStream.use { it.write(reqJson.toString().toByteArray(Charsets.UTF_8)) }
+        val code = conn.responseCode
+        val body = readHttpBody(conn, code)
+        if (code !in 200..299) {
+            throw IllegalStateException("BHASHINI config failed ($code)")
+        }
+        val root = JSONObject(body)
+        val ep = root.getJSONObject("pipelineInferenceAPIEndPoint")
+        val callbackUrl = ep.getString("callbackUrl")
+        val authKeyObj = ep.getJSONObject("inferenceApiKey")
+        val authName = authKeyObj.getString("name")
+        val authVal = authKeyObj.getString("value")
+        val serviceId = root.getJSONArray("pipelineResponseConfig")
+            .getJSONObject(0)
+            .getJSONArray("config")
+            .getJSONObject(0)
+            .getString("serviceId")
+
+        cachedBhashiniCallbackUrl = callbackUrl
+        cachedBhashiniAuthHeader = authName
+        cachedBhashiniAuthValue = authVal
+        cachedBhashiniServiceId = serviceId
+    }
+
+    private fun callBhashiniOdia(ctx: Context, wavBytes: ByteArray): String {
+        val userId = Prefs.getBhashiniUserId(ctx)
+        val apiKey = Prefs.getBhashiniApiKey(ctx)
+        if (userId.isBlank() || apiKey.isBlank()) {
+            throw IllegalStateException("Add your free BHASHINI User ID & API Key in MedUkti Settings")
+        }
+        ensureBhashiniOdiaConfig(userId, apiKey)
+        val callbackUrl = cachedBhashiniCallbackUrl ?: throw IllegalStateException("BHASHINI endpoint unavailable")
+        val authName = cachedBhashiniAuthHeader ?: "Authorization"
+        val authVal = cachedBhashiniAuthValue ?: ""
+        val serviceId = cachedBhashiniServiceId ?: ""
+
+        val b64Audio = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
+        val payload = JSONObject().apply {
+            put("pipelineTasks", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("taskType", "asr")
+                    put("config", JSONObject().apply {
+                        put("language", JSONObject().put("sourceLanguage", "or"))
+                        put("serviceId", serviceId)
+                        put("audioFormat", "wav")
+                        put("samplingRate", 16000)
+                    })
+                })
+            })
+            put("inputData", JSONObject().apply {
+                put("audio", JSONArray().apply {
+                    put(JSONObject().put("audioContent", b64Audio))
+                })
+            })
+        }
+
+        val conn = (URL(callbackUrl).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15000
+            readTimeout = 25000
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            if (authVal.isNotBlank()) setRequestProperty(authName, authVal)
+        }
+        conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+        val code = conn.responseCode
+        val body = readHttpBody(conn, code)
+        if (code !in 200..299) {
+            cachedBhashiniCallbackUrl = null
+            throw IllegalStateException("BHASHINI ASR error ($code)")
+        }
+        val resp = JSONObject(body)
+        val outputArr = resp.optJSONArray("pipelineResponse")
+            ?.optJSONObject(0)
+            ?.optJSONArray("output")
+        return outputArr?.optJSONObject(0)?.optString("source")?.trim() ?: ""
+    }
+
     fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
             val minRms = if (!Prefs.isIndicScriptEngine(engine)) 0.006f else 0.002f
@@ -465,9 +579,15 @@ object CloudAsrClient {
             val raw = when (engine) {
                 AsrEngineType.GROQ_MED, AsrEngineType.GROQ_HINGLISH ->
                     callGroqWhisper(ctx, wav, "whisper-large-v3-turbo", isLivePreview = true)
-                AsrEngineType.GEMINI_ODIA, AsrEngineType.GEMINI_HINDI -> {
+                AsrEngineType.GEMINI_ODIA -> {
+                    if (Prefs.getOdiaBackend(ctx) == OdiaBackend.GEMINI) {
+                        val key = Prefs.getGeminiKey(ctx)
+                        if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHindi = false)
+                    } else ""
+                }
+                AsrEngineType.GEMINI_HINDI -> {
                     val key = Prefs.getGeminiKey(ctx)
-                    if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHindi = (engine == AsrEngineType.GEMINI_HINDI))
+                    if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHindi = true)
                 }
             }
             Result.success(postProcessTranscript(ctx, raw, engine))
@@ -489,7 +609,10 @@ object CloudAsrClient {
                         stt
                     }
                 }
-                AsrEngineType.GEMINI_ODIA -> callGeminiIndic(ctx, wav, isHindi = false)
+                AsrEngineType.GEMINI_ODIA -> when (Prefs.getOdiaBackend(ctx)) {
+                    OdiaBackend.BHASHINI -> callBhashiniOdia(ctx, wav)
+                    OdiaBackend.GEMINI, OdiaBackend.ANDROID_NATIVE -> callGeminiIndic(ctx, wav, isHindi = false)
+                }
                 AsrEngineType.GEMINI_HINDI -> callGeminiIndic(ctx, wav, isHindi = true)
             }
             Result.success(postProcessTranscript(ctx, raw, engine))

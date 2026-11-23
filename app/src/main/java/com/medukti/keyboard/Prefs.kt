@@ -9,6 +9,12 @@ enum class AsrEngineType(val label: String, val badge: String) {
     GEMINI_HINDI("HI — Hindi + Medical (Gemini Flash)", "HI"),
 }
 
+enum class OdiaBackend(val label: String) {
+    ANDROID_NATIVE("Android Live (or-IN — Google Online, 0 keys)"),
+    BHASHINI("BHASHINI (AI4Bharat Odia Conformer — Free Govt API)"),
+    GEMINI("Gemini Flash (Current Google Gemini)")
+}
+
 enum class FocusPack(val label: String, val terms: String) {
     GENERAL(
         "General / Casualty & ICU",
@@ -41,6 +47,9 @@ object Prefs {
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
     private const val KEY_LIVE_STREAM = "live_streaming_preview"
     private const val KEY_PERSONAL_DICT = "personal_dictionary"
+    private const val KEY_ODIA_BACKEND = "odia_backend"
+    private const val KEY_BHASHINI_USER_ID = "bhashini_user_id"
+    private const val KEY_BHASHINI_API_KEY = "bhashini_api_key"
 
     fun getEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -159,6 +168,37 @@ object Prefs {
     fun setPersonalDict(ctx: Context, value: String) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString(KEY_PERSONAL_DICT, value)
+            .apply()
+    }
+
+    fun getOdiaBackend(ctx: Context): OdiaBackend {
+        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .getString(KEY_ODIA_BACKEND, OdiaBackend.ANDROID_NATIVE.name)
+        return OdiaBackend.entries.firstOrNull { it.name == raw }
+            ?: OdiaBackend.ANDROID_NATIVE
+    }
+
+    fun setOdiaBackend(ctx: Context, backend: OdiaBackend) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_ODIA_BACKEND, backend.name)
+            .apply()
+    }
+
+    fun getBhashiniUserId(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_BHASHINI_USER_ID, "") ?: ""
+
+    fun setBhashiniUserId(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_BHASHINI_USER_ID, value.trim())
+            .apply()
+    }
+
+    fun getBhashiniApiKey(ctx: Context): String =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_BHASHINI_API_KEY, "") ?: ""
+
+    fun setBhashiniApiKey(ctx: Context, value: String) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_BHASHINI_API_KEY, value.trim())
             .apply()
     }
 }

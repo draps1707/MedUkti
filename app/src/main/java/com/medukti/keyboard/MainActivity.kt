@@ -78,6 +78,9 @@ class MainActivity : AppCompatActivity() {
         val spinnerGroqAsr = findViewById<Spinner>(R.id.spinnerGroqAsr)
         val spinnerGroqLlm = findViewById<Spinner>(R.id.spinnerGroqLlm)
         val spinnerGeminiModel = findViewById<Spinner>(R.id.spinnerGeminiModel)
+        val spinnerOdiaBackend = findViewById<Spinner>(R.id.spinnerOdiaBackend)
+        val etBhashiniUserId = findViewById<EditText>(R.id.etBhashiniUserId)
+        val etBhashiniApiKey = findViewById<EditText>(R.id.etBhashiniApiKey)
 
         val switchAutoListen = findViewById<Switch>(R.id.switchAutoListen)
         val switchLiveStream = findViewById<Switch>(R.id.switchLiveStream)
@@ -113,6 +116,10 @@ class MainActivity : AppCompatActivity() {
         val curLlm = if (!Prefs.isAiPolishEnabled(this)) "off" else Prefs.getGroqLlmModel(this)
         bindModelSpinner(spinnerGroqLlm, etGroqLlmModel, groqLlmOptions, curLlm)
         bindModelSpinner(spinnerGeminiModel, etGeminiModel, geminiOptions, Prefs.getGeminiModel(this))
+        spinnerOdiaBackend.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, OdiaBackend.entries.map { it.label })
+        spinnerOdiaBackend.setSelection(OdiaBackend.entries.indexOf(Prefs.getOdiaBackend(this)).coerceAtLeast(0))
+        etBhashiniUserId.setText(Prefs.getBhashiniUserId(this))
+        etBhashiniApiKey.setText(Prefs.getBhashiniApiKey(this))
 
         switchAutoListen.isChecked = Prefs.isAutoListen(this)
         switchLiveStream.isChecked = Prefs.isLiveStreamingEnabled(this)
@@ -180,6 +187,9 @@ class MainActivity : AppCompatActivity() {
                 Prefs.setGroqLlmModel(this, llmChoice)
             }
             Prefs.setGeminiModel(this, resolveModelValue(spinnerGeminiModel, etGeminiModel, geminiOptions))
+            Prefs.setOdiaBackend(this, OdiaBackend.entries[spinnerOdiaBackend.selectedItemPosition])
+            Prefs.setBhashiniUserId(this, etBhashiniUserId.text.toString())
+            Prefs.setBhashiniApiKey(this, etBhashiniApiKey.text.toString())
 
             Prefs.setGroqKey(this, etGroqKey.text.toString())
             Prefs.setGeminiKey(this, etGeminiKey.text.toString())
