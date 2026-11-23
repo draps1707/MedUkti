@@ -24,7 +24,7 @@ object Prefs {
     private const val KEY_ODIA_BACKEND = "odia_backend"
     private const val KEY_AI_POLISH = "ai_polish_enabled"
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
-    private const val KEY_LIVE_STREAM = "live_streaming_preview"
+    private const val KEY_LIVE_STREAM = "live_streaming_preview_v2"
     private const val KEY_PERSONAL_DICT = "personal_dictionary"
 
     fun getEngine(ctx: Context): AsrEngineType {

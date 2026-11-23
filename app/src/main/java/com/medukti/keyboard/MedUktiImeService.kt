@@ -308,13 +308,10 @@ class MedUktiImeService : InputMethodService() {
         lastLiveDraftText = ""
         mainHandler.post {
             val ic = currentInputConnection ?: return@post
+            ic.finishComposingText()
             if (draft.isNotEmpty()) {
-                ic.finishComposingText()
                 lastCommittedLen = draft.length
                 lastCommittedPhrase = draft
-            } else {
-                ic.setComposingText("", 1)
-                ic.finishComposingText()
             }
         }
     }
@@ -490,7 +487,7 @@ class MedUktiImeService : InputMethodService() {
                     }
                     val curEngine = activeResolvedEngine.get()
                     val isOdiaNow = Prefs.isIndicScriptEngine(curEngine)
-                    val speechRmsThreshold = if (isOdiaNow) 0.0045f else 0.006f
+                    val speechRmsThreshold = if (isOdiaNow) 0.005f else 0.0085f
                     val hangoverFrames = 20 // ~640ms natural pause tolerance
 
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)

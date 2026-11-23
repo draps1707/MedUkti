@@ -215,7 +215,6 @@ object CloudAsrClient {
             out.write("\r\n".toByteArray())
 
             writeField("model", model)
-            writeField("language", "en")
             writeField("response_format", "json")
             writeField("temperature", "0")
             writeField("prompt", buildWhisperPrompt(ctx))
@@ -245,8 +244,8 @@ object CloudAsrClient {
             append("z<->j (carbimajol->Carbimazole, omeprajol->Omeprazole), ph/p<->f (epixabin->Apixaban, phosphormycin->Fosfomycin), ")
             append("dropped -r endings (acyclovia->Acyclovir, tenofova->Tenofovir), and 2-word splits (by basilar->bibasilar, Sacubitril ablastin->Sacubitril/valsartan). ")
             append("Use sentence context so normal English words (monitor, according, patients) are never wrongly replaced. ")
-            append("The speaker is an Indian doctor dictating naturally in English, Hinglish (Hindi + English in Roman script), or mixed clinical notes (e.g. 'Inj. Ceftriaxone 1 gm BD for Pneumonia' or 'Yeh patient ka hum agar Ceftriaxone ke saath Azithromycin de denge toh uska mortality ratio kam ho jayega'). ")
-            append("Preserve natural Hinglish phrasing in Roman letters when spoken—never translate Hinglish into formal English and never output Devanagari, French, or Spanish. ")
+            append("The speaker is an Indian doctor dictating naturally in English, Hinglish (Hindi + English), or mixed clinical notes (e.g. 'Inj. Ceftriaxone 1 gm BD for Pneumonia' or 'Yeh patient ka hum agar Ceftriaxone ke saath Azithromycin de denge toh uska mortality ratio kam ho jayega'). ")
+            append("If the raw transcript contains Hindi in Devanagari script, transliterate ONLY those Hindi words into natural Romanized Hinglish—NEVER translate Hindi/Hinglish into English, and keep medical/drug terms in English. Never output Devanagari, French, or Spanish. ")
             if (candidates.isNotEmpty()) {
                 append("Candidate Indian formulary/clinical terms that may match this audio: ${candidates.joinToString(", ")}. ")
             }
@@ -391,7 +390,8 @@ object CloudAsrClient {
         Regex("""(?i)\bthank(?:s|\s+you)\s+for\s+watching!?\b"""),
         Regex("""(?i)\band\s+many\s+more\.?\b"""),
         Regex("""(?i)\bsubtitles\s+by\b[^.]*\.?"""),
-        Regex("""(?i)\bamara\.org\b""")
+        Regex("""(?i)\bamara\.org\b"""),
+        Regex("""(?i)\btape[-\s]*system\b""")
     )
 
     fun postProcessTranscript(ctx: Context, raw: String, engine: AsrEngineType): String {
@@ -530,7 +530,7 @@ object CloudAsrClient {
 
     fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            val minRms = 0.002f
+            val minRms = if (Prefs.isIndicScriptEngine(engine)) 0.002f else 0.004f
             if (samples.size < 4800 || computeRms(samples) < minRms) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
