@@ -199,6 +199,7 @@ object CloudAsrClient {
             out.write("\r\n".toByteArray())
 
             writeField("model", model)
+            writeField("language", "en")
             writeField("response_format", "json")
             writeField("temperature", "0")
             writeField("prompt", buildWhisperPrompt(ctx))
@@ -228,7 +229,7 @@ object CloudAsrClient {
             append("z<->j (carbimajol->Carbimazole, omeprajol->Omeprazole), ph/p<->f (epixabin->Apixaban, phosphormycin->Fosfomycin), ")
             append("dropped -r endings (acyclovia->Acyclovir, tenofova->Tenofovir), and 2-word splits (by basilar->bibasilar, Sacubitril ablastin->Sacubitril/valsartan). ")
             append("Use sentence context so normal English words (monitor, according, patients) are never wrongly replaced. ")
-            append("Preserve natural Romanized Hinglish words if spoken. ")
+            append("Output strictly in English and natural Romanized Hinglish (never Devanagari, French, Spanish, or other foreign languages). ")
             if (candidates.isNotEmpty()) {
                 append("Candidate Indian formulary/clinical terms that may match this audio: ${candidates.joinToString(", ")}. ")
             }
@@ -382,6 +383,8 @@ object CloudAsrClient {
         text = MedicalNormalizer.normalize(ctx, text, engine)
 
         if (!Prefs.isOdiaEngine(engine)) {
+            text = text.replace(Regex("[\u0900-\u0DFF]+"), " ").replace(Regex("[ \t]{2,}"), " ").trim()
+            if (text.isEmpty()) return ""
             text = capitalizeSentences(text)
         }
 
@@ -409,7 +412,7 @@ object CloudAsrClient {
 
     fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            if (samples.size < 4800 || computeRms(samples) < 0.002f) return Result.success("")
+            if (samples.size < 4800 || computeRms(samples) < 0.008f) return Result.success("")
             if (engine == AsrEngineType.GEMINI_ODIA) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = callGroqWhisper(ctx, wav, "whisper-large-v3-turbo", isLivePreview = true)
@@ -421,7 +424,7 @@ object CloudAsrClient {
 
     fun transcribeFinal(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            if (samples.size < 3200 || computeRms(samples) < 0.002f) return Result.success("")
+            if (samples.size < 3200 || computeRms(samples) < 0.008f) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
                 AsrEngineType.GROQ_MED -> {

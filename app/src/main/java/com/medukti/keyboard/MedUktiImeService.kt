@@ -583,8 +583,8 @@ class MedUktiImeService : InputMethodService() {
                 var lastPreviewSamples = 0
                 var previewJob: Job? = null
 
-                val speechRmsThreshold = 0.012f
-                val hangoverFrames = if (Prefs.isOdiaEngine(activeResolvedEngine.get())) 28 else 22 // ~700–900ms
+                val speechRmsThreshold = 0.018f
+                val hangoverFrames = if (Prefs.isOdiaEngine(activeResolvedEngine.get())) 28 else 14 // ~450–900ms
                 val maxSegSamples = sampleRate * 18
 
                 while (isListening.get()) {
