@@ -7,6 +7,7 @@ import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.DataOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -75,8 +76,20 @@ object CloudAsrClient {
         return out
     }
 
+    private fun trimSilenceEdges(raw: FloatArray): FloatArray {
+        if (raw.size < 3200) return raw
+        val thr = 0.004f
+        var start = 0
+        while (start < raw.size && kotlin.math.abs(raw[start]) < thr) start++
+        var end = raw.size - 1
+        while (end > start && kotlin.math.abs(raw[end]) < thr) end--
+        if (end <= start) return raw
+        val pad = 1600
+        return raw.copyOfRange((start - pad).coerceAtLeast(0), (end + pad).coerceAtMost(raw.size - 1) + 1)
+    }
+
     private fun encodeWav16kMono(samples: FloatArray): ByteArray {
-        val boosted = normalizeGain(samples)
+        val boosted = normalizeGain(trimSilenceEdges(samples))
         val leadPad = 1600
         val tailPad = 1600
         val totalSamples = leadPad + boosted.size + tailPad
@@ -543,6 +556,15 @@ object CloudAsrClient {
         return callGeminiIndic(ctx, wavBytes, isHinglish = false)
     }
 
+    private inline fun <T> runWithOneNetworkRetry(block: () -> T): T {
+        return try {
+            block()
+        } catch (e: IOException) {
+            try { Thread.sleep(700L) } catch (_: InterruptedException) {}
+            block()
+        }
+    }
+
     fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
             val minRms = if (Prefs.isIndicScriptEngine(engine)) 0.002f else 0.004f
@@ -572,7 +594,8 @@ object CloudAsrClient {
         return try {
             if (samples.size < 3200 || computeRms(samples) < 0.002f) return Result.success("")
             val wav = encodeWav16kMono(samples)
-            val raw = when (engine) {
+            val raw = runWithOneNetworkRetry {
+                when (engine) {
                 AsrEngineType.MEDICAL -> {
                     val stt = callGroqWhisper(ctx, wav, Prefs.getGroqAsrModel(ctx), isLivePreview = false)
                     if (stt.isNotBlank() && Prefs.isAiPolishEnabled(ctx)) {
@@ -583,6 +606,7 @@ object CloudAsrClient {
                 }
                 AsrEngineType.HINGLISH -> callGeminiIndic(ctx, wav, isHinglish = true)
                 AsrEngineType.ODIA -> transcribeOdiaBest(ctx, wav)
+                }
             }
             Result.success(postProcessTranscript(ctx, raw, engine))
         } catch (e: Exception) {

@@ -11,6 +11,8 @@ import android.inputmethodservice.InputMethodService
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -507,6 +509,8 @@ class MedUktiImeService : InputMethodService() {
             ).coerceAtLeast(frameSamples * 4)
 
             var recorder: AudioRecord? = null
+            var agc: AutomaticGainControl? = null
+            var ns: NoiseSuppressor? = null
             try {
                 recorder = AudioRecord(
                     MediaRecorder.AudioSource.VOICE_RECOGNITION,
@@ -517,6 +521,16 @@ class MedUktiImeService : InputMethodService() {
                 )
                 if (recorder.state != AudioRecord.STATE_INITIALIZED) {
                     throw IllegalStateException("Mic unavailable")
+                }
+                val sid = recorder.audioSessionId
+                try {
+                    if (AutomaticGainControl.isAvailable()) {
+                        agc = AutomaticGainControl.create(sid)?.apply { enabled = true }
+                    }
+                    if (NoiseSuppressor.isAvailable()) {
+                        ns = NoiseSuppressor.create(sid)?.apply { enabled = true }
+                    }
+                } catch (_: Exception) {
                 }
                 recorder.startRecording()
 
@@ -532,17 +546,28 @@ class MedUktiImeService : InputMethodService() {
                 var previewJob: Job? = null
                 val maxSegSamples = sampleRate * 18
 
+                var hpPrevX = 0f
+                var hpPrevY = 0f
+                val hpAlpha = 0.968f // ~80 Hz high-pass rumble cut at 16 kHz
+
                 while (isListening.get()) {
                     val read = recorder.read(shortBuf, 0, frameSamples)
                     if (read <= 0) {
                         delay(10)
                         continue
                     }
+                    var zeroCrossings = 0
                     for (i in 0 until read) {
-                        floatBuf[i] = shortBuf[i] / 32768.0f
+                        val x = shortBuf[i] / 32768.0f
+                        val y = hpAlpha * (hpPrevY + x - hpPrevX)
+                        hpPrevX = x
+                        hpPrevY = y
+                        floatBuf[i] = y
+                        if (i > 0 && ((floatBuf[i] >= 0f && floatBuf[i - 1] < 0f) || (floatBuf[i] < 0f && floatBuf[i - 1] >= 0f))) {
+                            zeroCrossings++
+                        }
                     }
                     val curEngine = activeResolvedEngine.get()
-                    val isOdiaNow = Prefs.isIndicScriptEngine(curEngine)
                     val speechRmsThreshold = when (curEngine) {
                         AsrEngineType.ODIA -> 0.005f
                         AsrEngineType.HINGLISH -> 0.007f
@@ -551,7 +576,8 @@ class MedUktiImeService : InputMethodService() {
                     val hangoverFrames = 20 // ~640ms natural pause tolerance
 
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
-                    val isSpeechFrame = rms >= speechRmsThreshold
+                    val zcr = zeroCrossings.toFloat() / read
+                    val isSpeechFrame = rms >= speechRmsThreshold && zcr >= 0.015f
 
                     if (!inSpeech) {
                         val copy = FloatArray(read)
@@ -624,6 +650,8 @@ class MedUktiImeService : InputMethodService() {
                 }
             } finally {
                 segmentChannel.close()
+                try { agc?.release() } catch (_: Exception) {}
+                try { ns?.release() } catch (_: Exception) {}
                 try { recorder?.stop() } catch (_: Exception) {}
                 try { recorder?.release() } catch (_: Exception) {}
                 mainHandler.post {
