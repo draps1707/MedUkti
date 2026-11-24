@@ -495,8 +495,11 @@ class MedUktiImeService : InputMethodService() {
             Toast.makeText(this, "Add your free Groq API key in MedUkti Settings", Toast.LENGTH_LONG).show()
             return
         }
-        if (selected == AsrEngineType.HINGLISH && Prefs.getGeminiKey(this).isBlank()) {
-            Toast.makeText(this, "Add your free Gemini API key in MedUkti Settings", Toast.LENGTH_LONG).show()
+        if (selected == AsrEngineType.HINGLISH &&
+            Prefs.getGroqKey(this).isBlank() &&
+            Prefs.getGeminiKey(this).isBlank()
+        ) {
+            Toast.makeText(this, "Add your Groq or Gemini API key in MedUkti Settings", Toast.LENGTH_LONG).show()
             return
         }
         if (selected == AsrEngineType.ODIA &&

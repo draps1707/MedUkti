@@ -7,7 +7,7 @@ import org.json.JSONObject
 enum class AsrEngineType(val label: String, val badge: String) {
     ODIA("ଓ — Odia Conversational (ElevenLabs Scribe v2)", "ଓ"),
     MEDICAL("🩺 — English + Medical (Groq Whisper + GPT-OSS 120B)", "🩺"),
-    HINGLISH("हin — Hinglish + Medical (Gemini 3.8 Flash)", "हin"),
+    HINGLISH("हin — Hinglish + Medical (Groq Fast + Gemini Backup)", "हin"),
 }
 
 enum class OdiaBackend(val label: String) {
@@ -173,12 +173,12 @@ object Prefs {
 
     fun getGeminiModel(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_GEMINI_MODEL, "gemini-3.8-flash")
-            ?.ifBlank { "gemini-3.8-flash" } ?: "gemini-3.8-flash"
+            .getString(KEY_GEMINI_MODEL, "gemini-3.5-flash-lite")
+            ?.ifBlank { "gemini-3.5-flash-lite" } ?: "gemini-3.5-flash-lite"
 
     fun setGeminiModel(ctx: Context, value: String) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_GEMINI_MODEL, value.trim().ifBlank { "gemini-3.8-flash" })
+            .putString(KEY_GEMINI_MODEL, value.trim().ifBlank { "gemini-3.5-flash-lite" })
             .apply()
     }
 

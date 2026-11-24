@@ -264,19 +264,28 @@ object CloudAsrClient {
         val candidates = MedicalNormalizer.findCandidateHints(ctx, rawText)
         val sysPrompt = buildString {
             append("You are an ultra-fast medical & Hinglish transcription polisher for an Indian doctor. ")
-            append("Fix punctuation (split run-on clauses into clean sentences with periods and commas), capitalization, and self-corrections—keep spoken 'um' and 'uh' fillers as-is. ")
+            append("Fix punctuation, capitalization, and self-corrections while keeping spoken 'um' and 'uh' fillers as-is. ")
+            append("Do NOT force a trailing period at the end of an incomplete clause (like 'planning to give him' or 'started on'), and use commas between drug/item lists instead of periods. ")
+            append("Fix Indian-English clinical history slips (such as 'apparently already' -> 'apparently alright'). ")
             append("Watch for Indian-English ASR phonetic shifts: bh<->v (oseltamibhir->Oseltamivir, Bupibhaken->Bupivacaine), ")
             append("z<->j (carbimajol->Carbimazole, omeprajol->Omeprazole), ph/p<->f (epixabin->Apixaban, phosphormycin->Fosfomycin), ")
             append("dropped -r endings (acyclovia->Acyclovir, tenofova->Tenofovir), and 2-word splits (by basilar->bibasilar, Sacubitril ablastin->Sacubitril/valsartan). ")
             append("Use sentence context so normal English words (monitor, according, patients) are never wrongly replaced. ")
-            append("The speaker is an Indian doctor dictating clinical notes in Indian-accented English with medical and drug terms. If the input is noise or unclear, return it unchanged—never ask for text or reply conversationally. ")
-            append("Output clean clinical English and accurate drug/medical terms only—never output Devanagari, Korean, Japanese, or other foreign scripts. ")
-            if (candidates.isNotEmpty()) {
-                append("Candidate Indian formulary/clinical terms that may match this audio: ${candidates.joinToString(", ")}. ")
+            if (isHinglish) {
+                append("The speaker is speaking natural Hinglish (mixed Hindi and English) with medical terms. Convert any Devanagari/Hindi script into natural Romanized Hinglish and keep English/medical terms in crisp English. ")
+            } else {
+                append("The speaker is an Indian doctor dictating clinical notes in Indian-accented English with medical and drug terms. ")
             }
+            append("If the input is noise or unclear, return it unchanged—never ask for text or reply conversationally. ")
+            append("Never output Devanagari, Korean, Japanese, or other foreign scripts. ")
             val ctxTail = cursorContext.replace("\n", " ").replace("\"", "'").trim().takeLast(140)
             if (ctxTail.isNotEmpty()) {
-                append("Preceding text already typed before cursor (use ONLY for continuity, spelling, and capitalization; NEVER repeat or include it in your output): \"$ctxTail\". ")
+                val midClause = !ctxTail.endsWith(".") && !ctxTail.endsWith("?") && !ctxTail.endsWith("!") && !ctxTail.endsWith("।")
+                if (midClause) {
+                    append("Preceding text before cursor ended mid-sentence (\"$ctxTail\"); continue naturally with lowercase/commas unless a proper noun or drug name, and NEVER repeat the preceding text. ")
+                } else {
+                    append("Preceding text already typed before cursor (use ONLY for continuity and spelling; NEVER repeat it): \"$ctxTail\". ")
+                }
             }
             if (personal.isNotEmpty()) {
                 append("Always apply these exact user overrides: ${personal.replace("\n", "; ")}. ")
@@ -502,6 +511,7 @@ object CloudAsrClient {
             text = text.replace(Regex("\\b${Regex.escape(phrase)}\\b", RegexOption.IGNORE_CASE), emoji)
         }
 
+        text = text.replace(Regex("(?i)\\bapparently\\s+already\\b"), "apparently alright")
         text = MedicalNormalizer.normalize(ctx, text, engine)
 
         if (!Prefs.isIndicScriptEngine(engine)) {
@@ -524,12 +534,17 @@ object CloudAsrClient {
             }
         }
 
-        return Normalizer.normalize(
-            text.replace(Regex("\\s+([.,?!।])"), "$1")
-                .replace(Regex("[ \\t]{2,}"), " ")
-                .let { if (it.all { ch -> ch == '\n' }) it else it.trim() },
-            Normalizer.Form.NFC
-        )
+        var out = text.replace(Regex("\\s+([.,?!।])"), "$1")
+            .replace(Regex("[ \\t]{2,}"), " ")
+            .let { if (it.all { ch -> ch == '\n' }) it else it.trim() }
+        if (Prefs.isIndicScriptEngine(engine) && out.isNotEmpty() && out.last() !in listOf('।', '.', '?', '!')) {
+            val tailWords = out.split(Regex("\\s+")).takeLast(3).joinToString(" ")
+            val odiaQ = listOf("କ'ଣ", "କଣ", "କି", "କାହିଁକି", "କେମିତି", "କେବେ", "କେଉଁ", "କଉଠି", "କିପରି")
+            if (odiaQ.any { q -> tailWords.contains(q) }) {
+                out += "?"
+            }
+        }
+        return Normalizer.normalize(out, Normalizer.Form.NFC)
     }
 
     private fun callElevenLabsOdia(ctx: Context, wavBytes: ByteArray): String {
@@ -571,6 +586,29 @@ object CloudAsrClient {
             throw IllegalStateException("ElevenLabs STT error ($code): ${body.take(160)}")
         }
         return JSONObject(body).optString("text", "").trim()
+    }
+
+    private fun transcribeHinglishBest(ctx: Context, wavBytes: ByteArray, cursorContext: String = ""): String {
+        val groqKey = Prefs.getGroqKey(ctx)
+        if (groqKey.isNotBlank()) {
+            return try {
+                val stt = callGroqWhisper(ctx, wavBytes, Prefs.getGroqAsrModel(ctx), isLivePreview = false, cursorContext = cursorContext, language = null)
+                if (stt.isNotBlank()) {
+                    if (Prefs.isAiPolishEnabled(ctx)) {
+                        callGroqPolish(ctx, stt, cursorContext, isHinglish = true)
+                    } else {
+                        stt
+                    }
+                } else ""
+            } catch (e: Exception) {
+                if (Prefs.getGeminiKey(ctx).isNotBlank()) {
+                    callGeminiIndic(ctx, wavBytes, isHinglish = true, cursorContext = cursorContext)
+                } else {
+                    throw e
+                }
+            }
+        }
+        return callGeminiIndic(ctx, wavBytes, isHinglish = true, cursorContext = cursorContext)
     }
 
     private fun transcribeOdiaBest(ctx: Context, wavBytes: ByteArray, cursorContext: String = ""): String {
@@ -647,7 +685,7 @@ object CloudAsrClient {
                         stt
                     }
                 }
-                AsrEngineType.HINGLISH -> callGeminiIndic(ctx, wav, isHinglish = true, cursorContext = cursorContext)
+                AsrEngineType.HINGLISH -> transcribeHinglishBest(ctx, wav, cursorContext = cursorContext)
                 AsrEngineType.ODIA -> transcribeOdiaBest(ctx, wav, cursorContext = cursorContext)
                 }
             }
