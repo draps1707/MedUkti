@@ -43,7 +43,9 @@ object MedicalNormalizer {
         "bottle", "hospital", "emergency", "ward", "discharge", "problem", "symptom", "symptoms", "pain",
         "kaise", "kahan", "kitna", "kitne", "theek", "accha", "achha", "dekho", "dekha",
         "batao", "samjho", "samajh", "lagta", "lagti", "laga", "hota", "hoti", "hote",
-        "diya", "liya", "rakho", "bhejo", "likho", "chalo", "suno", "bolo", "bola", "bohot"
+        "diya", "liya", "rakho", "bhejo", "likho", "chalo", "suno", "bolo", "bola", "bohot",
+        "elderly", "weakness", "abdomen", "followed", "bloating", "everything", "insidious",
+        "already", "allergy", "alcohol", "ability", "developing", "presenting", "complaints"
     )
 
     private val PHONETIC_AND_SPELLING_BRIDGES = linkedMapOf(
@@ -243,6 +245,60 @@ object MedicalNormalizer {
         "hypokalemia" to "Hypokalaemia",
         "hypernatremia" to "Hypernatraemia",
         "hyponatremia" to "Hyponatraemia",
+        "esophagus" to "oesophagus",
+        "esophageal" to "oesophageal",
+        "hemorrhage" to "haemorrhage",
+        "hemorrhagic" to "haemorrhagic",
+        "ischemia" to "ischaemia",
+        "ischemic" to "ischaemic",
+        "leukemia" to "leukaemia",
+        "septicemia" to "septicaemia",
+        "etiology" to "aetiology",
+        "fetus" to "foetus",
+        "gynecology" to "gynaecology",
+        "pediatric" to "paediatric",
+        "pediatrics" to "paediatrics",
+        "petal edema" to "pedal oedema",
+        "pedal edema" to "pedal oedema",
+        "fluid edema" to "pedal oedema",
+        "ronchi" to "rhonchi",
+        "crepts" to "crepitations",
+        "malina" to "melena",
+        "hemo temesis" to "haematemesis",
+        "a sites" to "ascites",
+        "kala azar" to "kala-azar",
+        "lepto spirosis" to "leptospirosis",
+        "scrub typhus" to "scrub typhus",
+        "falci parum" to "falciparum",
+        "usg abdomen" to "USG abdomen",
+        "usg whole abdomen" to "USG whole abdomen",
+        "hrct chest" to "HRCT chest",
+        "2d echo" to "2D Echo",
+        "two d echo" to "2D Echo",
+        "ct brain" to "CT brain",
+        "ncct head" to "NCCT head",
+        "mri brain" to "MRI brain",
+        "mri spine" to "MRI spine",
+        "cxr" to "CXR",
+        "esr" to "ESR",
+        "crp" to "CRP",
+        "procalcitonin" to "Procalcitonin",
+        "bnp" to "BNP",
+        "troponin i" to "Troponin-I",
+        "lrti" to "LRTI",
+        "urti" to "URTI",
+        "gerd" to "GERD",
+        "dvt" to "DVT",
+        "tia" to "TIA",
+        "cad" to "CAD",
+        "cva" to "CVA",
+        "sle" to "SLE",
+        "ibd" to "IBD",
+        "ibs" to "IBS",
+        "hhs" to "HHS",
+        "svt" to "SVT",
+        "chf" to "CHF",
+        "ards" to "ARDS",
         "once daily" to "OD",
         "twice daily" to "BD",
         "thrice daily" to "TDS",
@@ -597,6 +653,7 @@ object MedicalNormalizer {
         val tokens = text.split(Regex("\\s+"))
         val out = ArrayList<String>(tokens.size)
         var ti = 0
+        var prev2Word = ""
         var prevCleanLow = ""
         while (ti < tokens.size) {
             val w1 = tokens[ti]
@@ -604,7 +661,9 @@ object MedicalNormalizer {
             val punct1 = w1.substring(clean1.length)
             val low1 = clean1.lowercase()
             val dehyphen1 = if ('-' in low1) low1.replace("-", "") else ""
-            val inRxContext = prevCleanLow in RX_CONTEXT_TRIGGERS
+            val prevPair = if (prev2Word.isNotEmpty() && prevCleanLow.isNotEmpty()) "$prev2Word $prevCleanLow" else ""
+            val inRxContext = (prevCleanLow in RX_CONTEXT_TRIGGERS) || (prevPair in TWO_WORD_RX_TRIGGERS)
+            val inClinicalContext = (prevCleanLow in CLINICAL_CONTEXT_SINGLE) || (prevPair in CLINICAL_CONTEXT_TWO)
 
             // 3-word split-drug joiner (exact skeleton match for >= 10 char splits like "empa gli flozin")
             if (ti + 2 < tokens.size && punct1.isEmpty() && clean1.length >= 2 && clean1.all { it.isLetter() } && low1 !in PROTECTED_WORDS) {
@@ -621,9 +680,10 @@ object MedicalNormalizer {
                     val joined3 = low1 + low2 + low3
                     if (joined3.length >= 10) {
                         val sk3 = englishSkeleton(joined3)
-                        val hit3 = singleWordMap[joined3] ?: (if (sk3.length >= 5) coreSkeletonMap[sk3] else null)
+                        val hit3 = singleWordMap[joined3] ?: (if (sk3.length >= 5 && (inRxContext || hasDrugSuffix(joined3) || hasClinicalSuffix(joined3))) coreSkeletonMap[sk3] else null)
                         if (hit3 != null) {
                             out.add(preserveClinicalCase(hit3, clean1) + punct3)
+                            prev2Word = prevCleanLow
                             prevCleanLow = hit3.lowercase()
                             ti += 3
                             continue
@@ -643,10 +703,11 @@ object MedicalNormalizer {
                     if (joined.length >= 8) {
                         val sk2 = englishSkeleton(joined)
                         val hit2 = singleWordMap[joined]
-                            ?: (if (sk2.length >= 5) coreSkeletonMap[sk2] else null)
+                            ?: (if (sk2.length >= 5 && (inRxContext || inClinicalContext || hasMedicalPrefix(low1) || hasDrugSuffix(joined) || hasClinicalSuffix(joined))) coreSkeletonMap[sk2] else null)
 
                         if (hit2 != null) {
                             out.add(preserveClinicalCase(hit2, clean1) + punct2)
+                            prev2Word = prevCleanLow
                             prevCleanLow = hit2.lowercase()
                             ti += 2
                             continue
@@ -657,16 +718,19 @@ object MedicalNormalizer {
 
             if (clean1.any { it.isDigit() } || low1 in PROTECTED_WORDS) {
                 out.add(w1)
+                prev2Word = prevCleanLow
                 prevCleanLow = low1
             } else {
                 val exact = singleWordMap[low1] ?: (if (dehyphen1.length >= 8) singleWordMap[dehyphen1] else null)
                 if (exact != null) {
                     out.add(preserveClinicalCase(exact, clean1) + punct1)
+                    prev2Word = prevCleanLow
                     prevCleanLow = exact.lowercase()
                 } else {
-                    val rescued = rescueDrugToken(low1, inRxContext)
+                    val rescued = rescueDrugToken(low1, inRxContext, inClinicalContext)
                     val finalTok = if (rescued != null) preserveClinicalCase(rescued, clean1) else clean1
                     out.add(finalTok + punct1)
+                    prev2Word = prevCleanLow
                     prevCleanLow = finalTok.lowercase()
                 }
             }
@@ -732,9 +796,28 @@ object MedicalNormalizer {
     private val RX_CONTEXT_TRIGGERS = setOf(
         "tab", "tablet", "cap", "capsule", "inj", "injection", "syp", "syrup",
         "drop", "drops", "oint", "ointment", "cream", "gel", "spray", "inhaler",
-        "started", "start", "given", "give", "prescribed", "prescribe",
-        "advise", "advised", "continue", "continued", "stop", "stopped",
-        "add", "added", "dose", "iv", "im", "sc", "po"
+        "prescribed", "prescribe", "dose", "iv", "im", "sc", "po"
+    )
+
+    private val TWO_WORD_RX_TRIGGERS = setOf(
+        "started on", "put on", "give him", "gave him", "give her", "gave her",
+        "started with", "given with"
+    )
+
+    private val CLINICAL_CONTEXT_SINGLE = setOf(
+        "bilateral", "unilateral", "mild", "moderate", "severe",
+        "auscultation", "palpation", "tenderness", "diffuse", "generalized"
+    )
+
+    private val CLINICAL_CONTEXT_TWO = setOf(
+        "complains of", "history of", "diagnosed with", "suggestive of",
+        "associated with", "evidence of"
+    )
+
+    private val MEDICAL_PREFIXES = listOf(
+        "hepato", "spleno", "chole", "pneumo", "nephro", "cardio",
+        "neuro", "osteo", "haemato", "hemato", "gastro", "encephalo",
+        "broncho", "thrombo", "pancyto", "leuko", "leuco"
     )
 
     private val DRUG_SUFFIXES = listOf(
@@ -774,20 +857,30 @@ object MedicalNormalizer {
     private fun hasClinicalSuffix(low: String): Boolean =
         CLINICAL_SUFFIXES.any { low.endsWith(it) }
 
-    private fun rescueDrugToken(low: String, rxBoost: Boolean = false): String? {
-        val minLen = if (rxBoost) 5 else 7
+    private fun hasMedicalPrefix(low: String): Boolean =
+        MEDICAL_PREFIXES.any { low == it || (low.startsWith(it) && low.length >= it.length + 1) }
+
+    private fun rescueDrugToken(low: String, rxBoost: Boolean = false, clinicalBoost: Boolean = false): String? {
+        val minLen = if (rxBoost) 5 else if (clinicalBoost) 6 else 7
         if (low.length < minLen || low in PROTECTED_WORDS) return null
+        val hasSuffix = hasDrugSuffix(low) || hasClinicalSuffix(low)
+        if (!rxBoost && !clinicalBoost && !hasSuffix) return null
+
         val sk = englishSkeleton(low)
         if (sk.length < 4) return null
-        coreSkeletonMap[sk]?.let { return it }
-        // In Rx context, also try Indian z/j swap on exact skeleton
+        coreSkeletonMap[sk]?.let { hit ->
+            if (rxBoost || hit[0].lowercaseChar() == low[0]) return hit
+        }
         if (rxBoost && ('j' in low || 'z' in low)) {
             val swapped = low.replace('j', 'z')
             coreSkeletonMap[englishSkeleton(swapped)]?.let { return it }
         }
-        if (sk.length >= 5 && (rxBoost || hasDrugSuffix(low) || hasClinicalSuffix(low))) {
+        if (sk.length >= 5) {
             val maxDist = if (rxBoost && sk.length >= 7 && hasDrugSuffix(low)) 2 else 1
-            return fuzzyCoreSkeleton(sk, maxDist, low)
+            val fuzzyHit = fuzzyCoreSkeleton(sk, maxDist, low)
+            if (fuzzyHit != null && (rxBoost || fuzzyHit[0].lowercaseChar() == low[0])) {
+                return fuzzyHit
+            }
         }
         return null
     }
