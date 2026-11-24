@@ -71,6 +71,11 @@ class MedUktiImeService : InputMethodService() {
     private var btnModeHinglish: TextView? = null
     private var micRingContainer: LinearLayout? = null
     private var ivKeyboardMic: ImageView? = null
+    private var llEqBars: LinearLayout? = null
+    private var eqBar1: View? = null
+    private var eqBar2: View? = null
+    private var eqBar3: View? = null
+    private var eqBar4: View? = null
 
     private val processingWatchdog = Runnable {
         if (isProcessing && !isListening.get()) {
@@ -126,6 +131,11 @@ class MedUktiImeService : InputMethodService() {
         btnModeHinglish = view.findViewById(R.id.btnModeHinglish)
         micRingContainer = view.findViewById(R.id.micRingContainer)
         ivKeyboardMic = view.findViewById(R.id.ivKeyboardMic)
+        llEqBars = view.findViewById(R.id.llEqBars)
+        eqBar1 = view.findViewById(R.id.eqBar1)
+        eqBar2 = view.findViewById(R.id.eqBar2)
+        eqBar3 = view.findViewById(R.id.eqBar3)
+        eqBar4 = view.findViewById(R.id.eqBar4)
 
         fun selectMode(mode: AsrEngineType) {
             buzz(20L)
@@ -266,20 +276,25 @@ class MedUktiImeService : InputMethodService() {
                 micRingContainer?.keepScreenOn = false
                 micRingContainer?.alpha = 1.0f
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
+                llEqBars?.visibility = View.GONE
+                ivKeyboardMic?.visibility = View.VISIBLE
                 ivKeyboardMic?.scaleX = 1.0f
                 ivKeyboardMic?.scaleY = 1.0f
                 ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#2DD4BF"))
             }
             MicUiState.LISTENING -> {
                 micRingContainer?.keepScreenOn = true
-                micRingContainer?.alpha = 0.88f
+                micRingContainer?.alpha = 1.0f
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
-                ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#FFFFFF"))
+                ivKeyboardMic?.visibility = View.GONE
+                llEqBars?.visibility = View.VISIBLE
             }
             MicUiState.POLISHING -> {
                 micRingContainer?.keepScreenOn = false
                 micRingContainer?.alpha = 1.0f
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_polishing)
+                llEqBars?.visibility = View.GONE
+                ivKeyboardMic?.visibility = View.VISIBLE
                 ivKeyboardMic?.scaleX = 1.0f
                 ivKeyboardMic?.scaleY = 1.0f
                 ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#FFFFFF"))
@@ -604,6 +619,8 @@ class MedUktiImeService : InputMethodService() {
                 var consecSpeechFrames = 0
                 var activeSpeechFrames = 0
                 var silenceFrames = 0
+                var peakSpeechRms = 0f
+                var animTick = 0
                 var lastPreviewSamples = 0
                 var previewJob: Job? = null
                 val maxSegSamples = sampleRate * 10
@@ -638,20 +655,32 @@ class MedUktiImeService : InputMethodService() {
 
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
                     val vadProb = if (sileroVad != null && read == frameSamples) sileroVad.predict(floatBuf) else 1.0f
-                    val isSpeechFrame = if (sileroVad != null) {
+                    val rawVadHit = if (sileroVad != null) {
                         vadProb >= 0.55f && rms >= 0.005f
                     } else {
                         rms >= speechRmsThreshold
                     }
-                    if (speechBuf.size % (frameSamples * 3) < frameSamples) {
-                        val level = (rms / 0.06f).coerceIn(0f, 1f)
-                        val scale = 1.0f + level * 0.22f
-                        val pillAlpha = if (isSpeechFrame) 1.0f else 0.84f
+                    // Relative Energy Endpointer: if speaker already reached strong volume, ignore softer bystander chatter
+                    val isBystanderDrop = inSpeech && peakSpeechRms >= 0.020f && rms < peakSpeechRms * 0.25f
+                    val isSpeechFrame = rawVadHit && !isBystanderDrop
+                    if (isSpeechFrame && rms > peakSpeechRms) {
+                        peakSpeechRms = rms
+                    }
+
+                    animTick++
+                    if (animTick % 3 == 0) {
+                        val level = (rms / 0.055f).coerceIn(0.08f, 1.0f)
+                        val phase = (animTick / 3) % 4
+                        val s1 = if (isSpeechFrame) (0.35f + level * (if (phase == 0) 0.80f else 0.45f)) else 0.25f
+                        val s2 = if (isSpeechFrame) (0.40f + level * (if (phase == 1) 0.85f else 0.55f)) else 0.30f
+                        val s3 = if (isSpeechFrame) (0.35f + level * (if (phase == 2) 0.80f else 0.50f)) else 0.25f
+                        val s4 = if (isSpeechFrame) (0.35f + level * (if (phase == 3) 0.75f else 0.40f)) else 0.22f
                         mainHandler.post {
                             if (isListening.get()) {
-                                ivKeyboardMic?.scaleX = scale
-                                ivKeyboardMic?.scaleY = scale
-                                micRingContainer?.alpha = pillAlpha
+                                eqBar1?.scaleY = s1
+                                eqBar2?.scaleY = s2
+                                eqBar3?.scaleY = s3
+                                eqBar4?.scaleY = s4
                             }
                         }
                     }
@@ -713,6 +742,7 @@ class MedUktiImeService : InputMethodService() {
                         inSpeech = false
                         activeSpeechFrames = 0
                         silenceFrames = 0
+                        peakSpeechRms = 0f
                         lastPreviewSamples = 0
                         sileroVad?.reset()
                     }

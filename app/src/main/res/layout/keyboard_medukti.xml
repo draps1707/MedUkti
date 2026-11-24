@@ -111,6 +111,42 @@
                 android:contentDescription="Speak"
                 android:src="@android:drawable/ic_btn_speak_now"
                 android:tint="#2DD4BF" />
+
+            <LinearLayout
+                android:id="@+id/llEqBars"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <View
+                    android:id="@+id/eqBar1"
+                    android:layout_width="5dp"
+                    android:layout_height="20dp"
+                    android:background="@drawable/bg_eq_bar" />
+
+                <View
+                    android:id="@+id/eqBar2"
+                    android:layout_width="5dp"
+                    android:layout_height="20dp"
+                    android:layout_marginStart="5dp"
+                    android:background="@drawable/bg_eq_bar" />
+
+                <View
+                    android:id="@+id/eqBar3"
+                    android:layout_width="5dp"
+                    android:layout_height="20dp"
+                    android:layout_marginStart="5dp"
+                    android:background="@drawable/bg_eq_bar" />
+
+                <View
+                    android:id="@+id/eqBar4"
+                    android:layout_width="5dp"
+                    android:layout_height="20dp"
+                    android:layout_marginStart="5dp"
+                    android:background="@drawable/bg_eq_bar" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView

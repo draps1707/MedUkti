@@ -1,4 +1,4 @@
-# Medଉକ୍ତି (MedUkti) v8.3.0 — Medical, Hinglish & Odia Voice Keyboard
+# Medଉକ୍ତି (MedUkti) v8.4.0 — Medical, Hinglish & Odia Voice Keyboard
 
 **Medଉକ୍ତି** (*Med* + *ଉକ୍ତି* / speech) is a fast, 100% free-tier Android voice-typing keyboard (`InputMethodService`) built for Indian doctors and Odia speakers. It runs with **<20 MB RAM, zero phone heating, and zero Accessibility permissions** (so banking and UPI apps never show security warnings).
 
@@ -16,7 +16,7 @@ Each mode is routed to the strongest free-tier cloud model for that language, pa
 
 ---
 
-## Key Features in v8.3.0
+## Key Features in v8.4.0
 
 * **1-Tap Auto-Listen Bar:** Tapping `ଓ`, `🩺`, or `हin` switches modes and starts listening immediately. Long-pressing any mode pill opens Settings.
 * **Midnight Clinical Minimal UI:** Single slim row (`#0B0E14` Obsidian, `#1E2430` Charcoal, `#0D9488` Clinical Teal active pill, `#10B981` Emerald listening pulse, `#D97706` Amber polishing).
@@ -33,8 +33,8 @@ Each mode is routed to the strongest free-tier cloud model for that language, pa
 
 ## Choosing Your Architecture: 100% Online vs. Hybrid vs. 100% Offline
 
-### 1. 100% Online (Current `v8.3.0` — Recommended)
-* **How to get it:** Use this `main` branch / `v8.3.0` APK directly.
+### 1. 100% Online (Current `v8.4.0` — Recommended)
+* **How to get it:** Use this `main` branch / `v8.4.0` APK directly.
 * **What you need:** Free-tier API keys from [Groq](https://console.groq.com/keys), [Google AI Studio](https://aistudio.google.com/apikey), and [ElevenLabs](https://elevenlabs.io/).
 * **Pros:** `<20 MB` RAM, zero overheating, instant startup, handles 5+ Odisha dialects and 1,056+ drugs effortlessly.
 * **Cons:** Requires internet; ElevenLabs free tier has a monthly credit cap (covered automatically by Gemini 3.8 fallback).
@@ -45,7 +45,7 @@ Each mode is routed to the strongest free-tier cloud model for that language, pa
 * **Cons (Why we moved off it):** Uses **2.8–4 GB RAM** on-device, causes heavy thermal throttling/battery drain, lags on older/midrange phones, and can freeze or crash background apps during long dictations.
 
 ### 3. Hybrid (Best of Both Worlds)
-* **Light Hybrid (already in `v8.3.0`):** Cloud ASR (`Groq`/`Gemini`/`ElevenLabs`) + **Offline `MedicalNormalizer`** (`<15 MB` RAM) + local `AudioRecord` DSP/pre-roll.
+* **Light Hybrid (already in `v8.4.0`):** Cloud ASR (`Groq`/`Gemini`/`ElevenLabs`) + **Offline `MedicalNormalizer`** (`<15 MB` RAM) + local `AudioRecord` DSP/pre-roll.
 * **Heavy Hybrid (`v4.2.x` + `v6.x` mix):** If you have a 12 GB+ RAM device and want **Offline Odia (`SraVaani 1.0`)** with **Online Medical (`Groq Whisper`)**, combine `ModelDownloader.kt` + `sherpa-onnx` from `v4.2.5` for `ODIA` mode while keeping `CloudAsrClient.kt` for `MEDICAL` and `HINGLISH`. Expect ~2 GB RAM usage when Odia is loaded.
 
 ---

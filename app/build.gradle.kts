@@ -11,8 +11,8 @@ android {
         applicationId = "com.medukti.keyboard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 69
-        versionName = "8.3.0"
+        versionCode = 70
+        versionName = "8.4.0"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }

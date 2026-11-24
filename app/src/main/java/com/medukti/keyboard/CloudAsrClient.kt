@@ -262,7 +262,7 @@ object CloudAsrClient {
         val candidates = MedicalNormalizer.findCandidateHints(ctx, rawText)
         val sysPrompt = buildString {
             append("You are an ultra-fast medical & Hinglish transcription polisher for an Indian doctor. ")
-            append("Fix punctuation, capitalization, filler words (umm, uh), and self-corrections. ")
+            append("Fix punctuation (split run-on clauses into clean sentences with periods and commas), capitalization, and self-corrections—keep spoken 'um' and 'uh' fillers as-is. ")
             append("Watch for Indian-English ASR phonetic shifts: bh<->v (oseltamibhir->Oseltamivir, Bupibhaken->Bupivacaine), ")
             append("z<->j (carbimajol->Carbimazole, omeprajol->Omeprazole), ph/p<->f (epixabin->Apixaban, phosphormycin->Fosfomycin), ")
             append("dropped -r endings (acyclovia->Acyclovir, tenofova->Tenofovir), and 2-word splits (by basilar->bibasilar, Sacubitril ablastin->Sacubitril/valsartan). ")
@@ -351,7 +351,7 @@ object CloudAsrClient {
         val prompt = if (isHinglish) {
             buildString {
                 append("Transcribe ONLY the spoken audio verbatim. The speaker is an Indian doctor speaking natural Hinglish (mixed Hindi and English) with medical terms. ")
-                append("Write Hindi words in natural Romanized Hinglish and English/medical terms in accurate English—NEVER output Devanagari, Korean, Japanese, or other non-Latin scripts. ")
+                append("Write Hindi words in natural Romanized Hinglish and English/medical terms in accurate English, add clean periods and commas between sentences, and keep spoken 'um' and 'uh' fillers as-is—NEVER output Devanagari, Korean, Japanese, or other non-Latin scripts. ")
                 append("If the audio is silence, breath, filler, or unintelligible noise, output an empty string. Never invent or repeat example sentences. ")
                 append("Output ONLY the spoken transcript with zero commentary.")
             }
@@ -473,7 +473,6 @@ object CloudAsrClient {
             .replace(Regex("\\{[^}]*\\}?"), " ")
             .replace(Regex("\\s*[\\]\\}]\\s*"), " ")
             .replace(Regex("\\b(\\w+)\\b(?:[.,!?\\s]+\\1\\b)+", RegexOption.IGNORE_CASE), "$1")
-            .replace(Regex("(?i)\\b(?:umm+|uhh+|err+m*|ahh+)\\b[,\\s]*"), " ")
 
         val selfCorr = Regex("(?i).*?\\b(?:wait no|sorry i mean|i mean)\\b[,\\s]+(.+)$").find(text)
         if (selfCorr != null) {
