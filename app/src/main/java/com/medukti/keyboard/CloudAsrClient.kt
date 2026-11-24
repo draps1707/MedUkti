@@ -3,7 +3,10 @@ package com.medukti.keyboard
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
+import android.widget.Toast
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -65,6 +68,7 @@ object CloudAsrClient {
     }
 
     private fun normalizeGain(samples: FloatArray): FloatArray {
+        if (computeRms(samples) < 0.006f) return samples
         if (samples.isEmpty()) return samples
         val rms = computeRms(samples)
         val gain = if (rms in 0.0015f..0.055f) (0.065f / rms).coerceAtMost(4.0f) else 1.0f
@@ -217,7 +221,7 @@ object CloudAsrClient {
 
             writeField("model", model)
             writeField("language", "en")
-            writeField("response_format", "json")
+            writeField("response_format", "verbose_json")
             writeField("temperature", "0")
             writeField("prompt", buildWhisperPrompt(ctx))
             out.write("--$boundary--\r\n".toByteArray())
@@ -229,7 +233,22 @@ object CloudAsrClient {
         if (code !in 200..299) {
             throw IllegalStateException("Groq STT error ($code): ${body.take(180)}")
         }
-        return JSONObject(body).optString("text", "").trim()
+        val root = JSONObject(body)
+        val segs = root.optJSONArray("segments")
+        if (segs != null && segs.length() > 0) {
+            val kept = ArrayList<String>(segs.length())
+            for (i in 0 until segs.length()) {
+                val seg = segs.optJSONObject(i) ?: continue
+                val noSpeech = seg.optDouble("no_speech_prob", 0.0)
+                val avgLogProb = seg.optDouble("avg_logprob", 0.0)
+                val segText = seg.optString("text", "").trim()
+                if (segText.isNotEmpty() && noSpeech <= 0.60 && avgLogProb >= -1.0) {
+                    kept.add(segText)
+                }
+            }
+            return kept.joinToString(" ").trim()
+        }
+        return root.optString("text", "").trim()
     }
 
     private fun callGroqPolish(ctx: Context, rawText: String): String {
@@ -417,11 +436,19 @@ object CloudAsrClient {
         Regex("""(?i)\btape[-\s]*system\b"""),
         Regex("""(?i)\btap\s+tape\b"""),
         Regex("""(?i)\bthe\s+current\s+medical\s+diagnosis\s+and\s+treatment\.?"""),
-        Regex("""(?i)\bhi\s+guys!?""")
+        Regex("""(?i)\bhi\s+guys!?"""),
+        Regex("""(?i)\b(?:transcription|transcribed|translation|translated|subtitles|captioned)\s+by\b[^.?!\n]*[.?!]?"""),
+        Regex("""(?i)^\s*(?:hello!?\s*){2,}$""")
     )
 
     fun postProcessTranscript(ctx: Context, raw: String, engine: AsrEngineType): String {
         var text = Normalizer.normalize(raw.trim(), Normalizer.Form.NFC)
+        val lowCheck = text.lowercase()
+        if (lowCheck.startsWith("there is no audio") ||
+            lowCheck.startsWith("i'm sorry") ||
+            lowCheck.startsWith("i cannot") ||
+            lowCheck.contains("please provide the transcription")
+        ) return "" 
         if (text.isEmpty()) return ""
         if (Prefs.isIndicScriptEngine(engine)) {
             text = text.replace(" |", "।").replace("|", "।")
@@ -546,6 +573,9 @@ object CloudAsrClient {
                     callElevenLabsOdia(ctx, wavBytes)
                 } catch (e: Exception) {
                     if (Prefs.getGeminiKey(ctx).isNotBlank()) {
+                        Handler(Looper.getMainLooper()).post {
+                            Toast.makeText(ctx.applicationContext, "11Labs busy — used Gemini backup", Toast.LENGTH_SHORT).show()
+                        }
                         callGeminiIndic(ctx, wavBytes, isHinglish = false)
                     } else {
                         throw e

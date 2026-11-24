@@ -540,6 +540,7 @@ class MedUktiImeService : InputMethodService() {
             ).coerceAtLeast(frameSamples * 4)
 
             var recorder: AudioRecord? = null
+            val sileroVad = SileroVadDetector.createOrNull(this@MedUktiImeService)
             val audioMgr = getSystemService(AUDIO_SERVICE) as? AudioManager
             var btScoStarted = false
             var btCommDeviceSet = false
@@ -590,6 +591,7 @@ class MedUktiImeService : InputMethodService() {
                 val preRoll = ArrayDeque<FloatArray>(12)
                 var inSpeech = false
                 var consecSpeechFrames = 0
+                var activeSpeechFrames = 0
                 var silenceFrames = 0
                 var lastPreviewSamples = 0
                 var previewJob: Job? = null
@@ -613,7 +615,12 @@ class MedUktiImeService : InputMethodService() {
                     val hangoverFrames = 20 // ~640ms natural pause tolerance
 
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
-                    val isSpeechFrame = rms >= speechRmsThreshold
+                    val vadProb = if (sileroVad != null && read == frameSamples) sileroVad.predict(floatBuf) else 1.0f
+                    val isSpeechFrame = if (sileroVad != null) {
+                        vadProb >= 0.42f && rms >= 0.003f
+                    } else {
+                        rms >= speechRmsThreshold
+                    }
                     if (speechBuf.size % (frameSamples * 3) < frameSamples) {
                         val level = (rms / 0.06f).coerceIn(0f, 1f)
                         val scale = 1.0f + level * 0.22f
@@ -636,6 +643,7 @@ class MedUktiImeService : InputMethodService() {
 
                     if (isSpeechFrame) {
                         consecSpeechFrames++
+                        if (inSpeech || consecSpeechFrames >= 2) activeSpeechFrames++
                         if (!inSpeech && consecSpeechFrames >= 2) {
                             inSpeech = true
                             while (preRoll.isNotEmpty()) {
@@ -674,20 +682,22 @@ class MedUktiImeService : InputMethodService() {
                     val segDone = inSpeech && (silenceFrames >= hangoverFrames || speechBuf.size >= maxSegSamples)
                     if (segDone) {
                         previewJob?.cancel()
-                        if (speechBuf.size >= 8000) {
+                        if (speechBuf.size >= 8000 && activeSpeechFrames >= 8) {
                             segmentChannel.trySend(speechBuf.toFloatArray() to curEngine)
                         } else {
                             lockOrClearLiveDraft()
                         }
                         speechBuf.clear()
                         inSpeech = false
+                        activeSpeechFrames = 0
                         silenceFrames = 0
                         lastPreviewSamples = 0
+                        sileroVad?.reset()
                     }
                 }
 
                 previewJob?.cancel()
-                if (inSpeech && speechBuf.size >= 3200) {
+                if (inSpeech && speechBuf.size >= 8000 && activeSpeechFrames >= 8) {
                     segmentChannel.trySend(speechBuf.toFloatArray() to activeResolvedEngine.get())
                 } else if (lastLiveDraftText.isNotEmpty()) {
                     lockOrClearLiveDraft()
@@ -700,6 +710,7 @@ class MedUktiImeService : InputMethodService() {
                 segmentChannel.close()
                 try { recorder?.stop() } catch (_: Exception) {}
                 try { recorder?.release() } catch (_: Exception) {}
+                try { sileroVad?.release() } catch (_: Exception) {}
                 try {
                     if (btCommDeviceSet && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         audioMgr?.clearCommunicationDevice()

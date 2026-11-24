@@ -738,7 +738,7 @@ object MedicalNormalizer {
         }
 
         var res = out.joinToString(" ").replace(Regex("[ \\t]{2,}"), " ").trim()
-        res = formatClinicalShorthand(res)
+        res = formatClinicalShorthand(res, engine == AsrEngineType.MEDICAL)
         return res
     }
 
@@ -756,7 +756,7 @@ object MedicalNormalizer {
         "follow up advice" to "Follow-up Advice:"
     )
 
-    private fun formatClinicalShorthand(input: String): String {
+    private fun formatClinicalShorthand(input: String, isMedicalMode: Boolean): String {
         var t = input
         // BP 130 by 80 / 130 over 80 -> BP 130/80
         t = t.replace(Regex("(?i)\\b(bp\\s+)?(\\d{2,3})\\s+(?:by|over)\\s+(\\d{2,3})\\b")) { m ->
@@ -771,7 +771,7 @@ object MedicalNormalizer {
         // Fix common Rx mishearings
         t = t.replace(Regex("(?i)\\b(?:one|1)\\s+(?:tub|tap)\\b"), "1 tab")
         t = t.replace(Regex("(?i)\\bdoublet\\s+(?=[A-Za-z])"), "Tab. ")
-        t = t.replace(Regex("(?i)\\bodi\\b"), "OD")
+        if (isMedicalMode) t = t.replace(Regex("(?i)\\bodi\\b"), "OD")
         t = t.replace(Regex("(?i)\\btub\\s+(od|bd|tds|qid)\\b")) { m -> "tab " + m.groupValues[1].uppercase() }
         t = t.replace(Regex("(?i)\\bb\\s+d\\b"), "BD")
         t = t.replace(Regex("(?i)\\bo\\s+d\\b"), "OD")
