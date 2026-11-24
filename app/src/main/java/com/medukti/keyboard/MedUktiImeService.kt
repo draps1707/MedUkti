@@ -210,9 +210,18 @@ class MedUktiImeService : InputMethodService() {
 
     private fun setMicUiState(state: MicUiState) {
         when (state) {
-            MicUiState.IDLE -> micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
-            MicUiState.LISTENING -> micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
-            MicUiState.POLISHING -> micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_polishing)
+            MicUiState.IDLE -> {
+                micRingContainer?.keepScreenOn = false
+                micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
+            }
+            MicUiState.LISTENING -> {
+                micRingContainer?.keepScreenOn = true
+                micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
+            }
+            MicUiState.POLISHING -> {
+                micRingContainer?.keepScreenOn = false
+                micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_polishing)
+            }
         }
     }
 

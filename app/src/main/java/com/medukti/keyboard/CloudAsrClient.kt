@@ -167,7 +167,7 @@ object CloudAsrClient {
     }
 
     private fun buildWhisperPrompt(ctx: Context): String {
-        val universalTerms = "Tab., Inj., Cap., Syp., SpO2, BP, Dyspnoea, Oedema, Haemoptysis, Scrub typhus, Rectus sheath, Troponin-I, NT-proBNP, Ceftriaxone, Piperacillin, Tazobactam, Augmentin, Azithromycin, Empagliflozin, Dapagliflozin, Apixaban, Sacubitril/valsartan, Atorvastatin, Telmisartan, Pantoprazole, Metformin, Paracetamol"
+        val universalTerms = "Tab., Inj., Cap., SpO2, BP, Dyspnoea, Oedema, Ceftriaxone, Piperacillin, Tazobactam, Augmentin, Azithromycin, Empagliflozin, Dapagliflozin, Apixaban, Sacubitril/valsartan, Alendronate, Prednisolone, Methotrexate, Sulfasalazine, Metformin, Paracetamol"
         val personal = Prefs.getPersonalDict(ctx)
         val customTerms = if (personal.isBlank()) emptyList() else personal.lines()
             .mapNotNull { line ->
@@ -177,9 +177,9 @@ object CloudAsrClient {
             .distinct()
             .take(25)
         val combined = if (customTerms.isEmpty()) {
-            "Indian clinical note: $universalTerms"
+            universalTerms
         } else {
-            "Indian clinical note: ${customTerms.joinToString(", ")}, $universalTerms"
+            "${customTerms.joinToString(", ")}, $universalTerms"
         }
         return combined.take(750)
     }
@@ -245,7 +245,9 @@ object CloudAsrClient {
             append("dropped -r endings (acyclovia->Acyclovir, tenofova->Tenofovir), and 2-word splits (by basilar->bibasilar, Sacubitril ablastin->Sacubitril/valsartan). ")
             append("Use sentence context so normal English words (monitor, according, patients) are never wrongly replaced. ")
             append("The speaker is an Indian doctor dictating naturally in English, Hinglish (Hindi + English), or mixed clinical notes (e.g. 'Inj. Ceftriaxone 1 gm BD for Pneumonia' or 'Yeh patient ka hum agar Ceftriaxone ke saath Azithromycin de denge toh uska mortality ratio kam ho jayega'). ")
-            append("If the raw transcript contains Hindi in Devanagari script, transliterate ONLY those Hindi words into natural Romanized Hinglish—NEVER translate Hindi/Hinglish into English, and keep medical/drug terms in English. Never output Devanagari, French, or Spanish. ")
+            append("Allow ONLY English, Romanized Hinglish, and real medical/drug terms—ban all other languages (never output Korean, Japanese, Chinese, Devanagari, Spanish, or Latin). ") 
+            append("If the raw transcript contains Hindi in Devanagari script, transliterate ONLY those Hindi words into natural Romanized Hinglish without translating to English. ") 
+            append("If Whisper emitted an out-of-context foreign/lookalike word (like 'aceturate' for 'started', 'abductores' for 'episodes', 'accipitres' for 'exposures', 'acetrizoic' for 'be aware'), replace it with the natural English/Hinglish word that fits the clinical sentence. ")
             if (candidates.isNotEmpty()) {
                 append("Candidate Indian formulary/clinical terms that may match this audio: ${candidates.joinToString(", ")}. ")
             }
@@ -391,7 +393,10 @@ object CloudAsrClient {
         Regex("""(?i)\band\s+many\s+more\.?\b"""),
         Regex("""(?i)\bsubtitles\s+by\b[^.]*\.?"""),
         Regex("""(?i)\bamara\.org\b"""),
-        Regex("""(?i)\btape[-\s]*system\b""")
+        Regex("""(?i)\btape[-\s]*system\b"""),
+        Regex("""(?i)\btap\s+tape\b"""),
+        Regex("""(?i)\bthe\s+current\s+medical\s+diagnosis\s+and\s+treatment\.?"""),
+        Regex("""(?i)\bhi\s+guys!?""")
     )
 
     fun postProcessTranscript(ctx: Context, raw: String, engine: AsrEngineType): String {
@@ -437,7 +442,7 @@ object CloudAsrClient {
         text = MedicalNormalizer.normalize(ctx, text, engine)
 
         if (!Prefs.isIndicScriptEngine(engine)) {
-            text = text.replace(Regex("[\u0900-\u0DFF]+"), " ").replace(Regex("[ \t]{2,}"), " ").trim()
+            text = text.replace(Regex("[^\\u0000-\\u024F\\s.,?!:;/'\"()\\-+%°]+"), " ").replace(Regex("[ \t]{2,}"), " ").trim()
             if (text.isEmpty()) return ""
             text = capitalizeSentences(text)
         }
