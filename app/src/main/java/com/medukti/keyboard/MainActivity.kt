@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
+import android.app.AlertDialog
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
@@ -32,6 +33,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvSetupBadge: TextView
+    private lateinit var tvKeyHealthSummary: TextView
     private lateinit var etGroqKey: EditText
     private lateinit var etGeminiKey: EditText
     private lateinit var etGroqAsrModel: EditText
@@ -90,6 +92,7 @@ class MainActivity : AppCompatActivity() {
         val btnToggleAdvanced = findViewById<TextView>(R.id.btnToggleAdvanced)
 
         tvSetupBadge = findViewById(R.id.tvSetupBadge)
+        tvKeyHealthSummary = findViewById(R.id.tvKeyHealthSummary)
         etGroqKey = findViewById(R.id.etGroqKey)
         etGeminiKey = findViewById(R.id.etGeminiKey)
         etGroqAsrModel = findViewById(R.id.etGroqAsrModel)
@@ -137,9 +140,9 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.btnGetGroqKey).setOnClickListener { openUrl("https://console.groq.com/keys") }
         findViewById<View>(R.id.btnGetGeminiKey).setOnClickListener { openUrl("https://aistudio.google.com/apikey") }
-        findViewById<View>(R.id.btnPasteGroqKey).setOnClickListener { pasteInto(etGroqKey, "Groq key pasted") }
-        findViewById<View>(R.id.btnPasteGeminiKey).setOnClickListener { pasteInto(etGeminiKey, "Gemini key pasted") }
-        findViewById<View>(R.id.btnPasteElevenLabsKey).setOnClickListener { pasteInto(etElevenLabsKey, "ElevenLabs key pasted") }
+        findViewById<View>(R.id.btnPasteGroqKey).setOnClickListener { pasteKeyGuarded(etGroqKey, "Groq") }
+        findViewById<View>(R.id.btnPasteGeminiKey).setOnClickListener { pasteKeyGuarded(etGeminiKey, "Gemini") }
+        findViewById<View>(R.id.btnPasteElevenLabsKey).setOnClickListener { pasteKeyGuarded(etElevenLabsKey, "ElevenLabs") }
 
         findViewById<View>(R.id.btnTestKeys).setOnClickListener {
             val gKey = etGroqKey.text.toString().trim()
@@ -204,6 +207,49 @@ class MainActivity : AppCompatActivity() {
             etPersonalDict.setText(merged)
             Prefs.setPersonalDict(this, merged)
             Toast.makeText(this, "Personal Fixes restored & saved!", Toast.LENGTH_SHORT).show()
+        }
+
+        val etTestSandbox = findViewById<EditText>(R.id.etTestSandbox)
+        findViewById<View>(R.id.btnClearSandbox).setOnClickListener {
+            etTestSandbox.setText("")
+        }
+
+        findViewById<View>(R.id.btnRestoreVault).setOnClickListener {
+            val n = Prefs.restoreKeysFromVault(this)
+            if (n == 0) {
+                Toast.makeText(this, "No backed-up keys in vault yet", Toast.LENGTH_SHORT).show()
+            } else {
+                etGroqKey.setText(Prefs.getGroqKey(this))
+                etGeminiKey.setText(Prefs.getGeminiKey(this))
+                etElevenLabsKey.setText(Prefs.getElevenLabsKey(this))
+                updateStatus()
+                Toast.makeText(this, "Restored $n key(s) from vault!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        findViewById<View>(R.id.btnBackupAll).setOnClickListener {
+            Prefs.setGroqKey(this, etGroqKey.text.toString())
+            Prefs.setGeminiKey(this, etGeminiKey.text.toString())
+            Prefs.setElevenLabsKey(this, etElevenLabsKey.text.toString())
+            Prefs.setPersonalDict(this, etPersonalDict.text.toString())
+            val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("MedUkti Full Backup", Prefs.exportAllBundle(this)))
+            Toast.makeText(this, "All keys + Personal Fixes copied to clipboard!", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<View>(R.id.btnRestoreAll).setOnClickListener {
+            val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            val clipText = cm.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
+            if (Prefs.importAllBundle(this, clipText)) {
+                etGroqKey.setText(Prefs.getGroqKey(this))
+                etGeminiKey.setText(Prefs.getGeminiKey(this))
+                etElevenLabsKey.setText(Prefs.getElevenLabsKey(this))
+                etPersonalDict.setText(Prefs.getPersonalDict(this))
+                updateStatus()
+                Toast.makeText(this, "Restored keys + Personal Fixes!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Clipboard doesn't have a valid MedUkti backup", Toast.LENGTH_SHORT).show()
+            }
         }
 
         findViewById<View>(R.id.btnSaveStart).setOnClickListener {
@@ -282,6 +328,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun pasteKeyGuarded(target: EditText, label: String) {
+        val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val text = cm.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
+        if (text.isEmpty()) {
+            Toast.makeText(this, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val current = target.text.toString().trim()
+        if (current.isNotEmpty() && current != text) {
+            AlertDialog.Builder(this)
+                .setTitle("Replace $label Key?")
+                .setMessage("You already have a $label key saved. Overwrite it with clipboard text?")
+                .setPositiveButton("Replace") { _, _ ->
+                    target.setText(text)
+                    Toast.makeText(this, "$label key replaced (tap Save Settings)", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Keep Existing", null)
+                .show()
+        } else {
+            target.setText(text)
+            Toast.makeText(this, "$label key pasted", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun pasteInto(target: EditText, msg: String) {
         val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         val txt = cm.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
@@ -307,7 +377,11 @@ class MainActivity : AppCompatActivity() {
     private fun updateStatus() {
         val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val imeOk = isImeEnabled()
-        val keyOk = Prefs.getGroqKey(this).isNotBlank() || Prefs.getGeminiKey(this).isNotBlank() || Prefs.getElevenLabsKey(this).isNotBlank()
+        val gOk = Prefs.getGroqKey(this).isNotBlank()
+        val mOk = Prefs.getGeminiKey(this).isNotBlank()
+        val eOk = Prefs.getElevenLabsKey(this).isNotBlank()
+        tvKeyHealthSummary.text = "Groq ${if (gOk) "✓" else "—"}  •  Gemini ${if (mOk) "✓" else "—"}  •  11Labs ${if (eOk) "✓" else "—"}"
+        val keyOk = gOk || mOk || eOk
 
         when {
             imeOk && micOk && keyOk -> {

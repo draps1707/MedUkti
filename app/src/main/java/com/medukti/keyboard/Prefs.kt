@@ -1,6 +1,7 @@
 package com.medukti.keyboard
 
 import android.content.Context
+import org.json.JSONObject
 
 enum class AsrEngineType(val label: String, val badge: String) {
     ODIA("ଓ — Odia Conversational (ElevenLabs Scribe v2)", "ଓ"),
@@ -19,6 +20,9 @@ object Prefs {
     private const val KEY_GROQ_KEY = "groq_api_key"
     private const val KEY_GEMINI_KEY = "gemini_api_key"
     private const val KEY_ELEVENLABS_KEY = "elevenlabs_api_key"
+    private const val KEY_BACKUP_GROQ = "vault_backup_groq"
+    private const val KEY_BACKUP_GEMINI = "vault_backup_gemini"
+    private const val KEY_BACKUP_ELEVENLABS = "vault_backup_elevenlabs"
     private const val KEY_GROQ_ASR_MODEL = "groq_asr_model_v2"
     private const val KEY_GROQ_LLM_MODEL = "groq_llm_model"
     private const val KEY_GEMINI_MODEL = "gemini_model_v2"
@@ -65,27 +69,77 @@ object Prefs {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_GROQ_KEY, "") ?: ""
 
     fun setGroqKey(ctx: Context, value: String) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_GROQ_KEY, value.trim())
-            .apply()
+        val v = value.trim()
+        val ed = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_GROQ_KEY, v)
+        if (v.isNotBlank()) ed.putString(KEY_BACKUP_GROQ, v)
+        ed.apply()
     }
 
     fun getGeminiKey(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_GEMINI_KEY, "") ?: ""
 
     fun setGeminiKey(ctx: Context, value: String) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_GEMINI_KEY, value.trim())
-            .apply()
+        val v = value.trim()
+        val ed = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_GEMINI_KEY, v)
+        if (v.isNotBlank()) ed.putString(KEY_BACKUP_GEMINI, v)
+        ed.apply()
     }
 
     fun getElevenLabsKey(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY_ELEVENLABS_KEY, "") ?: ""
 
     fun setElevenLabsKey(ctx: Context, value: String) {
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(KEY_ELEVENLABS_KEY, value.trim())
-            .apply()
+        val v = value.trim()
+        val ed = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY_ELEVENLABS_KEY, v)
+        if (v.isNotBlank()) ed.putString(KEY_BACKUP_ELEVENLABS, v)
+        ed.apply()
+    }
+
+    fun restoreKeysFromVault(ctx: Context): Int {
+        val sp = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        val g = sp.getString(KEY_BACKUP_GROQ, "") ?: ""
+        val m = sp.getString(KEY_BACKUP_GEMINI, "") ?: ""
+        val e = sp.getString(KEY_BACKUP_ELEVENLABS, "") ?: ""
+        var count = 0
+        val ed = sp.edit()
+        if (g.isNotBlank()) { ed.putString(KEY_GROQ_KEY, g); count++ }
+        if (m.isNotBlank()) { ed.putString(KEY_GEMINI_KEY, m); count++ }
+        if (e.isNotBlank()) { ed.putString(KEY_ELEVENLABS_KEY, e); count++ }
+        ed.apply()
+        return count
+    }
+
+    fun exportAllBundle(ctx: Context): String {
+        val obj = JSONObject()
+        obj.put("groq", getGroqKey(ctx))
+        obj.put("gemini", getGeminiKey(ctx))
+        obj.put("elevenlabs", getElevenLabsKey(ctx))
+        obj.put("fixes", getPersonalDict(ctx))
+        return obj.toString()
+    }
+
+    fun importAllBundle(ctx: Context, rawJson: String): Boolean {
+        return try {
+            val obj = JSONObject(rawJson.trim())
+            val g = obj.optString("groq", "").trim()
+            val m = obj.optString("gemini", "").trim()
+            val e = obj.optString("elevenlabs", "").trim()
+            val f = obj.optString("fixes", "").trim()
+            if (g.isNotBlank()) setGroqKey(ctx, g)
+            if (m.isNotBlank()) setGeminiKey(ctx, m)
+            if (e.isNotBlank()) setElevenLabsKey(ctx, e)
+            if (f.isNotBlank()) {
+                val merged = (getPersonalDict(ctx).lines() + f.lines())
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() && "=" in it }
+                    .distinctBy { it.substringBefore('=').trim().lowercase() }
+                    .joinToString("\n")
+                setPersonalDict(ctx, merged)
+            }
+            g.isNotBlank() || m.isNotBlank() || e.isNotBlank() || f.isNotBlank()
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun getGroqAsrModel(ctx: Context): String =

@@ -125,12 +125,21 @@ class MedUktiImeService : InputMethodService() {
 
         fun selectMode(mode: AsrEngineType) {
             buzz(20L)
-            if (isListening.get() && Prefs.getEngine(this) != mode) {
-                stopContinuousDictation()
-            }
+            val wasListening = isListening.get()
+            val prevMode = Prefs.getEngine(this)
             Prefs.setEngine(this, mode)
             activeResolvedEngine.set(mode)
             refreshModeUi()
+            if (wasListening && prevMode != mode) {
+                stopContinuousDictation()
+                mainHandler.postDelayed({
+                    if (isInputViewShown && !isListening.get()) {
+                        startContinuousDictation()
+                    }
+                }, 220L)
+            } else if (!wasListening) {
+                startContinuousDictation()
+            }
         }
         val openSettingsLongClick = View.OnLongClickListener {
             buzz(18L)
