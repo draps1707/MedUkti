@@ -31,6 +31,7 @@ object Prefs {
     private const val KEY_AI_POLISH = "ai_polish_enabled"
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
     private const val KEY_LIVE_STREAM = "live_streaming_preview_v2"
+    private const val KEY_DENOISER = "noisy_room_denoiser"
     private const val KEY_PERSONAL_DICT = "personal_dictionary"
     private const val KEY_DICTATION_HISTORY = "dictation_history_v1"
 
@@ -201,6 +202,15 @@ object Prefs {
     fun setLiveStreamingEnabled(ctx: Context, enabled: Boolean) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_LIVE_STREAM, enabled)
+            .apply()
+    }
+
+    fun isDenoiserEnabled(ctx: Context): Boolean =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_DENOISER, false)
+
+    fun setDenoiserEnabled(ctx: Context, enabled: Boolean) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_DENOISER, enabled)
             .apply()
     }
 

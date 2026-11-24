@@ -86,6 +86,7 @@ class MainActivity : AppCompatActivity() {
 
         val switchAutoListen = findViewById<Switch>(R.id.switchAutoListen)
         val switchLiveStream = findViewById<Switch>(R.id.switchLiveStream)
+        val switchDenoiser = findViewById<Switch>(R.id.switchDenoiser)
         val etPersonalDict = findViewById<EditText>(R.id.etPersonalDict)
         val etDictSearch = findViewById<EditText>(R.id.etDictSearch)
         val advancedContainer = findViewById<View>(R.id.advancedContainer)
@@ -125,6 +126,7 @@ class MainActivity : AppCompatActivity() {
 
         switchAutoListen.isChecked = Prefs.isAutoListen(this)
         switchLiveStream.isChecked = Prefs.isLiveStreamingEnabled(this)
+        switchDenoiser.isChecked = Prefs.isDenoiserEnabled(this)
 
         etGroqKey.setText(Prefs.getGroqKey(this))
         etGeminiKey.setText(Prefs.getGeminiKey(this))
@@ -256,6 +258,7 @@ class MainActivity : AppCompatActivity() {
             Prefs.setEngine(this, AsrEngineType.entries[spinnerEngine.selectedItemPosition])
             Prefs.setAutoListen(this, switchAutoListen.isChecked)
             Prefs.setLiveStreamingEnabled(this, switchLiveStream.isChecked)
+            Prefs.setDenoiserEnabled(this, switchDenoiser.isChecked)
 
             Prefs.setGroqAsrModel(this, resolveModelValue(spinnerGroqAsr, etGroqAsrModel, groqAsrOptions))
             val llmChoice = resolveModelValue(spinnerGroqLlm, etGroqLlmModel, groqLlmOptions)

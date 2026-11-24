@@ -13,6 +13,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.NoiseSuppressor
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -540,6 +541,8 @@ class MedUktiImeService : InputMethodService() {
             ).coerceAtLeast(frameSamples * 4)
 
             var recorder: AudioRecord? = null
+            var noiseSuppressor: NoiseSuppressor? = null
+            val denoiserOn = Prefs.isDenoiserEnabled(this@MedUktiImeService)
             val sileroVad = SileroVadDetector.createOrNull(this@MedUktiImeService)
             val audioMgr = getSystemService(AUDIO_SERVICE) as? AudioManager
             var btScoStarted = false
@@ -582,6 +585,14 @@ class MedUktiImeService : InputMethodService() {
                 if (preferredBt != null) {
                     recorder.preferredDevice = preferredBt
                 }
+                if (denoiserOn) {
+                    try {
+                        if (NoiseSuppressor.isAvailable()) {
+                            noiseSuppressor = NoiseSuppressor.create(recorder.audioSessionId)?.apply { enabled = true }
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
                 recorder.startRecording()
 
                 val shortBuf = ShortArray(frameSamples)
@@ -595,7 +606,10 @@ class MedUktiImeService : InputMethodService() {
                 var silenceFrames = 0
                 var lastPreviewSamples = 0
                 var previewJob: Job? = null
-                val maxSegSamples = sampleRate * 18
+                val maxSegSamples = sampleRate * 10
+                var hpPrevX = 0f
+                var hpPrevY = 0f
+                val hpAlpha = 0.968f
 
                 while (isListening.get()) {
                     val read = recorder.read(shortBuf, 0, frameSamples)
@@ -604,7 +618,15 @@ class MedUktiImeService : InputMethodService() {
                         continue
                     }
                     for (i in 0 until read) {
-                        floatBuf[i] = shortBuf[i] / 32768.0f
+                        val x = shortBuf[i] / 32768.0f
+                        if (denoiserOn) {
+                            val y = hpAlpha * (hpPrevY + x - hpPrevX)
+                            hpPrevX = x
+                            hpPrevY = y
+                            floatBuf[i] = y
+                        } else {
+                            floatBuf[i] = x
+                        }
                     }
                     val curEngine = activeResolvedEngine.get()
                     val speechRmsThreshold = when (curEngine) {
@@ -612,12 +634,12 @@ class MedUktiImeService : InputMethodService() {
                         AsrEngineType.HINGLISH -> 0.007f
                         AsrEngineType.MEDICAL -> 0.0085f
                     }
-                    val hangoverFrames = 20 // ~640ms natural pause tolerance
+                    val hangoverFrames = if (speechBuf.size >= sampleRate * 4) 14 else 20
 
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
                     val vadProb = if (sileroVad != null && read == frameSamples) sileroVad.predict(floatBuf) else 1.0f
                     val isSpeechFrame = if (sileroVad != null) {
-                        vadProb >= 0.42f && rms >= 0.003f
+                        vadProb >= 0.55f && rms >= 0.005f
                     } else {
                         rms >= speechRmsThreshold
                     }
@@ -710,6 +732,7 @@ class MedUktiImeService : InputMethodService() {
                 segmentChannel.close()
                 try { recorder?.stop() } catch (_: Exception) {}
                 try { recorder?.release() } catch (_: Exception) {}
+                try { noiseSuppressor?.release() } catch (_: Exception) {}
                 try { sileroVad?.release() } catch (_: Exception) {}
                 try {
                     if (btCommDeviceSet && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

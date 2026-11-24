@@ -45,7 +45,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="v8.2 • Medical, Hinglish &amp; Odia"
+                        android:text="v8.3 • Medical, Hinglish &amp; Odia"
                         android:textColor="#9AA0A6"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -681,6 +681,15 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:text="Live typing preview while speaking"
+                    android:textColor="#E8EAED"
+                    android:textSize="14sp" />
+
+                <Switch
+                    android:id="@+id/switchDenoiser"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Noisy room / fan filter (for OPD &amp; wards)"
                     android:textColor="#E8EAED"
                     android:textSize="14sp" />
             </LinearLayout>
