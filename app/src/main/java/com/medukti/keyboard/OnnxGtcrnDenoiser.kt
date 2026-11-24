@@ -4,6 +4,8 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import kotlin.math.PI
 import kotlin.math.cos
@@ -12,7 +14,7 @@ import kotlin.math.sqrt
 
 /**
  * On-device neural speech enhancer using gtcrn_simple.onnx (524 KB, 16 kHz, n_fft=512, hop=256).
- * Strips steady TV, fan, and ward background noise while preserving speech clarity.
+ * Shares one cached OrtSession and reuses direct ByteBuffers to eliminate GC pauses.
  */
 class OnnxGtcrnDenoiser private constructor(
     private val env: OrtEnvironment,
@@ -39,6 +41,18 @@ class OnnxGtcrnDenoiser private constructor(
             this[i] = j
         }
     }
+
+    private val convCache = FloatArray(2 * 1 * 16 * 16 * 33)
+    private val traCache = FloatArray(2 * 3 * 1 * 1 * 16)
+    private val interCache = FloatArray(2 * 1 * 33 * 16)
+    private val re = FloatArray(nFft)
+    private val im = FloatArray(nFft)
+    private val mixIn = FloatArray(bins * 2)
+
+    private val mixBuf: FloatBuffer = ByteBuffer.allocateDirect(bins * 2 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+    private val convBuf: FloatBuffer = ByteBuffer.allocateDirect(convCache.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+    private val traBuf: FloatBuffer = ByteBuffer.allocateDirect(traCache.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+    private val interBuf: FloatBuffer = ByteBuffer.allocateDirect(interCache.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
 
     private fun fft512(re: FloatArray, im: FloatArray, inverse: Boolean) {
         for (i in 0 until nFft) {
@@ -88,13 +102,9 @@ class OnnxGtcrnDenoiser private constructor(
             System.arraycopy(samples, 0, padded, hop, samples.size)
             val out = FloatArray(paddedLen)
 
-            var convCache = FloatArray(2 * 1 * 16 * 16 * 33)
-            var traCache = FloatArray(2 * 3 * 1 * 1 * 16)
-            var interCache = FloatArray(2 * 1 * 33 * 16)
-
-            val re = FloatArray(nFft)
-            val im = FloatArray(nFft)
-            val mixIn = FloatArray(bins * 2)
+            convCache.fill(0f)
+            traCache.fill(0f)
+            interCache.fill(0f)
 
             val numFrames = (paddedLen - nFft) / hop + 1
             for (f in 0 until numFrames) {
@@ -109,16 +119,21 @@ class OnnxGtcrnDenoiser private constructor(
                     mixIn[k * 2 + 1] = im[k]
                 }
 
+                mixBuf.clear(); mixBuf.put(mixIn); mixBuf.rewind()
+                convBuf.clear(); convBuf.put(convCache); convBuf.rewind()
+                traBuf.clear(); traBuf.put(traCache); traBuf.rewind()
+                interBuf.clear(); interBuf.put(interCache); interBuf.rewind()
+
                 var mixT: OnnxTensor? = null
                 var convT: OnnxTensor? = null
                 var traT: OnnxTensor? = null
                 var interT: OnnxTensor? = null
                 var res: OrtSession.Result? = null
                 try {
-                    mixT = OnnxTensor.createTensor(env, FloatBuffer.wrap(mixIn), longArrayOf(1L, 257L, 1L, 2L))
-                    convT = OnnxTensor.createTensor(env, FloatBuffer.wrap(convCache), longArrayOf(2L, 1L, 16L, 16L, 33L))
-                    traT = OnnxTensor.createTensor(env, FloatBuffer.wrap(traCache), longArrayOf(2L, 3L, 1L, 1L, 16L))
-                    interT = OnnxTensor.createTensor(env, FloatBuffer.wrap(interCache), longArrayOf(2L, 1L, 33L, 16L))
+                    mixT = OnnxTensor.createTensor(env, mixBuf, longArrayOf(1L, 257L, 1L, 2L))
+                    convT = OnnxTensor.createTensor(env, convBuf, longArrayOf(2L, 1L, 16L, 16L, 33L))
+                    traT = OnnxTensor.createTensor(env, traBuf, longArrayOf(2L, 3L, 1L, 1L, 16L))
+                    interT = OnnxTensor.createTensor(env, interBuf, longArrayOf(2L, 1L, 33L, 16L))
 
                     res = session.run(
                         mapOf(
@@ -129,11 +144,11 @@ class OnnxGtcrnDenoiser private constructor(
                         )
                     )
 
-                    val enhBuf = (res[0] as OnnxTensor).floatBuffer
-                    enhBuf.rewind()
+                    val enhOut = (res[0] as OnnxTensor).floatBuffer
+                    enhOut.rewind()
                     for (k in 0 until bins) {
-                        re[k] = enhBuf.get()
-                        im[k] = enhBuf.get()
+                        re[k] = enhOut.get()
+                        im[k] = enhOut.get()
                     }
                     im[0] = 0f
                     im[bins - 1] = 0f
@@ -142,17 +157,17 @@ class OnnxGtcrnDenoiser private constructor(
                         im[k] = -im[nFft - k]
                     }
 
-                    val convBuf = (res[1] as OnnxTensor).floatBuffer
-                    convBuf.rewind()
-                    convBuf.get(convCache)
+                    val convOut = (res[1] as OnnxTensor).floatBuffer
+                    convOut.rewind()
+                    convOut.get(convCache)
 
-                    val traBuf = (res[2] as OnnxTensor).floatBuffer
-                    traBuf.rewind()
-                    traBuf.get(traCache)
+                    val traOut = (res[2] as OnnxTensor).floatBuffer
+                    traOut.rewind()
+                    traOut.get(traCache)
 
-                    val interBuf = (res[3] as OnnxTensor).floatBuffer
-                    interBuf.rewind()
-                    interBuf.get(interCache)
+                    val interOut = (res[3] as OnnxTensor).floatBuffer
+                    interOut.rewind()
+                    interOut.get(interCache)
 
                     fft512(re, im, inverse = true)
                     for (i in 0 until nFft) {
@@ -179,20 +194,27 @@ class OnnxGtcrnDenoiser private constructor(
     }
 
     fun release() {
-        try { session.close() } catch (_: Exception) {}
+        // Shared OrtSession stays cached in memory for zero-lag keyboard switches.
     }
 
     companion object {
+        private val lock = Any()
+        @Volatile private var sharedSession: OrtSession? = null
+
         fun createOrNull(ctx: Context): OnnxGtcrnDenoiser? {
             return try {
-                val modelBytes = ctx.assets.open("gtcrn_simple.onnx").use { it.readBytes() }
                 val env = OrtEnvironment.getEnvironment()
-                val opts = OrtSession.SessionOptions().apply {
-                    setIntraOpNumThreads(2)
-                    setInterOpNumThreads(1)
+                val sess = sharedSession ?: synchronized(lock) {
+                    sharedSession ?: run {
+                        val file = SileroVadDetector.ensureAssetFile(ctx.applicationContext, "gtcrn_simple.onnx")
+                        val opts = OrtSession.SessionOptions().apply {
+                            setIntraOpNumThreads(2)
+                            setInterOpNumThreads(1)
+                        }
+                        env.createSession(file.absolutePath, opts).also { sharedSession = it }
+                    }
                 }
-                val session = env.createSession(modelBytes, opts)
-                OnnxGtcrnDenoiser(env, session)
+                OnnxGtcrnDenoiser(env, sess)
             } catch (_: Exception) {
                 null
             }

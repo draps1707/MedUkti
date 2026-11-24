@@ -493,7 +493,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatus() {
         val micOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        val imeOk = isImeEnabled()
+        uiScope.launch {
+            val imeOk = withContext(Dispatchers.IO) { isImeEnabled() }
+            updateStatusUi(micOk, imeOk)
+        }
+    }
+
+    private fun updateStatusUi(micOk: Boolean, imeOk: Boolean) {
         val gOk = Prefs.getGroqKey(this).isNotBlank()
         val mOk = Prefs.getGeminiKey(this).isNotBlank()
         val eOk = Prefs.getElevenLabsKey(this).isNotBlank()

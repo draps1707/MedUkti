@@ -202,7 +202,7 @@ class SpeakerVoiceprintManager private constructor(
     }
 
     fun release() {
-        try { session.close() } catch (_: Exception) {}
+        // Shared OrtSession stays cached in memory for zero-lag keyboard switches.
     }
 
     companion object {
@@ -215,16 +215,23 @@ class SpeakerVoiceprintManager private constructor(
         fun hasAnyEnrolled(ctx: Context): Boolean =
             Prefs.getVoiceprint(ctx, 1) != null || Prefs.getVoiceprint(ctx, 2) != null
 
+        private val lock = Any()
+        @Volatile private var sharedSession: OrtSession? = null
+
         fun createOrNull(ctx: Context): SpeakerVoiceprintManager? {
             return try {
-                val modelBytes = ctx.assets.open("wespeaker_en_voxceleb_CAM++.onnx").use { it.readBytes() }
                 val env = OrtEnvironment.getEnvironment()
-                val opts = OrtSession.SessionOptions().apply {
-                    setIntraOpNumThreads(2)
-                    setInterOpNumThreads(1)
+                val sess = sharedSession ?: synchronized(lock) {
+                    sharedSession ?: run {
+                        val file = SileroVadDetector.ensureAssetFile(ctx.applicationContext, "wespeaker_en_voxceleb_CAM++.onnx")
+                        val opts = OrtSession.SessionOptions().apply {
+                            setIntraOpNumThreads(2)
+                            setInterOpNumThreads(1)
+                        }
+                        env.createSession(file.absolutePath, opts).also { sharedSession = it }
+                    }
                 }
-                val session = env.createSession(modelBytes, opts)
-                SpeakerVoiceprintManager(env, session)
+                SpeakerVoiceprintManager(env, sess)
             } catch (_: Exception) {
                 null
             }

@@ -106,6 +106,7 @@ class MedUktiImeService : InputMethodService() {
         registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
         serviceScope.launch(Dispatchers.IO) {
             MedicalNormalizer.init(this@MedUktiImeService)
+            SileroVadDetector.createOrNull(this@MedUktiImeService)
         }
     }
 
@@ -237,6 +238,7 @@ class MedUktiImeService : InputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        micAnimView?.setMode(MicAnimView.Mode.IDLE)
         if (isListening.get()) {
             stopContinuousDictation()
         }
@@ -466,7 +468,7 @@ class MedUktiImeService : InputMethodService() {
 
             val cleanCommitted = formatted.trim().trimEnd('.', ',', '!', '?')
             lastCommittedPhrase = cleanCommitted
-            Prefs.appendHistory(this, outText)
+            serviceScope.launch(Dispatchers.IO) { Prefs.appendHistory(this@MedUktiImeService, outText) }
             val wrong = pendingWrongPhrase
             if (wrong != null && cleanCommitted.isNotEmpty() && cleanCommitted.length <= 40 &&
                 cleanCommitted.split(Regex("\\s+")).size <= 3 && !wrong.equals(cleanCommitted, ignoreCase = true)
@@ -514,8 +516,8 @@ class MedUktiImeService : InputMethodService() {
         val liveStreamEnabled = Prefs.isLiveStreamingEnabled(this)
 
         vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
-            val gtcrnDenoiser = OnnxGtcrnDenoiser.createOrNull(this@MedUktiImeService)
-            val speakerVerifier = SpeakerVoiceprintManager.createOrNull(this@MedUktiImeService)
+            val gtcrnDenoiser = if (Prefs.isDenoiserEnabled(this@MedUktiImeService)) OnnxGtcrnDenoiser.createOrNull(this@MedUktiImeService) else null
+            val speakerVerifier = if (Prefs.isVoiceprintLockEnabled(this@MedUktiImeService) && SpeakerVoiceprintManager.hasAnyEnrolled(this@MedUktiImeService)) SpeakerVoiceprintManager.createOrNull(this@MedUktiImeService) else null
             try {
                 for ((seg, segEngine) in segmentChannel) {
                     val cleanSeg = if (Prefs.isDenoiserEnabled(this@MedUktiImeService) && gtcrnDenoiser != null) {
@@ -584,10 +586,14 @@ class MedUktiImeService : InputMethodService() {
                 var preferredBt: AudioDeviceInfo? = null
                 if (audioMgr != null) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        val btDev = audioMgr.availableCommunicationDevices.firstOrNull {
+                        val hasBtMic = audioMgr.getDevices(AudioManager.GET_DEVICES_INPUTS).any {
                             it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
                                 it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
                         }
+                        val btDev = if (hasBtMic) audioMgr.availableCommunicationDevices.firstOrNull {
+                            it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                        } else null
                         if (btDev != null) {
                             btCommDeviceSet = audioMgr.setCommunicationDevice(btDev)
                             preferredBt = btDev
