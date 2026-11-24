@@ -191,7 +191,7 @@ object CloudAsrClient {
         return withCtx.take(800)
     }
 
-    private fun callGroqWhisper(ctx: Context, wavBytes: ByteArray, model: String, isLivePreview: Boolean, cursorContext: String = ""): String {
+    private fun callGroqWhisper(ctx: Context, wavBytes: ByteArray, model: String, isLivePreview: Boolean, cursorContext: String = "", language: String? = "en"): String {
         val apiKey = Prefs.getGroqKey(ctx)
         if (apiKey.isBlank()) {
             throw IllegalStateException("Add your free Groq API key in MedUkti Settings")
@@ -222,7 +222,7 @@ object CloudAsrClient {
             out.write("\r\n".toByteArray())
 
             writeField("model", model)
-            writeField("language", "en")
+            if (language != null) writeField("language", language)
             writeField("response_format", "verbose_json")
             writeField("temperature", "0")
             writeField("prompt", buildWhisperPrompt(ctx, cursorContext))
@@ -253,7 +253,7 @@ object CloudAsrClient {
         return root.optString("text", "").trim()
     }
 
-    private fun callGroqPolish(ctx: Context, rawText: String, cursorContext: String = ""): String {
+    private fun callGroqPolish(ctx: Context, rawText: String, cursorContext: String = "", isHinglish: Boolean = false): String {
         val apiKey = Prefs.getGroqKey(ctx)
         if (apiKey.isBlank() || rawText.isBlank()) return rawText
         val wordCount = rawText.trim().split(Regex("\\s+")).count { tok -> tok.any { it.isLetterOrDigit() } }
