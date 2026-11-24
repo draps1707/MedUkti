@@ -34,7 +34,16 @@ object MedicalNormalizer {
         "raha", "rahi", "rahe", "gaya", "gayi", "gaye", "lena", "dena", "wala", "wali", "wale",
         "abhi", "kab", "jab", "tab", "par", "aur", "bhi", "tak", "liye", "saath", "baat",
         "kaam", "din", "raat", "ghar", "log", "sab", "kuch", "koi", "yeh", "woh", "yah", "vah",
-        "hum", "tum", "iss", "uss", "kis", "jis", "se", "ko", "ka", "ke", "ki", "na", "ho", "to", "ha", "me"
+        "hum", "tum", "iss", "uss", "kis", "jis", "se", "ko", "ka", "ke", "ki", "na", "ho", "to", "ha", "me",
+        "maintain", "maintained", "handle", "handling", "victim", "victims", "public", "another",
+        "identify", "analyze", "analyse", "started", "episodes", "exposures", "aware",
+        "karna", "karne", "karke", "andar", "chal", "sabse", "dono", "jagah", "iske", "isko", "usko",
+        "kyunki", "agar", "lekin", "phir", "bahut", "zyada", "kaafi",
+        "doctor", "fever", "cough", "sugar", "pressure", "report", "tablet", "injection",
+        "bottle", "hospital", "emergency", "ward", "discharge", "problem", "symptom", "symptoms", "pain",
+        "kaise", "kahan", "kitna", "kitne", "theek", "accha", "achha", "dekho", "dekha",
+        "batao", "samjho", "samajh", "lagta", "lagti", "laga", "hota", "hoti", "hote",
+        "diya", "liya", "rakho", "bhejo", "likho", "chalo", "suno", "bolo", "bola", "bohot"
     )
 
     private val PHONETIC_AND_SPELLING_BRIDGES = linkedMapOf(
@@ -635,7 +644,7 @@ object MedicalNormalizer {
                         val sk2 = englishSkeleton(joined)
                         val hit2 = singleWordMap[joined]
                             ?: (if (sk2.length >= 5) coreSkeletonMap[sk2] else null)
-                            ?: (if (joined.length >= 9 && sk2.length >= 6) fuzzyCoreSkeleton(sk2, 1, joined) else null)
+
                         if (hit2 != null) {
                             out.add(preserveClinicalCase(hit2, clean1) + punct2)
                             prevCleanLow = hit2.lowercase()
@@ -762,6 +771,9 @@ object MedicalNormalizer {
     private fun hasDrugSuffix(low: String): Boolean =
         DRUG_SUFFIXES.any { low.endsWith(it) }
 
+    private fun hasClinicalSuffix(low: String): Boolean =
+        CLINICAL_SUFFIXES.any { low.endsWith(it) }
+
     private fun rescueDrugToken(low: String, rxBoost: Boolean = false): String? {
         val minLen = if (rxBoost) 5 else 7
         if (low.length < minLen || low in PROTECTED_WORDS) return null
@@ -773,7 +785,7 @@ object MedicalNormalizer {
             val swapped = low.replace('j', 'z')
             coreSkeletonMap[englishSkeleton(swapped)]?.let { return it }
         }
-        if (sk.length >= 5) {
+        if (sk.length >= 5 && (rxBoost || hasDrugSuffix(low) || hasClinicalSuffix(low))) {
             val maxDist = if (rxBoost && sk.length >= 7 && hasDrugSuffix(low)) 2 else 1
             return fuzzyCoreSkeleton(sk, maxDist, low)
         }

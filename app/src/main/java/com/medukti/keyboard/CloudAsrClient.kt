@@ -215,6 +215,7 @@ object CloudAsrClient {
             out.write("\r\n".toByteArray())
 
             writeField("model", model)
+            writeField("language", "en")
             writeField("response_format", "json")
             writeField("temperature", "0")
             writeField("prompt", buildWhisperPrompt(ctx))
@@ -244,10 +245,8 @@ object CloudAsrClient {
             append("z<->j (carbimajol->Carbimazole, omeprajol->Omeprazole), ph/p<->f (epixabin->Apixaban, phosphormycin->Fosfomycin), ")
             append("dropped -r endings (acyclovia->Acyclovir, tenofova->Tenofovir), and 2-word splits (by basilar->bibasilar, Sacubitril ablastin->Sacubitril/valsartan). ")
             append("Use sentence context so normal English words (monitor, according, patients) are never wrongly replaced. ")
-            append("The speaker is an Indian doctor dictating naturally in English, Hinglish (Hindi + English), or mixed clinical notes (e.g. 'Inj. Ceftriaxone 1 gm BD for Pneumonia' or 'Yeh patient ka hum agar Ceftriaxone ke saath Azithromycin de denge toh uska mortality ratio kam ho jayega'). ")
-            append("Allow ONLY English, Romanized Hinglish, and real medical/drug terms—ban all other languages (never output Korean, Japanese, Chinese, Devanagari, Spanish, or Latin). ") 
-            append("If the raw transcript contains Hindi in Devanagari script, transliterate ONLY those Hindi words into natural Romanized Hinglish without translating to English. ") 
-            append("If Whisper emitted an out-of-context foreign/lookalike word (like 'aceturate' for 'started', 'abductores' for 'episodes', 'accipitres' for 'exposures', 'acetrizoic' for 'be aware'), replace it with the natural English/Hinglish word that fits the clinical sentence. ")
+            append("The speaker is an Indian doctor dictating clinical notes in Indian-accented English with medical and drug terms (e.g. 'Inj. Ceftriaxone 1 gm BD for Pneumonia'). ")
+            append("Output clean clinical English and accurate drug/medical terms only—never output Devanagari, Korean, Japanese, or other foreign scripts. ")
             if (candidates.isNotEmpty()) {
                 append("Candidate Indian formulary/clinical terms that may match this audio: ${candidates.joinToString(", ")}. ")
             }
@@ -294,35 +293,46 @@ object CloudAsrClient {
         return content.ifBlank { rawText }
     }
 
-    private fun callGeminiIndic(ctx: Context, wavBytes: ByteArray, isHindi: Boolean): String {
+    private fun callGeminiIndic(ctx: Context, wavBytes: ByteArray, isHinglish: Boolean): String {
         val apiKey = Prefs.getGeminiKey(ctx)
         if (apiKey.isBlank()) {
             throw IllegalStateException("Add your free Gemini API key in MedUkti Settings for Odia/Hindi")
         }
         val primaryModel = Prefs.getGeminiModel(ctx)
         return try {
-            callGeminiWithModel(apiKey, primaryModel, wavBytes, useMinimalThinking = !primaryModel.contains("lite", ignoreCase = true), isHindi = isHindi)
+            callGeminiWithModel(apiKey, primaryModel, wavBytes, useMinimalThinking = !primaryModel.contains("lite", ignoreCase = true), isHinglish = isHinglish)
         } catch (e: Exception) {
             if (primaryModel != "gemini-3.5-flash-lite" || !primaryModel.contains("lite", ignoreCase = true)) {
-                callGeminiWithModel(apiKey, "gemini-3.5-flash-lite", wavBytes, useMinimalThinking = false, isHindi = isHindi)
+                callGeminiWithModel(apiKey, "gemini-3.5-flash-lite", wavBytes, useMinimalThinking = false, isHinglish = isHinglish)
             } else {
                 throw e
             }
         }
     }
 
-    private fun callGeminiWithModel(apiKey: String, model: String, wavBytes: ByteArray, useMinimalThinking: Boolean, isHindi: Boolean): String {
+    private fun callGeminiWithModel(apiKey: String, model: String, wavBytes: ByteArray, useMinimalThinking: Boolean, isHinglish: Boolean): String {
         val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
         val b64Audio = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
 
-        val prompt = buildString {
-            append("The speaker is from Odisha speaking natural, casual conversational Odia (ଓଡ଼ିଆ) with occasional English medical or drug terms. ")
-            append("Transcribe colloquial Odisha speech faithfully in clean Odia script (ଓଡ଼ିଆ) without forcing stiff textbook grammar, and keep compound words intact (e.g. ଆମେମାନେ, ଶୀତଳ). ")
-            append("Use proper sentence punctuation (। or ?)—never use '|' pipe characters. ")
-            append("Never transliterate Odia into Roman letters, and NEVER output Bengali, Devanagari, Malayalam, or Gujarati characters. ")
-            append("Keep actual English medical terms, drug names (e.g. Ceftriaxone, Piptaz, SpO2, ECG), and digits in English. ")
-            append("If the audio is only breath, filler ('hmm', 'humm', 'uh'), or background noise, return an empty string. ")
-            append("Output ONLY the transcribed text with zero commentary.")
+        val prompt = if (isHinglish) {
+            buildString {
+                append("The speaker is an Indian doctor speaking natural Hinglish (mixed conversational Hindi and English) with medical and drug terms ")
+                append("(e.g. 'Yeh patient ko Ceftriaxone ke saath Azithromycin dena hai, BP 130/80 hai'). ")
+                append("Transcribe Hindi words in natural, easy-to-read Romanized Hinglish—NEVER output Devanagari, Korean, Japanese, or other non-Latin scripts. ")
+                append("Write all English words, medical terms, and drug names (e.g. Ceftriaxone, Azithromycin, Dapagliflozin, SpO2, ECG) in accurate English. ")
+                append("If the audio is only breath, filler ('hmm', 'uh'), or background noise, return an empty string. ")
+                append("Output ONLY the transcribed text with zero commentary.")
+            }
+        } else {
+            buildString {
+                append("The speaker is from Odisha speaking natural, casual conversational Odia (ଓଡ଼ିଆ) with occasional English medical or drug terms. ")
+                append("Transcribe colloquial Odisha speech faithfully in clean Odia script (ଓଡ଼ିଆ) without forcing stiff textbook grammar, and keep compound words intact (e.g. ଆମେମାନେ, ଶୀତଳ). ")
+                append("Use proper sentence punctuation (। or ?)—never use '|' pipe characters. ")
+                append("Never transliterate Odia into Roman letters, and NEVER output Bengali, Devanagari, Malayalam, or Gujarati characters. ")
+                append("Keep actual English medical terms, drug names (e.g. Ceftriaxone, Piptaz, SpO2, ECG), and digits in English. ")
+                append("If the audio is only breath, filler ('hmm', 'humm', 'uh'), or background noise, return an empty string. ")
+                append("Output ONLY the transcribed text with zero commentary.")
+            }
         }
 
         val payload = JSONObject().apply {
@@ -519,18 +529,18 @@ object CloudAsrClient {
                     callElevenLabsOdia(ctx, wavBytes)
                 } catch (e: Exception) {
                     if (Prefs.getGeminiKey(ctx).isNotBlank()) {
-                        callGeminiIndic(ctx, wavBytes, isHindi = false)
+                        callGeminiIndic(ctx, wavBytes, isHinglish = false)
                     } else {
                         throw e
                     }
                 }
             }
             if (Prefs.getGeminiKey(ctx).isNotBlank()) {
-                return callGeminiIndic(ctx, wavBytes, isHindi = false)
+                return callGeminiIndic(ctx, wavBytes, isHinglish = false)
             }
             throw IllegalStateException("Add your ElevenLabs or Gemini API key in MedUkti Settings")
         }
-        return callGeminiIndic(ctx, wavBytes, isHindi = false)
+        return callGeminiIndic(ctx, wavBytes, isHinglish = false)
     }
 
     fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
@@ -539,12 +549,16 @@ object CloudAsrClient {
             if (samples.size < 4800 || computeRms(samples) < minRms) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
-                AsrEngineType.CLINICAL ->
+                AsrEngineType.MEDICAL ->
                     callGroqWhisper(ctx, wav, "whisper-large-v3-turbo", isLivePreview = true)
+                AsrEngineType.HINGLISH -> {
+                    val key = Prefs.getGeminiKey(ctx)
+                    if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHinglish = true)
+                }
                 AsrEngineType.ODIA -> {
                     if (Prefs.getOdiaBackend(ctx) == OdiaBackend.GEMINI) {
                         val key = Prefs.getGeminiKey(ctx)
-                        if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHindi = false)
+                        if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHinglish = false)
                     } else ""
                 }
             }
@@ -559,7 +573,7 @@ object CloudAsrClient {
             if (samples.size < 3200 || computeRms(samples) < 0.002f) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
-                AsrEngineType.CLINICAL -> {
+                AsrEngineType.MEDICAL -> {
                     val stt = callGroqWhisper(ctx, wav, Prefs.getGroqAsrModel(ctx), isLivePreview = false)
                     if (stt.isNotBlank() && Prefs.isAiPolishEnabled(ctx)) {
                         callGroqPolish(ctx, stt)
@@ -567,6 +581,7 @@ object CloudAsrClient {
                         stt
                     }
                 }
+                AsrEngineType.HINGLISH -> callGeminiIndic(ctx, wav, isHinglish = true)
                 AsrEngineType.ODIA -> transcribeOdiaBest(ctx, wav)
             }
             Result.success(postProcessTranscript(ctx, raw, engine))

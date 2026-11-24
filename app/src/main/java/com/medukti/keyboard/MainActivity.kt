@@ -2,6 +2,8 @@ package com.medukti.keyboard
 
 import android.Manifest
 import android.content.ClipboardManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -175,6 +177,34 @@ class MainActivity : AppCompatActivity() {
                     tvDictSearchResult.setTextColor(Color.parseColor("#6DD58C"))
                 }
             }
+        }
+
+        findViewById<View>(R.id.btnBackupFixes).setOnClickListener {
+            val raw = etPersonalDict.text.toString().trim()
+            if (raw.isEmpty()) {
+                Toast.makeText(this, "No Personal Fixes to copy", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("MedUkti Personal Fixes", raw))
+            Toast.makeText(this, "Personal Fixes copied to clipboard", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<View>(R.id.btnRestoreFixes).setOnClickListener {
+            val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            val clipText = cm.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
+            if (clipText.isEmpty() || "=" !in clipText) {
+                Toast.makeText(this, "Copy valid 'wrong = right' fixes first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val merged = (etPersonalDict.text.toString().lines() + clipText.lines())
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && "=" in it }
+                .distinctBy { it.substringBefore('=').trim().lowercase() }
+                .joinToString("\n")
+            etPersonalDict.setText(merged)
+            Prefs.setPersonalDict(this, merged)
+            Toast.makeText(this, "Personal Fixes restored & saved!", Toast.LENGTH_SHORT).show()
         }
 
         findViewById<View>(R.id.btnSaveStart).setOnClickListener {

@@ -3,8 +3,9 @@ package com.medukti.keyboard
 import android.content.Context
 
 enum class AsrEngineType(val label: String, val badge: String) {
-    CLINICAL("🩺 — English + Hinglish + Medical (Groq Whisper + LLM)", "🩺"),
-    ODIA("ଓ — Conversational Odia (ElevenLabs Scribe / Gemini)", "ଓ"),
+    ODIA("ଓ — Odia Conversational (ElevenLabs Scribe v2)", "ଓ"),
+    MEDICAL("🩺 — English + Medical (Groq Whisper + GPT-OSS 120B)", "🩺"),
+    HINGLISH("हin — Hinglish + Medical (Gemini 3.8 Flash)", "हin"),
 }
 
 enum class OdiaBackend(val label: String) {
@@ -18,9 +19,9 @@ object Prefs {
     private const val KEY_GROQ_KEY = "groq_api_key"
     private const val KEY_GEMINI_KEY = "gemini_api_key"
     private const val KEY_ELEVENLABS_KEY = "elevenlabs_api_key"
-    private const val KEY_GROQ_ASR_MODEL = "groq_asr_model"
+    private const val KEY_GROQ_ASR_MODEL = "groq_asr_model_v2"
     private const val KEY_GROQ_LLM_MODEL = "groq_llm_model"
-    private const val KEY_GEMINI_MODEL = "gemini_model"
+    private const val KEY_GEMINI_MODEL = "gemini_model_v2"
     private const val KEY_ODIA_BACKEND = "odia_backend"
     private const val KEY_AI_POLISH = "ai_polish_enabled"
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
@@ -29,10 +30,11 @@ object Prefs {
 
     fun getEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY_ENGINE, AsrEngineType.CLINICAL.name)
+            .getString(KEY_ENGINE, AsrEngineType.MEDICAL.name)
         return when (raw) {
             "ODIA", "GEMINI_ODIA" -> AsrEngineType.ODIA
-            else -> AsrEngineType.CLINICAL
+            "HINGLISH", "GROQ_HINGLISH" -> AsrEngineType.HINGLISH
+            else -> AsrEngineType.MEDICAL
         }
     }
 

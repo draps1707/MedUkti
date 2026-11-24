@@ -23,8 +23,9 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.content.ClipboardManager
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -59,10 +60,13 @@ class MedUktiImeService : InputMethodService() {
     private var tvSaveFixLabel: TextView? = null
     private var vadConsumerJob: Job? = null
     private var liveLoopJob: Job? = null
-    private val activeResolvedEngine = AtomicReference<AsrEngineType>(AsrEngineType.CLINICAL)
+    private val activeResolvedEngine = AtomicReference<AsrEngineType>(AsrEngineType.MEDICAL)
 
-    private var btnModeToggle: TextView? = null
+    private var btnModeOdia: TextView? = null
+    private var btnModeMedical: TextView? = null
+    private var btnModeHinglish: TextView? = null
     private var micRingContainer: LinearLayout? = null
+    private var ivKeyboardMic: ImageView? = null
 
     private val processingWatchdog = Runnable {
         if (isProcessing && !isListening.get()) {
@@ -113,11 +117,22 @@ class MedUktiImeService : InputMethodService() {
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.keyboard_medukti, null)
-        btnModeToggle = view.findViewById(R.id.btnModeToggle)
+        btnModeOdia = view.findViewById(R.id.btnModeOdia)
+        btnModeMedical = view.findViewById(R.id.btnModeMedical)
+        btnModeHinglish = view.findViewById(R.id.btnModeHinglish)
         micRingContainer = view.findViewById(R.id.micRingContainer)
+        ivKeyboardMic = view.findViewById(R.id.ivKeyboardMic)
 
-        btnModeToggle?.setOnClickListener { toggleLanguage() }
-        btnModeToggle?.setOnLongClickListener {
+        fun selectMode(mode: AsrEngineType) {
+            buzz(20L)
+            if (isListening.get() && Prefs.getEngine(this) != mode) {
+                stopContinuousDictation()
+            }
+            Prefs.setEngine(this, mode)
+            activeResolvedEngine.set(mode)
+            refreshModeUi()
+        }
+        val openSettingsLongClick = View.OnLongClickListener {
             buzz(18L)
             val intent = Intent(this, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -125,6 +140,12 @@ class MedUktiImeService : InputMethodService() {
             startActivity(intent)
             true
         }
+        btnModeOdia?.setOnClickListener { selectMode(AsrEngineType.ODIA) }
+        btnModeMedical?.setOnClickListener { selectMode(AsrEngineType.MEDICAL) }
+        btnModeHinglish?.setOnClickListener { selectMode(AsrEngineType.HINGLISH) }
+        btnModeOdia?.setOnLongClickListener(openSettingsLongClick)
+        btnModeMedical?.setOnLongClickListener(openSettingsLongClick)
+        btnModeHinglish?.setOnLongClickListener(openSettingsLongClick)
 
         micRingContainer?.setOnClickListener {
             buzz(22L)
@@ -136,6 +157,16 @@ class MedUktiImeService : InputMethodService() {
                 return@setOnClickListener
             }
             if (!isListening.get()) startContinuousDictation() else stopContinuousDictation()
+        }
+
+        view.findViewById<View>(R.id.keyPaste).setOnClickListener {
+            buzz(14L)
+            pasteFromClipboard()
+        }
+        view.findViewById<View>(R.id.keyPaste).setOnLongClickListener {
+            buzz(20L)
+            undoLastCommitted()
+            true
         }
 
         val bsRepeatRunnable = object : Runnable {
@@ -196,9 +227,17 @@ class MedUktiImeService : InputMethodService() {
         }
     }
 
+    private fun styleModePill(tv: TextView?, active: Boolean) {
+        if (tv == null) return
+        tv.setBackgroundResource(if (active) R.drawable.bg_key_accent else R.drawable.bg_key_dark)
+        tv.setTextColor(android.graphics.Color.parseColor(if (active) "#FFFFFF" else "#9AA5B4"))
+    }
+
     private fun refreshModeUi() {
         val engine = Prefs.getEngine(this)
-        btnModeToggle?.text = engine.badge
+        styleModePill(btnModeOdia, engine == AsrEngineType.ODIA)
+        styleModePill(btnModeMedical, engine == AsrEngineType.MEDICAL)
+        styleModePill(btnModeHinglish, engine == AsrEngineType.HINGLISH)
         setMicUiState(
             when {
                 isListening.get() -> MicUiState.LISTENING
@@ -213,44 +252,39 @@ class MedUktiImeService : InputMethodService() {
             MicUiState.IDLE -> {
                 micRingContainer?.keepScreenOn = false
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
+                ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#2DD4BF"))
             }
             MicUiState.LISTENING -> {
                 micRingContainer?.keepScreenOn = true
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
+                ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#FFFFFF"))
             }
             MicUiState.POLISHING -> {
                 micRingContainer?.keepScreenOn = false
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_polishing)
+                ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#FFFFFF"))
             }
         }
     }
 
-    private fun showLanguagePicker(anchor: View) {
-        buzz(18L)
-        val popup = PopupMenu(this, anchor)
-        popup.menu.add(0, 0, 0, "Clinical (English + Hinglish + Medical)")
-        popup.menu.add(0, 1, 1, "Odia (ଓଡ଼ିଆ Conversational)")
-        popup.setOnMenuItemClickListener { item ->
-            val next = when (item.itemId) {
-                1 -> AsrEngineType.ODIA
-                else -> AsrEngineType.CLINICAL
-            }
-            Prefs.setEngine(this, next)
-            activeResolvedEngine.set(next)
-            refreshModeUi()
-            true
+    private fun pasteFromClipboard() {
+        val cm = getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+        val clip = cm.primaryClip
+        val text = if (clip != null && clip.itemCount > 0) {
+            clip.getItemAt(0).coerceToText(this)?.toString().orEmpty()
+        } else ""
+        if (text.isEmpty()) {
+            Toast.makeText(this, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+            return
         }
-        popup.show()
-    }
-
-    private fun toggleLanguage() {
-        buzz(22L)
-        val cur = Prefs.getEngine(this)
-        val entries = AsrEngineType.entries
-        val next = entries[(entries.indexOf(cur) + 1) % entries.size]
-        Prefs.setEngine(this, next)
-        activeResolvedEngine.set(next)
-        refreshModeUi()
+        val ic = currentInputConnection ?: return
+        ic.finishComposingText()
+        val before = ic.getTextBeforeCursor(20, 0)?.toString() ?: ""
+        val needSpace = before.isNotEmpty() && !before.endsWith(" ") && !before.endsWith("\n") &&
+            !text.startsWith(" ") && !text.startsWith("\n")
+        val out = (if (needSpace) " " else "") + text
+        ic.commitText(out, 1)
+        lastCommittedLen = out.length
     }
 
     private fun commitQuickToken(token: String) {
@@ -405,8 +439,12 @@ class MedUktiImeService : InputMethodService() {
             return
         }
         val selected = Prefs.getEngine(this)
-        if (selected == AsrEngineType.CLINICAL && Prefs.getGroqKey(this).isBlank()) {
+        if (selected == AsrEngineType.MEDICAL && Prefs.getGroqKey(this).isBlank()) {
             Toast.makeText(this, "Add your free Groq API key in MedUkti Settings", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (selected == AsrEngineType.HINGLISH && Prefs.getGeminiKey(this).isBlank()) {
+            Toast.makeText(this, "Add your free Gemini API key in MedUkti Settings", Toast.LENGTH_LONG).show()
             return
         }
         if (selected == AsrEngineType.ODIA &&
@@ -496,7 +534,11 @@ class MedUktiImeService : InputMethodService() {
                     }
                     val curEngine = activeResolvedEngine.get()
                     val isOdiaNow = Prefs.isIndicScriptEngine(curEngine)
-                    val speechRmsThreshold = if (isOdiaNow) 0.005f else 0.0085f
+                    val speechRmsThreshold = when (curEngine) {
+                        AsrEngineType.ODIA -> 0.005f
+                        AsrEngineType.HINGLISH -> 0.007f
+                        AsrEngineType.MEDICAL -> 0.0085f
+                    }
                     val hangoverFrames = 20 // ~640ms natural pause tolerance
 
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
@@ -581,7 +623,7 @@ class MedUktiImeService : InputMethodService() {
                         isProcessing = true
                         setMicUiState(MicUiState.POLISHING)
                         mainHandler.removeCallbacks(processingWatchdog)
-                        mainHandler.postDelayed(processingWatchdog, 10000L)
+                        mainHandler.postDelayed(processingWatchdog, 15000L)
                     } else {
                         isProcessing = false
                         setMicUiState(MicUiState.IDLE)
@@ -595,6 +637,6 @@ class MedUktiImeService : InputMethodService() {
         isListening.set(false)
         setMicUiState(MicUiState.POLISHING)
         mainHandler.removeCallbacks(processingWatchdog)
-        mainHandler.postDelayed(processingWatchdog, 10000L)
+        mainHandler.postDelayed(processingWatchdog, 15000L)
     }
 }
