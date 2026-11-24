@@ -76,20 +76,8 @@ object CloudAsrClient {
         return out
     }
 
-    private fun trimSilenceEdges(raw: FloatArray): FloatArray {
-        if (raw.size < 3200) return raw
-        val thr = 0.004f
-        var start = 0
-        while (start < raw.size && kotlin.math.abs(raw[start]) < thr) start++
-        var end = raw.size - 1
-        while (end > start && kotlin.math.abs(raw[end]) < thr) end--
-        if (end <= start) return raw
-        val pad = 1600
-        return raw.copyOfRange((start - pad).coerceAtLeast(0), (end + pad).coerceAtMost(raw.size - 1) + 1)
-    }
-
     private fun encodeWav16kMono(samples: FloatArray): ByteArray {
-        val boosted = normalizeGain(trimSilenceEdges(samples))
+        val boosted = normalizeGain(samples)
         val leadPad = 1600
         val tailPad = 1600
         val totalSamples = leadPad + boosted.size + tailPad
@@ -427,6 +415,12 @@ object CloudAsrClient {
         if (text.isEmpty()) return ""
         if (Prefs.isIndicScriptEngine(engine)) {
             text = text.replace(" |", "।").replace("|", "।")
+            // Strip accidental Spanish/French accented hallucinations (e.g. "Por el bien y la mejoración")
+            if (text.any { it in '\u00C0'..'\u024F' }) {
+                text = text.replace(Regex("\\b[A-Za-z\u00C0-\u024F]*[\u00C0-\u024F][A-Za-z\u00C0-\u024F]*\\b"), " ")
+                    .replace(Regex("(?i)\\bpor\\s+el\\s+bien\\b[^।?!]*"), " ")
+                    .replace(Regex("[ \t]{2,}"), " ").trim()
+            }
         }
         if (!Prefs.isIndicScriptEngine(engine)) {
             for (rx in WHISPER_HALLUCINATIONS) {

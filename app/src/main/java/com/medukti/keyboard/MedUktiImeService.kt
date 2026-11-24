@@ -8,11 +8,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.inputmethodservice.InputMethodService
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.media.audiofx.AutomaticGainControl
-import android.media.audiofx.NoiseSuppressor
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -28,6 +28,7 @@ import android.view.inputmethod.InputMethodManager
 import android.content.ClipboardManager
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -174,9 +175,9 @@ class MedUktiImeService : InputMethodService() {
             buzz(14L)
             pasteFromClipboard()
         }
-        view.findViewById<View>(R.id.keyPaste).setOnLongClickListener {
+        view.findViewById<View>(R.id.keyPaste).setOnLongClickListener { anchor ->
             buzz(20L)
-            undoLastCommitted()
+            showPasteHistoryMenu(anchor)
             true
         }
 
@@ -283,6 +284,28 @@ class MedUktiImeService : InputMethodService() {
                 ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#FFFFFF"))
             }
         }
+    }
+
+    private fun showPasteHistoryMenu(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menu.add(0, -1, 0, "↺ Undo last phrase")
+        val hist = Prefs.getHistory(this)
+        hist.forEachIndexed { idx, item ->
+            val preview = if (item.length > 42) item.take(40) + "…" else item
+            popup.menu.add(0, idx, idx + 1, preview)
+        }
+        popup.setOnMenuItemClickListener { m ->
+            if (m.itemId == -1) {
+                undoLastCommitted()
+            } else {
+                val chosen = hist.getOrNull(m.itemId)
+                if (!chosen.isNullOrEmpty()) {
+                    commitQuickToken(chosen)
+                }
+            }
+            true
+        }
+        popup.show()
     }
 
     private fun pasteFromClipboard() {
@@ -435,6 +458,7 @@ class MedUktiImeService : InputMethodService() {
 
             val cleanCommitted = formatted.trim().trimEnd('.', ',', '!', '?')
             lastCommittedPhrase = cleanCommitted
+            Prefs.appendHistory(this, outText)
             val wrong = pendingWrongPhrase
             if (wrong != null && cleanCommitted.isNotEmpty() && cleanCommitted.length <= 40 &&
                 cleanCommitted.split(Regex("\\s+")).size <= 3 && !wrong.equals(cleanCommitted, ignoreCase = true)
@@ -516,9 +540,34 @@ class MedUktiImeService : InputMethodService() {
             ).coerceAtLeast(frameSamples * 4)
 
             var recorder: AudioRecord? = null
-            var agc: AutomaticGainControl? = null
-            var ns: NoiseSuppressor? = null
+            val audioMgr = getSystemService(AUDIO_SERVICE) as? AudioManager
+            var btScoStarted = false
+            var btCommDeviceSet = false
             try {
+                var preferredBt: AudioDeviceInfo? = null
+                if (audioMgr != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val btDev = audioMgr.availableCommunicationDevices.firstOrNull {
+                            it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                        }
+                        if (btDev != null) {
+                            btCommDeviceSet = audioMgr.setCommunicationDevice(btDev)
+                            preferredBt = btDev
+                        }
+                    } else if (audioMgr.isBluetoothScoAvailableOffCall) {
+                        val hasBt = audioMgr.getDevices(AudioManager.GET_DEVICES_INPUTS).any {
+                            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                        }
+                        if (hasBt) {
+                            @Suppress("DEPRECATION")
+                            audioMgr.startBluetoothSco()
+                            @Suppress("DEPRECATION")
+                            audioMgr.isBluetoothScoOn = true
+                            btScoStarted = true
+                        }
+                    }
+                }
                 recorder = AudioRecord(
                     MediaRecorder.AudioSource.VOICE_RECOGNITION,
                     sampleRate,
@@ -529,15 +578,8 @@ class MedUktiImeService : InputMethodService() {
                 if (recorder.state != AudioRecord.STATE_INITIALIZED) {
                     throw IllegalStateException("Mic unavailable")
                 }
-                val sid = recorder.audioSessionId
-                try {
-                    if (AutomaticGainControl.isAvailable()) {
-                        agc = AutomaticGainControl.create(sid)?.apply { enabled = true }
-                    }
-                    if (NoiseSuppressor.isAvailable()) {
-                        ns = NoiseSuppressor.create(sid)?.apply { enabled = true }
-                    }
-                } catch (_: Exception) {
+                if (preferredBt != null) {
+                    recorder.preferredDevice = preferredBt
                 }
                 recorder.startRecording()
 
@@ -553,26 +595,14 @@ class MedUktiImeService : InputMethodService() {
                 var previewJob: Job? = null
                 val maxSegSamples = sampleRate * 18
 
-                var hpPrevX = 0f
-                var hpPrevY = 0f
-                val hpAlpha = 0.968f // ~80 Hz high-pass rumble cut at 16 kHz
-
                 while (isListening.get()) {
                     val read = recorder.read(shortBuf, 0, frameSamples)
                     if (read <= 0) {
                         delay(10)
                         continue
                     }
-                    var zeroCrossings = 0
                     for (i in 0 until read) {
-                        val x = shortBuf[i] / 32768.0f
-                        val y = hpAlpha * (hpPrevY + x - hpPrevX)
-                        hpPrevX = x
-                        hpPrevY = y
-                        floatBuf[i] = y
-                        if (i > 0 && ((floatBuf[i] >= 0f && floatBuf[i - 1] < 0f) || (floatBuf[i] < 0f && floatBuf[i - 1] >= 0f))) {
-                            zeroCrossings++
-                        }
+                        floatBuf[i] = shortBuf[i] / 32768.0f
                     }
                     val curEngine = activeResolvedEngine.get()
                     val speechRmsThreshold = when (curEngine) {
@@ -583,8 +613,7 @@ class MedUktiImeService : InputMethodService() {
                     val hangoverFrames = 20 // ~640ms natural pause tolerance
 
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
-                    val zcr = zeroCrossings.toFloat() / read
-                    val isSpeechFrame = rms >= speechRmsThreshold && zcr >= 0.015f
+                    val isSpeechFrame = rms >= speechRmsThreshold
                     if (speechBuf.size % (frameSamples * 3) < frameSamples) {
                         val level = (rms / 0.06f).coerceIn(0f, 1f)
                         val scale = 1.0f + level * 0.22f
@@ -645,7 +674,7 @@ class MedUktiImeService : InputMethodService() {
                     val segDone = inSpeech && (silenceFrames >= hangoverFrames || speechBuf.size >= maxSegSamples)
                     if (segDone) {
                         previewJob?.cancel()
-                        if (speechBuf.size >= 4800) {
+                        if (speechBuf.size >= 8000) {
                             segmentChannel.trySend(speechBuf.toFloatArray() to curEngine)
                         } else {
                             lockOrClearLiveDraft()
@@ -669,10 +698,19 @@ class MedUktiImeService : InputMethodService() {
                 }
             } finally {
                 segmentChannel.close()
-                try { agc?.release() } catch (_: Exception) {}
-                try { ns?.release() } catch (_: Exception) {}
                 try { recorder?.stop() } catch (_: Exception) {}
                 try { recorder?.release() } catch (_: Exception) {}
+                try {
+                    if (btCommDeviceSet && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        audioMgr?.clearCommunicationDevice()
+                    }
+                    if (btScoStarted) {
+                        @Suppress("DEPRECATION")
+                        audioMgr?.isBluetoothScoOn = false
+                        @Suppress("DEPRECATION")
+                        audioMgr?.stopBluetoothSco()
+                    }
+                } catch (_: Exception) {}
                 mainHandler.post {
                     isListening.set(false)
                     if (vadConsumerJob?.isActive == true) {

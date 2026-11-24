@@ -1,6 +1,7 @@
 package com.medukti.keyboard
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 
 enum class AsrEngineType(val label: String, val badge: String) {
@@ -31,6 +32,7 @@ object Prefs {
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
     private const val KEY_LIVE_STREAM = "live_streaming_preview_v2"
     private const val KEY_PERSONAL_DICT = "personal_dictionary"
+    private const val KEY_DICTATION_HISTORY = "dictation_history_v1"
 
     fun getEngine(ctx: Context): AsrEngineType {
         val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -220,5 +222,35 @@ object Prefs {
         existing.removeAll { it.substringBefore('=').trim().lowercase() + "=" == prefix }
         existing.add("$w = $r")
         setPersonalDict(ctx, existing.joinToString("\n"))
+    }
+
+    fun appendHistory(ctx: Context, text: String) {
+        val clean = text.trim()
+        if (clean.length < 4) return
+        val list = getHistory(ctx).toMutableList()
+        list.removeAll { it == clean }
+        list.add(0, clean)
+        val trimmed = list.take(15)
+        val arr = JSONArray()
+        trimmed.forEach { arr.put(it) }
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString(KEY_DICTATION_HISTORY, arr.toString())
+            .apply()
+    }
+
+    fun getHistory(ctx: Context): List<String> {
+        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .getString(KEY_DICTATION_HISTORY, "[]") ?: "[]"
+        return try {
+            val arr = JSONArray(raw)
+            val out = ArrayList<String>(arr.length())
+            for (i in 0 until arr.length()) {
+                val s = arr.optString(i, "").trim()
+                if (s.isNotEmpty()) out.add(s)
+            }
+            out
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 }
