@@ -38,3 +38,5 @@ This document tracks every iteration from **v4.2.4** through **v8.1.0**—includ
   * *Why reverted:* Legacy Android DSP muffled soft Odia consonants (`naka` → `ନାଗ`, `kariba` → `କରିଆ`, `"tapare pijuli khaibi"` → Spanish `"Por el bien y la mejoración"`). Kept the **live mic-icon voice pulse** and **1x network retry**.
 * **v8.0.0 (Gold Master Audio):** Reverted `v7.7` audio filters back to clean raw `VOICE_RECOGNITION` + `320 ms` pre-roll + `normalizeGain()`, added a **0.5-second minimum speech guard**, and stripped accented foreign hallucinations in `ODIA`.
 * **v8.1.0 (Final Release):** Added **Auto Bluetooth Mic Routing** (for Galaxy Buds 2 Pro, JBL Tune Buds, Sony WH-XB910N via `AudioManager`), **Last-15 Dictation History** on long-press `📋`, and complete GitHub documentation.
+
+* **v8.1.1 (Prompt-Leak & Hallucination Fix):** Removed all `(e.g. '...')` example sentences from Gemini/Groq prompts (fixing the echoed Hinglish example sentence), added `<2-word` and chatbot-reply guards to `callGroqPolish()` (fixing *"Please provide the transcription..."*), and raised `MEDICAL` `minRms` to `0.006f` to block quiet-hum hallucinations.

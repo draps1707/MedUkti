@@ -235,6 +235,8 @@ object CloudAsrClient {
     private fun callGroqPolish(ctx: Context, rawText: String): String {
         val apiKey = Prefs.getGroqKey(ctx)
         if (apiKey.isBlank() || rawText.isBlank()) return rawText
+        val wordCount = rawText.trim().split(Regex("\\s+")).count { tok -> tok.any { it.isLetterOrDigit() } }
+        if (wordCount < 2) return rawText
 
         val model = Prefs.getGroqLlmModel(ctx)
         val personal = Prefs.getPersonalDict(ctx).trim()
@@ -246,7 +248,7 @@ object CloudAsrClient {
             append("z<->j (carbimajol->Carbimazole, omeprajol->Omeprazole), ph/p<->f (epixabin->Apixaban, phosphormycin->Fosfomycin), ")
             append("dropped -r endings (acyclovia->Acyclovir, tenofova->Tenofovir), and 2-word splits (by basilar->bibasilar, Sacubitril ablastin->Sacubitril/valsartan). ")
             append("Use sentence context so normal English words (monitor, according, patients) are never wrongly replaced. ")
-            append("The speaker is an Indian doctor dictating clinical notes in Indian-accented English with medical and drug terms (e.g. 'Inj. Ceftriaxone 1 gm BD for Pneumonia'). ")
+            append("The speaker is an Indian doctor dictating clinical notes in Indian-accented English with medical and drug terms. If the input is noise or unclear, return it unchanged—never ask for text or reply conversationally. ")
             append("Output clean clinical English and accurate drug/medical terms only—never output Devanagari, Korean, Japanese, or other foreign scripts. ")
             if (candidates.isNotEmpty()) {
                 append("Candidate Indian formulary/clinical terms that may match this audio: ${candidates.joinToString(", ")}. ")
@@ -291,7 +293,19 @@ object CloudAsrClient {
             ?.optString("content", "")
             ?.trim()
             .orEmpty()
-        return content.ifBlank { rawText }
+        if (content.isBlank()) return rawText
+        val low = content.lowercase()
+        if (low.startsWith("please provide") ||
+            low.startsWith("i'm sorry") ||
+            low.startsWith("i cannot") ||
+            low.startsWith("here is") ||
+            low.startsWith("sure,") ||
+            low.contains("transcription you would like") ||
+            content.length > rawText.length * 3 + 40
+        ) {
+            return rawText
+        }
+        return content
     }
 
     private fun callGeminiIndic(ctx: Context, wavBytes: ByteArray, isHinglish: Boolean): String {
@@ -317,22 +331,18 @@ object CloudAsrClient {
 
         val prompt = if (isHinglish) {
             buildString {
-                append("The speaker is an Indian doctor speaking natural Hinglish (mixed conversational Hindi and English) with medical and drug terms ")
-                append("(e.g. 'Yeh patient ko Ceftriaxone ke saath Azithromycin dena hai, BP 130/80 hai'). ")
-                append("Transcribe Hindi words in natural, easy-to-read Romanized Hinglish—NEVER output Devanagari, Korean, Japanese, or other non-Latin scripts. ")
-                append("Write all English words, medical terms, and drug names (e.g. Ceftriaxone, Azithromycin, Dapagliflozin, SpO2, ECG) in accurate English. ")
-                append("If the audio is only breath, filler ('hmm', 'uh'), or background noise, return an empty string. ")
-                append("Output ONLY the transcribed text with zero commentary.")
+                append("Transcribe ONLY the spoken audio verbatim. The speaker is an Indian doctor speaking natural Hinglish (mixed Hindi and English) with medical terms. ")
+                append("Write Hindi words in natural Romanized Hinglish and English/medical terms in accurate English—NEVER output Devanagari, Korean, Japanese, or other non-Latin scripts. ")
+                append("If the audio is silence, breath, filler, or unintelligible noise, output an empty string. Never invent or repeat example sentences. ")
+                append("Output ONLY the spoken transcript with zero commentary.")
             }
         } else {
             buildString {
-                append("The speaker is from Odisha speaking natural, casual conversational Odia (ଓଡ଼ିଆ) with occasional English medical or drug terms. ")
-                append("Transcribe colloquial Odisha speech faithfully in clean Odia script (ଓଡ଼ିଆ) without forcing stiff textbook grammar, and keep compound words intact (e.g. ଆମେମାନେ, ଶୀତଳ). ")
-                append("Use proper sentence punctuation (। or ?)—never use '|' pipe characters. ")
-                append("Never transliterate Odia into Roman letters, and NEVER output Bengali, Devanagari, Malayalam, or Gujarati characters. ")
-                append("Keep actual English medical terms, drug names (e.g. Ceftriaxone, Piptaz, SpO2, ECG), and digits in English. ")
-                append("If the audio is only breath, filler ('hmm', 'humm', 'uh'), or background noise, return an empty string. ")
-                append("Output ONLY the transcribed text with zero commentary.")
+                append("Transcribe ONLY the spoken audio verbatim. The speaker is from Odisha speaking casual conversational Odia (ଓଡ଼ିଆ) with occasional English medical terms. ")
+                append("Write Odia speech in clean Odia script (ଓଡ଼ିଆ) keeping colloquial phrasing natural, use '।' or '?' for punctuation (never '|'), and keep English medical terms and digits in English. ")
+                append("NEVER output Bengali, Devanagari, Malayalam, or Gujarati characters. ")
+                append("If the audio is silence, breath, filler, or unintelligible noise, output an empty string. ")
+                append("Output ONLY the spoken transcript with zero commentary.")
             }
         }
 
@@ -561,7 +571,7 @@ object CloudAsrClient {
 
     fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
         return try {
-            val minRms = if (Prefs.isIndicScriptEngine(engine)) 0.002f else 0.004f
+            val minRms = when (engine) { AsrEngineType.ODIA -> 0.002f; AsrEngineType.HINGLISH -> 0.004f; AsrEngineType.MEDICAL -> 0.006f }
             if (samples.size < 4800 || computeRms(samples) < minRms) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
