@@ -522,20 +522,46 @@ class MedUktiImeService : InputMethodService() {
         val liveStreamEnabled = Prefs.isLiveStreamingEnabled(this)
 
         vadConsumerJob = serviceScope.launch(Dispatchers.IO) {
-            for ((seg, segEngine) in segmentChannel) {
-                val res = CloudAsrClient.transcribeFinal(this@MedUktiImeService, segEngine, seg)
-                res.onSuccess { text ->
-                    if (text.isNotEmpty()) {
-                        commitTranscript(text)
+            val gtcrnDenoiser = OnnxGtcrnDenoiser.createOrNull(this@MedUktiImeService)
+            val speakerVerifier = SpeakerVoiceprintManager.createOrNull(this@MedUktiImeService)
+            try {
+                for ((seg, segEngine) in segmentChannel) {
+                    val cleanSeg = if (Prefs.isDenoiserEnabled(this@MedUktiImeService) && gtcrnDenoiser != null) {
+                        gtcrnDenoiser.denoiseChunk(seg)
                     } else {
-                        lockOrClearLiveDraft()
+                        seg
                     }
-                }.onFailure { err ->
-                    lockOrClearLiveDraft()
-                    mainHandler.post {
-                        Toast.makeText(this@MedUktiImeService, err.message ?: "Network error", Toast.LENGTH_SHORT).show()
+                    if (Prefs.isVoiceprintLockEnabled(this@MedUktiImeService) &&
+                        SpeakerVoiceprintManager.hasAnyEnrolled(this@MedUktiImeService) &&
+                        speakerVerifier != null &&
+                        cleanSeg.size >= 8000
+                    ) {
+                        val sim = speakerVerifier.maxSimilarity(this@MedUktiImeService, cleanSeg)
+                        if (sim != null && sim < Prefs.getVoiceprintThreshold(this@MedUktiImeService)) {
+                            lockOrClearLiveDraft()
+                            continue
+                        }
+                    }
+                    val cursorCtx = withContext(Dispatchers.Main) {
+                        currentInputConnection?.getTextBeforeCursor(180, 0)?.toString()?.trim().orEmpty()
+                    }
+                    val res = CloudAsrClient.transcribeFinal(this@MedUktiImeService, segEngine, cleanSeg, cursorCtx)
+                    res.onSuccess { text ->
+                        if (text.isNotEmpty()) {
+                            commitTranscript(text)
+                        } else {
+                            lockOrClearLiveDraft()
+                        }
+                    }.onFailure { err ->
+                        lockOrClearLiveDraft()
+                        mainHandler.post {
+                            Toast.makeText(this@MedUktiImeService, err.message ?: "Network error", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
+            } finally {
+                gtcrnDenoiser?.release()
+                speakerVerifier?.release()
             }
             withContext(Dispatchers.Main + NonCancellable) {
                 mainHandler.removeCallbacks(processingWatchdog)
@@ -600,14 +626,7 @@ class MedUktiImeService : InputMethodService() {
                 if (preferredBt != null) {
                     recorder.preferredDevice = preferredBt
                 }
-                if (denoiserOn) {
-                    try {
-                        if (NoiseSuppressor.isAvailable()) {
-                            noiseSuppressor = NoiseSuppressor.create(recorder.audioSessionId)?.apply { enabled = true }
-                        }
-                    } catch (_: Exception) {
-                    }
-                }
+                // Legacy Android NoiseSuppressor disabled; GTCRN neural denoiser runs cleanly on chunks.
                 recorder.startRecording()
 
                 val shortBuf = ShortArray(frameSamples)
@@ -635,15 +654,7 @@ class MedUktiImeService : InputMethodService() {
                         continue
                     }
                     for (i in 0 until read) {
-                        val x = shortBuf[i] / 32768.0f
-                        if (denoiserOn) {
-                            val y = hpAlpha * (hpPrevY + x - hpPrevX)
-                            hpPrevX = x
-                            hpPrevY = y
-                            floatBuf[i] = y
-                        } else {
-                            floatBuf[i] = x
-                        }
+                        floatBuf[i] = shortBuf[i] / 32768.0f
                     }
                     val curEngine = activeResolvedEngine.get()
                     val speechRmsThreshold = when (curEngine) {

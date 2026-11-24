@@ -171,7 +171,7 @@ object CloudAsrClient {
         }
     }
 
-    private fun buildWhisperPrompt(ctx: Context): String {
+    private fun buildWhisperPrompt(ctx: Context, cursorContext: String = ""): String {
         val universalTerms = "Tab., Inj., Cap., SpO2, BP, Dyspnoea, Oedema, Ceftriaxone, Piperacillin, Tazobactam, Augmentin, Azithromycin, Empagliflozin, Dapagliflozin, Apixaban, Sacubitril/valsartan, Alendronate, Prednisolone, Methotrexate, Sulfasalazine, Metformin, Paracetamol"
         val personal = Prefs.getPersonalDict(ctx)
         val customTerms = if (personal.isBlank()) emptyList() else personal.lines()
@@ -186,10 +186,12 @@ object CloudAsrClient {
         } else {
             "${customTerms.joinToString(", ")}, $universalTerms"
         }
-        return combined.take(750)
+        val ctxTail = cursorContext.replace("\n", " ").trim().takeLast(120)
+        val withCtx = if (ctxTail.isNotEmpty()) "$combined. Context: $ctxTail" else combined
+        return withCtx.take(800)
     }
 
-    private fun callGroqWhisper(ctx: Context, wavBytes: ByteArray, model: String, isLivePreview: Boolean): String {
+    private fun callGroqWhisper(ctx: Context, wavBytes: ByteArray, model: String, isLivePreview: Boolean, cursorContext: String = ""): String {
         val apiKey = Prefs.getGroqKey(ctx)
         if (apiKey.isBlank()) {
             throw IllegalStateException("Add your free Groq API key in MedUkti Settings")
@@ -223,7 +225,7 @@ object CloudAsrClient {
             writeField("language", "en")
             writeField("response_format", "verbose_json")
             writeField("temperature", "0")
-            writeField("prompt", buildWhisperPrompt(ctx))
+            writeField("prompt", buildWhisperPrompt(ctx, cursorContext))
             out.write("--$boundary--\r\n".toByteArray())
         }
 
@@ -251,7 +253,7 @@ object CloudAsrClient {
         return root.optString("text", "").trim()
     }
 
-    private fun callGroqPolish(ctx: Context, rawText: String): String {
+    private fun callGroqPolish(ctx: Context, rawText: String, cursorContext: String = ""): String {
         val apiKey = Prefs.getGroqKey(ctx)
         if (apiKey.isBlank() || rawText.isBlank()) return rawText
         val wordCount = rawText.trim().split(Regex("\\s+")).count { tok -> tok.any { it.isLetterOrDigit() } }
@@ -271,6 +273,10 @@ object CloudAsrClient {
             append("Output clean clinical English and accurate drug/medical terms only—never output Devanagari, Korean, Japanese, or other foreign scripts. ")
             if (candidates.isNotEmpty()) {
                 append("Candidate Indian formulary/clinical terms that may match this audio: ${candidates.joinToString(", ")}. ")
+            }
+            val ctxTail = cursorContext.replace("\n", " ").replace("\"", "'").trim().takeLast(140)
+            if (ctxTail.isNotEmpty()) {
+                append("Preceding text already typed before cursor (use ONLY for continuity, spelling, and capitalization; NEVER repeat or include it in your output): \"$ctxTail\". ")
             }
             if (personal.isNotEmpty()) {
                 append("Always apply these exact user overrides: ${personal.replace("\n", "; ")}. ")
@@ -327,29 +333,32 @@ object CloudAsrClient {
         return content
     }
 
-    private fun callGeminiIndic(ctx: Context, wavBytes: ByteArray, isHinglish: Boolean): String {
+    private fun callGeminiIndic(ctx: Context, wavBytes: ByteArray, isHinglish: Boolean, cursorContext: String = ""): String {
         val apiKey = Prefs.getGeminiKey(ctx)
         if (apiKey.isBlank()) {
             throw IllegalStateException("Add your free Gemini API key in MedUkti Settings for Odia/Hindi")
         }
         val primaryModel = Prefs.getGeminiModel(ctx)
         return try {
-            callGeminiWithModel(apiKey, primaryModel, wavBytes, useMinimalThinking = !primaryModel.contains("lite", ignoreCase = true), isHinglish = isHinglish)
+            callGeminiWithModel(apiKey, primaryModel, wavBytes, useMinimalThinking = !primaryModel.contains("lite", ignoreCase = true), isHinglish = isHinglish, cursorContext = cursorContext)
         } catch (e: Exception) {
             if (primaryModel != "gemini-3.5-flash-lite" || !primaryModel.contains("lite", ignoreCase = true)) {
-                callGeminiWithModel(apiKey, "gemini-3.5-flash-lite", wavBytes, useMinimalThinking = false, isHinglish = isHinglish)
+                callGeminiWithModel(apiKey, "gemini-3.5-flash-lite", wavBytes, useMinimalThinking = false, isHinglish = isHinglish, cursorContext = cursorContext)
             } else {
                 throw e
             }
         }
     }
 
-    private fun callGeminiWithModel(apiKey: String, model: String, wavBytes: ByteArray, useMinimalThinking: Boolean, isHinglish: Boolean): String {
+    private fun callGeminiWithModel(apiKey: String, model: String, wavBytes: ByteArray, useMinimalThinking: Boolean, isHinglish: Boolean, cursorContext: String = ""): String {
         val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
         val b64Audio = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
 
+        val ctxTail = cursorContext.replace("\n", " ").replace("\"", "'").trim().takeLast(120)
+        val ctxHint = if (ctxTail.isNotEmpty()) "Context already typed before cursor (use ONLY for continuity; NEVER repeat it): \"$ctxTail\". " else ""
         val prompt = if (isHinglish) {
             buildString {
+                append(ctxHint)
                 append("Transcribe ONLY the spoken audio verbatim. The speaker is an Indian doctor speaking natural Hinglish (mixed Hindi and English) with medical terms. ")
                 append("Write Hindi words in natural Romanized Hinglish and English/medical terms in accurate English, add clean periods and commas between sentences, and keep spoken 'um' and 'uh' fillers as-is—NEVER output Devanagari, Korean, Japanese, or other non-Latin scripts. ")
                 append("If the audio is silence, breath, filler, or unintelligible noise, output an empty string. Never invent or repeat example sentences. ")
@@ -357,6 +366,7 @@ object CloudAsrClient {
             }
         } else {
             buildString {
+                append(ctxHint)
                 append("Transcribe ONLY the spoken audio verbatim. The speaker is from Odisha speaking casual conversational Odia (ଓଡ଼ିଆ) with occasional English medical terms. ")
                 append("Write Odia speech in clean Odia script (ଓଡ଼ିଆ) keeping colloquial phrasing natural, use '।' or '?' for punctuation (never '|'), and keep English medical terms and digits in English. ")
                 append("NEVER output Bengali, Devanagari, Malayalam, or Gujarati characters. ")
@@ -563,7 +573,7 @@ object CloudAsrClient {
         return JSONObject(body).optString("text", "").trim()
     }
 
-    private fun transcribeOdiaBest(ctx: Context, wavBytes: ByteArray): String {
+    private fun transcribeOdiaBest(ctx: Context, wavBytes: ByteArray, cursorContext: String = ""): String {
         val backend = Prefs.getOdiaBackend(ctx)
         if (backend == OdiaBackend.ELEVENLABS) {
             val elKey = Prefs.getElevenLabsKey(ctx)
@@ -575,18 +585,18 @@ object CloudAsrClient {
                         Handler(Looper.getMainLooper()).post {
                             Toast.makeText(ctx.applicationContext, "11Labs busy — used Gemini backup", Toast.LENGTH_SHORT).show()
                         }
-                        callGeminiIndic(ctx, wavBytes, isHinglish = false)
+                        callGeminiIndic(ctx, wavBytes, isHinglish = false, cursorContext = cursorContext)
                     } else {
                         throw e
                     }
                 }
             }
             if (Prefs.getGeminiKey(ctx).isNotBlank()) {
-                return callGeminiIndic(ctx, wavBytes, isHinglish = false)
+                return callGeminiIndic(ctx, wavBytes, isHinglish = false, cursorContext = cursorContext)
             }
             throw IllegalStateException("Add your ElevenLabs or Gemini API key in MedUkti Settings")
         }
-        return callGeminiIndic(ctx, wavBytes, isHinglish = false)
+        return callGeminiIndic(ctx, wavBytes, isHinglish = false, cursorContext = cursorContext)
     }
 
     private inline fun <T> runWithOneNetworkRetry(block: () -> T): T {
@@ -598,22 +608,22 @@ object CloudAsrClient {
         }
     }
 
-    fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
+    fun transcribeLivePreview(ctx: Context, engine: AsrEngineType, samples: FloatArray, cursorContext: String = ""): Result<String> {
         return try {
             val minRms = when (engine) { AsrEngineType.ODIA -> 0.002f; AsrEngineType.HINGLISH -> 0.004f; AsrEngineType.MEDICAL -> 0.006f }
             if (samples.size < 4800 || computeRms(samples) < minRms) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = when (engine) {
                 AsrEngineType.MEDICAL ->
-                    callGroqWhisper(ctx, wav, "whisper-large-v3-turbo", isLivePreview = true)
+                    callGroqWhisper(ctx, wav, "whisper-large-v3-turbo", isLivePreview = true, cursorContext = cursorContext)
                 AsrEngineType.HINGLISH -> {
                     val key = Prefs.getGeminiKey(ctx)
-                    if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHinglish = true)
+                    if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHinglish = true, cursorContext = cursorContext)
                 }
                 AsrEngineType.ODIA -> {
                     if (Prefs.getOdiaBackend(ctx) == OdiaBackend.GEMINI) {
                         val key = Prefs.getGeminiKey(ctx)
-                        if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHinglish = false)
+                        if (key.isBlank()) "" else callGeminiWithModel(key, "gemini-3.5-flash-lite", wav, useMinimalThinking = false, isHinglish = false, cursorContext = cursorContext)
                     } else ""
                 }
             }
@@ -623,22 +633,22 @@ object CloudAsrClient {
         }
     }
 
-    fun transcribeFinal(ctx: Context, engine: AsrEngineType, samples: FloatArray): Result<String> {
+    fun transcribeFinal(ctx: Context, engine: AsrEngineType, samples: FloatArray, cursorContext: String = ""): Result<String> {
         return try {
             if (samples.size < 3200 || computeRms(samples) < 0.002f) return Result.success("")
             val wav = encodeWav16kMono(samples)
             val raw = runWithOneNetworkRetry {
                 when (engine) {
                 AsrEngineType.MEDICAL -> {
-                    val stt = callGroqWhisper(ctx, wav, Prefs.getGroqAsrModel(ctx), isLivePreview = false)
+                    val stt = callGroqWhisper(ctx, wav, Prefs.getGroqAsrModel(ctx), isLivePreview = false, cursorContext = cursorContext)
                     if (stt.isNotBlank() && Prefs.isAiPolishEnabled(ctx)) {
-                        callGroqPolish(ctx, stt)
+                        callGroqPolish(ctx, stt, cursorContext)
                     } else {
                         stt
                     }
                 }
-                AsrEngineType.HINGLISH -> callGeminiIndic(ctx, wav, isHinglish = true)
-                AsrEngineType.ODIA -> transcribeOdiaBest(ctx, wav)
+                AsrEngineType.HINGLISH -> callGeminiIndic(ctx, wav, isHinglish = true, cursorContext = cursorContext)
+                AsrEngineType.ODIA -> transcribeOdiaBest(ctx, wav, cursorContext = cursorContext)
                 }
             }
             Result.success(postProcessTranscript(ctx, raw, engine))

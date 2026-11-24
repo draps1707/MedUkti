@@ -158,6 +158,144 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
+        
+        <!-- Card 2B: 2-Voice Speaker Voiceprint Lock -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_card_dark"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SPEAKER VOICEPRINT LOCK (ME + WIFE)"
+                android:textColor="#2DD4BF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <Switch
+                android:id="@+id/switchVoiceprintLock"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Ignore bystanders (enrolled voices only)"
+                android:textColor="#E8EAED"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Voice 1 (Dr. Aditya)"
+                        android:textColor="#E8EAED"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvVoice1Status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Not enrolled"
+                        android:textColor="#9AA0A6"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/btnEnrollVoice1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_btn_compact"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="Record 5s"
+                    android:textColor="#2DD4BF"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnClearVoice1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_key_action"
+                    android:gravity="center"
+                    android:paddingHorizontal="10dp"
+                    android:text="Clear"
+                    android:textColor="#9AA0A6"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Voice 2 (Wife)"
+                        android:textColor="#E8EAED"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvVoice2Status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Not enrolled"
+                        android:textColor="#9AA0A6"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/btnEnrollVoice2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_btn_compact"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="Record 5s"
+                    android:textColor="#2DD4BF"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnClearVoice2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_key_action"
+                    android:gravity="center"
+                    android:paddingHorizontal="10dp"
+                    android:text="Clear"
+                    android:textColor="#9AA0A6"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- Card 3: Built-in Dictionary Check & Personal Dictionary -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -689,7 +827,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Noisy room / fan filter (for OPD &amp; wards)"
+                    android:text="Neural TV &amp; ward noise filter (GTCRN)"
                     android:textColor="#E8EAED"
                     android:textSize="14sp" />
             </LinearLayout>

@@ -31,7 +31,11 @@ object Prefs {
     private const val KEY_AI_POLISH = "ai_polish_enabled"
     private const val KEY_AUTO_LISTEN = "auto_listen_ime"
     private const val KEY_LIVE_STREAM = "live_streaming_preview_v2"
-    private const val KEY_DENOISER = "noisy_room_denoiser"
+    private const val KEY_DENOISER = "neural_gtcrn_denoiser_v1"
+    private const val KEY_VOICEPRINT_LOCK = "voiceprint_lock_enabled"
+    private const val KEY_VOICEPRINT_1 = "voiceprint_emb_1"
+    private const val KEY_VOICEPRINT_2 = "voiceprint_emb_2"
+    private const val KEY_VOICEPRINT_THRESHOLD = "voiceprint_threshold"
     private const val KEY_PERSONAL_DICT = "personal_dictionary"
     private const val KEY_DICTATION_HISTORY = "dictation_history_v1"
 
@@ -206,12 +210,50 @@ object Prefs {
     }
 
     fun isDenoiserEnabled(ctx: Context): Boolean =
-        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_DENOISER, false)
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_DENOISER, true)
 
     fun setDenoiserEnabled(ctx: Context, enabled: Boolean) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_DENOISER, enabled)
             .apply()
+    }
+
+
+    fun isVoiceprintLockEnabled(ctx: Context): Boolean =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_VOICEPRINT_LOCK, true)
+
+    fun setVoiceprintLockEnabled(ctx: Context, enabled: Boolean) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_VOICEPRINT_LOCK, enabled)
+            .apply()
+    }
+
+    fun getVoiceprintThreshold(ctx: Context): Float =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getFloat(KEY_VOICEPRINT_THRESHOLD, 0.42f)
+
+    fun getVoiceprint(ctx: Context, slot: Int): FloatArray? {
+        val key = if (slot == 1) KEY_VOICEPRINT_1 else KEY_VOICEPRINT_2
+        val raw = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(key, null) ?: return null
+        return try {
+            val arr = JSONArray(raw)
+            if (arr.length() == 0) return null
+            FloatArray(arr.length()) { i -> arr.getDouble(i).toFloat() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun setVoiceprint(ctx: Context, slot: Int, emb: FloatArray?) {
+        val key = if (slot == 1) KEY_VOICEPRINT_1 else KEY_VOICEPRINT_2
+        val ed = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+        if (emb == null) {
+            ed.remove(key)
+        } else {
+            val arr = JSONArray()
+            for (v in emb) arr.put(v.toDouble())
+            ed.putString(key, arr.toString())
+        }
+        ed.apply()
     }
 
     fun getPersonalDict(ctx: Context): String =

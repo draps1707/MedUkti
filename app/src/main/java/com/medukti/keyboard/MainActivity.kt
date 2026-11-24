@@ -1,6 +1,10 @@
 package com.medukti.keyboard
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.content.ClipboardManager
 import android.content.ClipData
 import android.content.Intent
@@ -41,6 +45,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etGeminiModel: EditText
     private lateinit var tvKeyTestResult: TextView
     private lateinit var tvDictSearchResult: TextView
+    private lateinit var switchVoiceprintLock: Switch
+    private lateinit var tvVoice1Status: TextView
+    private lateinit var tvVoice2Status: TextView
+    private var isEnrollingVoice = false
     private val uiScope = CoroutineScope(Dispatchers.Main + Job())
 
     private val groqAsrOptions = listOf(
@@ -101,6 +109,30 @@ class MainActivity : AppCompatActivity() {
         etGeminiModel = findViewById(R.id.etGeminiModel)
         tvKeyTestResult = findViewById(R.id.tvKeyTestResult)
         tvDictSearchResult = findViewById(R.id.tvDictSearchResult)
+        switchVoiceprintLock = findViewById(R.id.switchVoiceprintLock)
+        tvVoice1Status = findViewById(R.id.tvVoice1Status)
+        tvVoice2Status = findViewById(R.id.tvVoice2Status)
+        val btnEnrollVoice1 = findViewById<TextView>(R.id.btnEnrollVoice1)
+        val btnClearVoice1 = findViewById<View>(R.id.btnClearVoice1)
+        val btnEnrollVoice2 = findViewById<TextView>(R.id.btnEnrollVoice2)
+        val btnClearVoice2 = findViewById<View>(R.id.btnClearVoice2)
+        switchVoiceprintLock.isChecked = Prefs.isVoiceprintLockEnabled(this)
+        switchVoiceprintLock.setOnCheckedChangeListener { _, isChecked ->
+            Prefs.setVoiceprintLockEnabled(this, isChecked)
+        }
+        btnEnrollVoice1.setOnClickListener { enrollVoiceSlot(1, btnEnrollVoice1) }
+        btnEnrollVoice2.setOnClickListener { enrollVoiceSlot(2, btnEnrollVoice2) }
+        btnClearVoice1.setOnClickListener {
+            Prefs.setVoiceprint(this, 1, null)
+            refreshVoiceprintUi()
+            Toast.makeText(this, "Voice 1 cleared", Toast.LENGTH_SHORT).show()
+        }
+        btnClearVoice2.setOnClickListener {
+            Prefs.setVoiceprint(this, 2, null)
+            refreshVoiceprintUi()
+            Toast.makeText(this, "Voice 2 cleared", Toast.LENGTH_SHORT).show()
+        }
+        refreshVoiceprintUi()
 
         btnToggleAdvanced.setOnClickListener {
             val open = advancedContainer.visibility != View.VISIBLE
@@ -259,6 +291,7 @@ class MainActivity : AppCompatActivity() {
             Prefs.setAutoListen(this, switchAutoListen.isChecked)
             Prefs.setLiveStreamingEnabled(this, switchLiveStream.isChecked)
             Prefs.setDenoiserEnabled(this, switchDenoiser.isChecked)
+            Prefs.setVoiceprintLockEnabled(this, switchVoiceprintLock.isChecked)
 
             Prefs.setGroqAsrModel(this, resolveModelValue(spinnerGroqAsr, etGroqAsrModel, groqAsrOptions))
             val llmChoice = resolveModelValue(spinnerGroqLlm, etGroqLlmModel, groqLlmOptions)
@@ -316,6 +349,87 @@ class MainActivity : AppCompatActivity() {
     ): String {
         val sel = options[spinner.selectedItemPosition].second
         return if (sel == "__CUSTOM__") customEdit.text.toString().trim() else sel
+    }
+
+
+    private fun refreshVoiceprintUi() {
+        val v1 = Prefs.getVoiceprint(this, 1) != null
+        val v2 = Prefs.getVoiceprint(this, 2) != null
+        tvVoice1Status.text = if (v1) "Enrolled ✓" else "Not enrolled"
+        tvVoice1Status.setTextColor(Color.parseColor(if (v1) "#6DD58C" else "#9AA0A6"))
+        tvVoice2Status.text = if (v2) "Enrolled ✓" else "Not enrolled"
+        tvVoice2Status.setTextColor(Color.parseColor(if (v2) "#6DD58C" else "#9AA0A6"))
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun enrollVoiceSlot(slot: Int, btn: TextView) {
+        if (isEnrollingVoice) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestNeededPermissions()
+            Toast.makeText(this, "Grant Microphone permission first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        isEnrollingVoice = true
+        btn.isEnabled = false
+        val labelName = if (slot == 1) "Dr. Aditya" else "Wife"
+        uiScope.launch {
+            try {
+                val emb = withContext(Dispatchers.IO) {
+                    val sr = 16000
+                    val totalSamples = sr * 5
+                    val minBuf = AudioRecord.getMinBufferSize(
+                        sr, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
+                    ).coerceAtLeast(4096)
+                    val rec = AudioRecord(
+                        MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                        sr, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minBuf
+                    )
+                    if (rec.state != AudioRecord.STATE_INITIALIZED) {
+                        rec.release()
+                        return@withContext null
+                    }
+                    val pcm = FloatArray(totalSamples)
+                    val buf = ShortArray(1024)
+                    var pos = 0
+                    var lastSec = -1
+                    try {
+                        rec.startRecording()
+                        while (pos < totalSamples) {
+                            val r = rec.read(buf, 0, minOf(buf.size, totalSamples - pos))
+                            if (r > 0) {
+                                for (i in 0 until r) pcm[pos + i] = buf[i] / 32768.0f
+                                pos += r
+                                val rem = ((totalSamples - pos) / sr) + 1
+                                if (rem != lastSec) {
+                                    lastSec = rem
+                                    withContext(Dispatchers.Main) { btn.text = "${rem.coerceAtLeast(1)}s…" }
+                                }
+                            }
+                        }
+                    } finally {
+                        try { rec.stop() } catch (_: Exception) {}
+                        rec.release()
+                    }
+                    val denoiser = OnnxGtcrnDenoiser.createOrNull(this@MainActivity)
+                    val clean = try { denoiser?.denoiseChunk(pcm) ?: pcm } finally { denoiser?.release() }
+                    val verifier = SpeakerVoiceprintManager.createOrNull(this@MainActivity)
+                    try { verifier?.extractEmbedding(clean) } finally { verifier?.release() }
+                }
+                if (emb != null) {
+                    Prefs.setVoiceprint(this@MainActivity, slot, emb)
+                    Prefs.setVoiceprintLockEnabled(this@MainActivity, true)
+                    switchVoiceprintLock.isChecked = true
+                    refreshVoiceprintUi()
+                    Toast.makeText(this@MainActivity, "Saved voiceprint for $labelName ✓", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "Could not capture voice — speak clearly and retry", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                btn.text = "Record 5s"
+                btn.isEnabled = true
+                isEnrollingVoice = false
+            }
+        }
     }
 
     override fun onResume() {

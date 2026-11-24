@@ -17,6 +17,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Download WeSpeaker CAM++ speaker-voiceprint ONNX model
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fsSL --retry 3 \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_CAM++.onnx" \
+            -o app/src/main/assets/wespeaker_en_voxceleb_CAM++.onnx
+          ls -lh app/src/main/assets/wespeaker_en_voxceleb_CAM++.onnx
+
       - name: Compile 3-layer medical dictionary (Indian core + 2026 molecules + 98k open list)
         run: |
           curl -fsSL https://raw.githubusercontent.com/glutanimate/wordlist-medicalterms-en/master/wordlist.txt -o /tmp/med_extra.txt || true
