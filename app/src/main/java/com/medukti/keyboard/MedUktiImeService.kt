@@ -262,17 +262,24 @@ class MedUktiImeService : InputMethodService() {
         when (state) {
             MicUiState.IDLE -> {
                 micRingContainer?.keepScreenOn = false
+                micRingContainer?.alpha = 1.0f
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_idle)
+                ivKeyboardMic?.scaleX = 1.0f
+                ivKeyboardMic?.scaleY = 1.0f
                 ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#2DD4BF"))
             }
             MicUiState.LISTENING -> {
                 micRingContainer?.keepScreenOn = true
+                micRingContainer?.alpha = 0.88f
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_active)
                 ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#FFFFFF"))
             }
             MicUiState.POLISHING -> {
                 micRingContainer?.keepScreenOn = false
+                micRingContainer?.alpha = 1.0f
                 micRingContainer?.setBackgroundResource(R.drawable.bg_mic_pill_polishing)
+                ivKeyboardMic?.scaleX = 1.0f
+                ivKeyboardMic?.scaleY = 1.0f
                 ivKeyboardMic?.setColorFilter(android.graphics.Color.parseColor("#FFFFFF"))
             }
         }
@@ -578,6 +585,18 @@ class MedUktiImeService : InputMethodService() {
                     val rms = CloudAsrClient.computeRms(floatBuf, 0, read)
                     val zcr = zeroCrossings.toFloat() / read
                     val isSpeechFrame = rms >= speechRmsThreshold && zcr >= 0.015f
+                    if (speechBuf.size % (frameSamples * 3) < frameSamples) {
+                        val level = (rms / 0.06f).coerceIn(0f, 1f)
+                        val scale = 1.0f + level * 0.22f
+                        val pillAlpha = if (isSpeechFrame) 1.0f else 0.84f
+                        mainHandler.post {
+                            if (isListening.get()) {
+                                ivKeyboardMic?.scaleX = scale
+                                ivKeyboardMic?.scaleY = scale
+                                micRingContainer?.alpha = pillAlpha
+                            }
+                        }
+                    }
 
                     if (!inSpeech) {
                         val copy = FloatArray(read)
